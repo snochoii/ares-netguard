@@ -1,0 +1,12 @@
+{"entity_id":"host-alpha","feature_name":"dns_failure_ratio","window_start":"2026-01-01T00:00:00Z","actual_value":0.02}
+{"entity_id":"host-alpha","feature_name":"dns_failure_ratio","window_start":"2026-01-01T00:05:00Z","actual_value":0.03}
+{"entity_id":"host-alpha","feature_name":"dns_failure_ratio","window_start":"2026-01-01T00:10:00Z","actual_value":0.04}
+{"entity_id":"host-alpha","feature_name":"dns_failure_ratio","window_start":"2026-01-01T00:15:00Z","actual_value":0.25}
+{"entity_id":"host-alpha","feature_name":"external_connection_count","window_start":"2026-01-01T00:00:00Z","actual_value":2}
+{"entity_id":"host-alpha","feature_name":"external_connection_count","window_start":"2026-01-01T00:05:00Z","actual_value":2}
+{"entity_id":"host-alpha","feature_name":"external_connection_count","window_start":"2026-01-01T00:10:00Z","actual_value":3}
+{"entity_id":"host-alpha","feature_name":"external_connection_count","window_start":"2026-01-01T00:15:00Z","actual_value":9}
+{"entity_id":"host-beta","feature_name":"bytes_out","window_start":"2026-01-01T00:00:00Z","actual_value":100}
+{"entity_id":"host-beta","feature_name":"bytes_out","window_start":"2026-01-01T00:05:00Z","actual_value":110}
+{"entity_id":"host-beta","feature_name":"bytes_out","window_start":"2026-01-01T00:10:00Z","actual_value":105}
+{"entity_id":"host-beta","feature_name":"bytes_out","window_start":"2026-01-01T00:15:00Z","actual_value":112}
