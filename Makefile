@@ -28,3 +28,9 @@ fixture-smoke:
 		tests/fixtures/self_supervised_representation/synthetic_sequences.jsonl \
 		/tmp/ares-netguard/traffic-representation-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/traffic-representation-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.graph.temporal_security_graph \
+		tests/fixtures/temporal_security_graph/synthetic_edges.jsonl \
+		/tmp/ares-netguard/temporal-security-graph-report.json \
+		--history-window 3 \
+		--min-history-windows 2
+	$(PYTHON) -m json.tool /tmp/ares-netguard/temporal-security-graph-report.json >/dev/null
