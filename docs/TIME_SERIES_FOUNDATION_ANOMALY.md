@@ -2,35 +2,42 @@
 
 ## Idea
 
-Use pretrained or large-scale time-series forecasting models to predict future network feature windows. Convert forecast residuals into anomaly evidence.
+Use forecasting residuals to produce temporal anomaly evidence for network or
+host feature windows. A single feature row may look normal, while its change
+relative to an expected sequence is anomalous.
 
-## Why
+## v0 status
 
-Network behavior is temporal. A single feature row may look normal, while its change relative to expected sequence is anomalous.
+`src/ares_netguard/models/time_series_residual.py` is a deterministic
+stdlib-only residual proxy. It is not a real TimesFM, Chronos, Moirai, PatchTST,
+iTransformer, TimeMixer, or other pretrained foundation model adapter.
 
-## Candidate model families
+The v0 producer:
 
-- TimesFM-style forecasting.
-- Chronos-style forecasting.
-- Moirai-style forecasting.
-- PatchTST/iTransformer/TimeMixer-style research models.
-- Conformal prediction wrappers over forecast residuals.
+- reads tiny synthetic feature-window JSON/JSONL rows;
+- forecasts the next value from a fixed previous-window mean and interval;
+- emits residual, residual z-score, conformal-style score, and bounded
+  residual risk evidence;
+- converts residual evidence into existing `model_score_row.v0` rows using
+  `time_series_residual` as the model id;
+- writes smoke output only to `/tmp/ares-netguard/`.
 
 ## Product approach
 
 ```text
-host feature sequence
-  -> forecast next window
-  -> compare actual values
-  -> residual score
-  -> prediction interval breach
+host/entity feature sequence
+  -> deterministic forecast proxy
+  -> compare actual value with forecast interval
+  -> residual and conformal-style scoring
   -> anomaly evidence
+  -> model disagreement input row
 ```
 
-## Output schema
+## v0 residual evidence row schema
+
+Each row in `time_series_residual_report.v0` uses exactly these fields:
 
 ```text
-src_ip
 entity_id
 feature_name
 window_start
@@ -46,10 +53,22 @@ model_id
 model_family
 ```
 
+`model_id` is `time_series_residual`. `model_family` is
+`experimental_time_series`.
+
+## Future adapters
+
+Future research milestones may add optional TimesFM, Chronos, Moirai,
+PatchTST/iTransformer/TimeMixer-style, or conformal forecast adapters behind
+the same evidence schema. Those adapters must remain optional and must not
+download models in CI.
+
 ## Safety
 
 - No raw packet payloads.
 - No private absolute paths.
-- No unbounded model downloads in CI.
+- No live capture or external probing.
+- No network calls or model downloads in tests or CI.
 - External pretrained model use must be optional and documented.
 - Tests use tiny synthetic sequences or mocked model outputs.
+- v0 residual evidence is research-only and is not a production detector claim.

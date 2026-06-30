@@ -20,3 +20,7 @@ fixture-smoke:
 		tests/fixtures/model_disagreement/synthetic_scores.jsonl \
 		/tmp/ares-netguard/model-disagreement-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/model-disagreement-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.time_series_residual \
+		tests/fixtures/time_series_residual/synthetic_windows.jsonl \
+		/tmp/ares-netguard/time-series-residual-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/time-series-residual-report.json >/dev/null
