@@ -120,6 +120,14 @@ def test_schema_validation_rejects_bad_rows() -> None:
 
 
 def test_privacy_guard_rejects_forbidden_keys_and_raw_values() -> None:
+    raw_entity = _sequence(entity_id="alice")
+    with pytest.raises(ValueError, match="synthetic/coarse entity identifier"):
+        generate_representation_report([raw_entity])
+
+    raw_sequence = _sequence(sequence_id="alice-session")
+    with pytest.raises(ValueError, match="synthetic/coarse sequence identifier"):
+        generate_representation_report([raw_sequence])
+
     raw_key = _sequence()
     raw_key["destination_ip"] = "198.51.100.10"
     with pytest.raises(ValueError, match="unsafe raw field"):

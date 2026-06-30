@@ -61,6 +61,12 @@ Rows with raw identifiers or private content are rejected at the input boundary.
 Forbidden examples include raw IPs, domains, URLs, payloads, credentials,
 usernames, private paths, packet bodies, and PCAP content.
 
+Because `model_score_row.v0` requires an `entity_id`, v0 accepts only
+synthetic/coarse entity labels such as `host-alpha`, `asset-01`, or
+`sensor-lab`. It rejects plain user-style identifiers such as `alice`, raw
+hostnames, addresses, and other private identifiers. Sequence IDs follow the
+same rule and must use synthetic labels such as `seq-001`.
+
 ## Privacy boundary
 
 Do not store raw payloads, credentials, URLs with sensitive query strings, full packet bodies, or private PCAP content in model reports.

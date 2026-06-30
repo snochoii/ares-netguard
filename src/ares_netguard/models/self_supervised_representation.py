@@ -82,6 +82,8 @@ REPRESENTATION_ROW_FIELDS = frozenset(
 
 JsonMap = dict[str, Any]
 
+SAFE_ENTITY_ID_RE = re.compile(r"^(?:asset|entity|fixture|host|sensor)-[a-z0-9][a-z0-9_-]{0,62}$")
+SAFE_SEQUENCE_ID_RE = re.compile(r"^(?:fixture|seq|sequence)-[a-z0-9][a-z0-9_-]{0,62}$")
 TOKEN_RE = re.compile(r"^[a-z0-9_]+:[a-z0-9_]+$")
 URL_RE = re.compile(r"(?i)\b(?:https?|ftp)://")
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
@@ -334,8 +336,8 @@ def validate_representation_evidence_row(row: Mapping[str, Any]) -> None:
             details.append(f"unexpected {unexpected}")
         raise ValueError(f"representation evidence row fields invalid: {', '.join(details)}")
 
-    _required_text(row, "sequence_id")
-    _required_text(row, "entity_id")
+    _required_safe_id(row, "sequence_id", SAFE_SEQUENCE_ID_RE, "sequence")
+    _required_safe_id(row, "entity_id", SAFE_ENTITY_ID_RE, "entity")
     _parse_window_start(_required_text(row, "window_start"))
 
     tokens = row.get("tokens")
@@ -408,8 +410,8 @@ def _normalize_input_row(row: Mapping[str, Any]) -> JsonMap:
             f"traffic sequence row requires schema_version '{INPUT_ROW_SCHEMA_VERSION}'"
         )
 
-    sequence_id = _required_text(row, "sequence_id")
-    entity_id = _required_text(row, "entity_id")
+    sequence_id = _required_safe_id(row, "sequence_id", SAFE_SEQUENCE_ID_RE, "sequence")
+    entity_id = _required_safe_id(row, "entity_id", SAFE_ENTITY_ID_RE, "entity")
     window_start = _required_text(row, "window_start")
     timestamp = _parse_window_start(window_start)
 
@@ -596,6 +598,21 @@ def _required_text(row: Mapping[str, Any], key: str) -> str:
     cleaned = value.strip()
     _reject_unsafe_text(cleaned, key)
     return cleaned
+
+
+def _required_safe_id(
+    row: Mapping[str, Any],
+    key: str,
+    pattern: re.Pattern[str],
+    kind: str,
+) -> str:
+    value = _required_text(row, key)
+    if not pattern.fullmatch(value):
+        raise ValueError(
+            f"{key} must be a synthetic/coarse {kind} identifier, "
+            "not a raw username, hostname, address, or private identifier"
+        )
+    return value
 
 
 def _reject_unsafe_text(value: str, field: str) -> None:
