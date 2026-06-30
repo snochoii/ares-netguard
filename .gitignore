@@ -1,0 +1,59 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Generated telemetry and model artifacts
+*.pcap
+*.pcapng
+*.parquet
+*.joblib
+*.pkl
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.db
+*.sqlite
+*.duckdb
+*.jsonl
+!tests/fixtures/**/*.jsonl
+
+data/pcap/*
+data/zeek/*
+data/suricata/*
+data/falco/*
+data/features/*
+data/models/*
+data/reports/*
+data/registry/*
+!data/**/.gitkeep
+
+.runtime/*
+artifacts/*
+
+# Build/package outputs
+dist/
+build/
+target/
+node_modules/
+apps/*/node_modules/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

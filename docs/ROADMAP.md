@@ -1,0 +1,43 @@
+# Roadmap
+
+## Current strategic direction
+
+ARES NetGuard-ML is an Experimental AI-NDR Workstation.
+
+The near-term roadmap prioritizes experimental ML differentiation before a full product UI rewrite.
+
+## Milestone sequence
+
+1. **Contract update: experimental AI-NDR strategy**
+   - AGENTS, docs, skills, subagents updated.
+   - No source behavior change.
+
+2. **Model Disagreement Engine**
+   - Compare model families and signal sources.
+   - Emit disagreement report.
+
+3. **Time-Series Foundation Residual Prototype**
+   - Forecast-residual anomaly using mocked or optional foundation model backend.
+   - Conformal/residual risk contract.
+
+4. **Self-Supervised Traffic Representation Prototype**
+   - Tokenization/embedding experiment over sanitized synthetic telemetry.
+   - No raw payload storage.
+
+5. **Temporal Security Graph Baseline**
+   - NetworkX graph features and rare-edge anomaly.
+
+6. **Agentic Investigation Layer**
+   - Evidence-grounded hypotheses over local artifacts.
+
+7. **Detection Engineering Candidates**
+   - Draft Zeek/Sigma/Suricata candidates from recurring ML evidence.
+
+8. **Native Inference Adapters**
+   - ONNX/LightGBM native path.
+
+9. **Qt/QML AI-NDR Workstation Shell**
+   - Product UI begins once ML evidence artifacts are meaningful.
+
+10. **Rust/C++ Product Runtime**
+    - Workspace/session/job/storage/native inference core.
