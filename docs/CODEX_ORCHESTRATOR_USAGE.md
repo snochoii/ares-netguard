@@ -28,9 +28,43 @@ The orchestrator may choose:
 - safety cleanup;
 - plan-only.
 
+For normal execution, PR creation is not the end of the run when guarded
+auto-merge is allowed. The expected flow is:
+
+```text
+implement bounded milestone
+  -> validate
+  -> commit and push
+  -> create PR
+  -> evaluate guarded merge gates in the same run
+  -> merge only if all gates pass
+  -> post-merge validation and cleanup
+```
+
+The orchestrator stops after PR creation only when validation, checks,
+mergeability, artifact/secret policy, required review output, branch safety, or
+explicit user instruction blocks merge.
+
 ## Explicit permission
 
 Calling `$netguard-orchestrator` is explicit permission to use subagents and parallel worktree lanes when high leverage. The user does not need to separately say "use subagents."
+
+It is also explicit permission to continue from PR creation into guarded
+auto-merge evaluation and post-merge cleanup when policy gates allow it. The
+user does not need to separately say "merge" after invoking the orchestrator.
+
+## Review gate output
+
+Every required read-only review gate must return a final response that begins
+with exactly one of:
+
+```text
+MERGE_READY: yes
+MERGE_READY: no
+```
+
+Missing review output, malformed output, or any `MERGE_READY: no` result blocks
+merge.
 
 ## Technology selection
 

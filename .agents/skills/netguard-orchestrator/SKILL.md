@@ -66,9 +66,20 @@ For `$netguard-orchestrator`:
 6. Implement only bounded milestones.
 7. Validate.
 8. Commit and push using `$git-safe-commit-push`.
-9. Create PR and guarded merge using `$github-pr-create-merge`.
-10. Cleanup merged branch/worktree.
+9. Create PR using `$github-pr-create-merge`, then immediately continue into
+   guarded merge-gate evaluation in the same run.
+10. If merge gates pass, merge and complete post-merge cleanup. If any gate
+    blocks merge, stop after reporting the exact blocker.
 11. Report progress, technology selection, and next task.
+
+Creating a PR is not a terminal success state for normal `$netguard-orchestrator`
+execution. Do not stop at PR creation unless validation, CI/checks, mergeability,
+required reviews, artifact/secret policy, branch safety, or explicit user
+instruction blocks guarded auto-merge.
+
+Every required read-only review gate must return a final response that begins
+with exactly `MERGE_READY: yes` or `MERGE_READY: no`. Missing, malformed, or
+negative review output blocks merge.
 
 ## Hard stops
 
@@ -80,6 +91,8 @@ Stop without commit/merge if:
 - unreviewed technology boundary, dependency, runtime, UI toolkit, storage,
   capture, packaging, or native inference changes are present;
 - merge conflicts exist;
+- required review output is missing or does not begin with exactly
+  `MERGE_READY: yes` or `MERGE_READY: no`;
 - required review returns `MERGE_READY: no`;
 - live capture/probing appears without explicit authorized safety contract;
 - multiple writer lanes would touch shared chokepoints.
