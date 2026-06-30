@@ -30,3 +30,5 @@ Total: 100%
 - Capture/ingestion is necessary foundation but must not dominate the score.
 - IsolationForest is only baseline ML.
 - Experimental AI capabilities carry the highest weight.
+- Technology selection policy is governance only. It can improve confidence in
+  future route choices, but it does not add implemented capability percentage.

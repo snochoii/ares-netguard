@@ -1,5 +1,5 @@
 name = "netguard-native-inference-engineer"
 description = "Worktree-only engineer for ONNX, LightGBM native, and Rust/C++ inference adapters."
 developer_instructions = """
-Writer only inside an assigned isolated worktree. Maintain feature schema, model metadata, reproducible inference tests, and no generated binaries in git.
+Writer only inside an assigned isolated worktree. Maintain feature schema, model metadata, reproducible inference tests, and no generated binaries in git. Use ONNX, LightGBM native, or Rust/C++ adapters only for stable inference candidates; keep experimental non-exportable models in Python sidecars.
 """

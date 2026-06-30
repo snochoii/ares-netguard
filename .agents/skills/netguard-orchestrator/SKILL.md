@@ -17,6 +17,7 @@ For `/plan $netguard-orchestrator`:
 - inspect repository state;
 - spawn read-only subagents if useful;
 - choose one route;
+- choose and report technology using `docs/TECHNOLOGY_SELECTION_POLICY.md`;
 - output plan only;
 - do not edit files;
 - do not create branches;
@@ -44,7 +45,9 @@ For `$netguard-orchestrator`:
 3. Choose route:
    - `finish-open-prs` if an already validated branch/PR should be completed;
    - `integration-merge` if merge-ready PRs exist;
+   - `commit-push-only` if validated local changes only need commit/push;
    - `safety-cleanup` if generated artifacts or unsafe staged files exist;
+   - `plan-only` if the safe outcome is a decision-complete plan without mutation;
    - `parallel-worktree` if two or more independent non-conflicting high-leverage tasks exist;
    - `single-milestone` otherwise.
 
@@ -59,12 +62,13 @@ For `$netguard-orchestrator`:
    - Qt/QML workstation;
    - Rust/C++ runtime.
 
-5. Implement only bounded milestones.
-6. Validate.
-7. Commit and push using `$git-safe-commit-push`.
-8. Create PR and guarded merge using `$github-pr-create-merge`.
-9. Cleanup merged branch/worktree.
-10. Report progress and next task.
+5. Select technology using `docs/TECHNOLOGY_SELECTION_POLICY.md`.
+6. Implement only bounded milestones.
+7. Validate.
+8. Commit and push using `$git-safe-commit-push`.
+9. Create PR and guarded merge using `$github-pr-create-merge`.
+10. Cleanup merged branch/worktree.
+11. Report progress, technology selection, and next task.
 
 ## Hard stops
 
@@ -73,6 +77,8 @@ Stop without commit/merge if:
 - validation fails;
 - generated artifacts are staged/tracked incorrectly;
 - secrets/private telemetry are detected;
+- unreviewed technology boundary, dependency, runtime, UI toolkit, storage,
+  capture, packaging, or native inference changes are present;
 - merge conflicts exist;
 - required review returns `MERGE_READY: no`;
 - live capture/probing appears without explicit authorized safety contract;
@@ -84,9 +90,17 @@ Report:
 
 ```text
 Selected route:
-Progress before:
-Progress after:
+Current progress before route:
+Expected progress after route:
 Confidence:
+Selected technology:
+Why this technology:
+Why not Python/Rust/C++/Qt for this milestone:
+Migration path if this is a prototype:
+Production-readiness implication:
+Completed capabilities:
+Missing capabilities:
+Why this percentage:
 Subagents used:
 Worktrees used:
 Validation:
@@ -95,5 +109,5 @@ Push:
 PR:
 Merge:
 Cleanup:
-Next milestone:
+Next highest-value milestone:
 ```

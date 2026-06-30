@@ -12,32 +12,39 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
    - AGENTS, docs, skills, subagents updated.
    - No source behavior change.
 
-2. **Model Disagreement Engine**
+2. **Contract update: technology selection policy**
+   - Orchestrator chooses Python, Rust, C++, Qt/QML, ONNX/native runtimes, or
+     Python sidecar from milestone intent.
+   - Plans and final reports include technology selection, rejected alternatives,
+     prototype migration path, and production-readiness implication.
+   - No feature code or dependency change.
+
+3. **Model Disagreement Engine**
    - Compare model families and signal sources.
    - Emit disagreement report.
 
-3. **Time-Series Foundation Residual Prototype**
+4. **Time-Series Foundation Residual Prototype**
    - Forecast-residual anomaly using mocked or optional foundation model backend.
    - Conformal/residual risk contract.
 
-4. **Self-Supervised Traffic Representation Prototype**
+5. **Self-Supervised Traffic Representation Prototype**
    - Tokenization/embedding experiment over sanitized synthetic telemetry.
    - No raw payload storage.
 
-5. **Temporal Security Graph Baseline**
+6. **Temporal Security Graph Baseline**
    - NetworkX graph features and rare-edge anomaly.
 
-6. **Agentic Investigation Layer**
+7. **Agentic Investigation Layer**
    - Evidence-grounded hypotheses over local artifacts.
 
-7. **Detection Engineering Candidates**
+8. **Detection Engineering Candidates**
    - Draft Zeek/Sigma/Suricata candidates from recurring ML evidence.
 
-8. **Native Inference Adapters**
+9. **Native Inference Adapters**
    - ONNX/LightGBM native path.
 
-9. **Qt/QML AI-NDR Workstation Shell**
+10. **Qt/QML AI-NDR Workstation Shell**
    - Product UI begins once ML evidence artifacts are meaningful.
 
-10. **Rust/C++ Product Runtime**
+11. **Rust/C++ Product Runtime**
     - Workspace/session/job/storage/native inference core.

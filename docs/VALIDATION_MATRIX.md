@@ -17,6 +17,16 @@ make verify
 rg "Experimental AI-NDR|model disagreement|foundation|self-supervised|graph|agentic|native inference" AGENTS.md docs .agents .codex
 ```
 
+## Docs-only technology policy change
+
+```bash
+make verify
+git diff --check
+bash scripts/check_no_generated_artifacts.sh --staged
+bash scripts/check_no_generated_artifacts.sh --tracked
+rg "TECHNOLOGY_SELECTION_POLICY|Selected technology|Why this technology|Why not Python/Rust/C\\+\\+/Qt|Migration path|Production-readiness implication" AGENTS.md docs .agents .codex
+```
+
 ## Model changes
 
 ```bash

@@ -88,6 +88,49 @@ ARES NetGuard-ML differentiates by exposing experimental AI capabilities that ar
 11. Python remains the ML Lab for research, training, benchmark, evaluation, SHAP, export, and non-exportable experimental models.
 12. Stable production inference should migrate toward ONNX Runtime, LightGBM native, and selected Rust/C++ detectors.
 
+## Technology Selection Policy
+
+Codex must not ask the user to manually choose Python, Rust, C++, Qt/QML, ONNX,
+or other core tooling for each milestone. The orchestrator must infer the
+technology from the final product goal, current repository state, and selected
+milestone using `docs/TECHNOLOGY_SELECTION_POLICY.md`.
+
+Default boundaries:
+
+- Python: ML research, PyOD, River, scikit-learn, training, PyTorch
+  experiments, SHAP, time-series foundation experiments, graph ML experiments,
+  synthetic fixture-based model reports, and model registry/evaluation
+  prototypes.
+- Rust: product runtime, workspace/session/job orchestration, artifact registry,
+  storage/indexing, process supervision, capture safety boundary, suitable
+  native inference adapters, and long-running reliable backend services.
+- C++/Qt/QML: professional native desktop UI, Wireshark-like analyst workstation
+  shell, high-performance native tables/views, packet/session/incident detail
+  UI, and Qt model/view components.
+- ONNX Runtime / LightGBM native / selected native runtimes: stable production
+  inference and reducing long-term Python runtime dependency.
+- Python sidecar: experimental, non-exportable, fast-changing research models
+  where rapid iteration is more important than native runtime stability.
+
+Anti-rules:
+
+- Do not rewrite working Python research/evaluation pipelines into Rust/C++ only
+  for aesthetics.
+- Do not choose Rust/C++ for early research prototypes unless the milestone is
+  explicitly runtime, packaging, native inference, capture safety, or product UI.
+- Do not choose Python for long-running product runtime, native UI backend,
+  capture boundary, storage/runtime, or packaging-sensitive work.
+
+Every orchestrator plan and final report must include:
+
+```text
+Selected technology:
+Why this technology:
+Why not Python/Rust/C++/Qt for this milestone:
+Migration path if this is a prototype:
+Production-readiness implication:
+```
+
 ## Final Product Capabilities
 
 ### 1. Telemetry foundation
@@ -226,6 +269,7 @@ docs/
   TEMPORAL_SECURITY_GRAPH.md
   AGENTIC_INVESTIGATION_LAYER.md
   DETECTION_ENGINEERING_CANDIDATES.md
+  TECHNOLOGY_SELECTION_POLICY.md
   NATIVE_INFERENCE_STRATEGY.md
   QT_WORKSTATION_STRATEGY.md
   RUST_CPP_RUNTIME_STRATEGY.md
@@ -355,6 +399,10 @@ The plan must choose one route:
 - `safety-cleanup`
 - `plan-only`
 
+Every plan must also include the selected technology, why it was chosen, why
+the other major technology boundaries were not chosen, any prototype migration
+path, and the production-readiness implication.
+
 ## Normal Orchestrator Behavior
 
 When invoked as:
@@ -398,6 +446,9 @@ Required review routing:
 - Shared model/eval/native/runtime contracts: `netguard-integration-reviewer`.
 - Experimental ML claims/docs: `netguard-ml-research-architect` read-only review.
 - Qt/runtime product architecture: `netguard-product-architect` read-only review.
+- Technology boundary, language/runtime, framework, UI toolkit, native inference,
+  capture, storage, or packaging changes: follow
+  `docs/TECHNOLOGY_SELECTION_POLICY.md` review gates.
 
 After merge:
 
@@ -444,6 +495,11 @@ Current progress before route: N%
 Expected progress after route: N%
 Confidence: low | medium | high
 Selected route:
+Selected technology:
+Why this technology:
+Why not Python/Rust/C++/Qt for this milestone:
+Migration path if this is a prototype:
+Production-readiness implication:
 Completed capabilities:
 Missing capabilities:
 Why this percentage:
@@ -464,7 +520,10 @@ A task is done only when:
 4. Generated artifact guard passed.
 5. No secrets or generated/private artifacts are staged.
 6. Relevant docs were updated when operator workflow changed.
-7. Commit/push completed when automation is allowed.
-8. PR/merge completed only when merge policy allowed it.
-9. Post-merge cleanup completed when merge occurred.
-10. Final response includes progress, validation, commit hash, push status, PR status, merge status, cleanup status, and next recommended milestone.
+7. Technology selection and review routing were reported when the milestone
+   changes or depends on a language, runtime, framework, UI toolkit, storage,
+   capture, packaging, or inference boundary.
+8. Commit/push completed when automation is allowed.
+9. PR/merge completed only when merge policy allowed it.
+10. Post-merge cleanup completed when merge occurred.
+11. Final response includes progress, technology selection, validation, commit hash, push status, PR status, merge status, cleanup status, and next recommended milestone.
