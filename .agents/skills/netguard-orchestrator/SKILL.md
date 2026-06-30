@@ -33,6 +33,9 @@ For `$netguard-orchestrator`:
    - `git remote -v`;
    - `gh auth status -h github.com` if available;
    - open PRs if GitHub CLI is available;
+   - pushed unmerged branches;
+   - open and dirty worktrees;
+   - blocked merge gates from existing PRs;
    - docs and capability map.
 
 2. Spawn read-only subagents when useful:
@@ -42,14 +45,35 @@ For `$netguard-orchestrator`:
    - security reviewer;
    - test/eval engineer.
 
+   Read-only subagents may run in the same checkout for exploration, research,
+   security/privacy, integration, test/eval, and product architecture review.
+   Implementation subagents that write concurrently require isolated Git
+   worktrees. Skipping subagents requires a concrete reason, such as small
+   docs-only work, narrow serial work, unavailable tools, sufficient context,
+   plan-mode limits, or no review gate yet.
+
 3. Choose route:
    - `finish-open-prs` if an already validated branch/PR should be completed;
    - `integration-merge` if merge-ready PRs exist;
+   - `merge-only` when normalizing `finish-open-prs` or `integration-merge`
+     as the selected merge-priority route;
    - `commit-push-only` if validated local changes only need commit/push;
    - `safety-cleanup` if generated artifacts or unsafe staged files exist;
    - `plan-only` if the safe outcome is a decision-complete plan without mutation;
    - `parallel-worktree` if two or more independent non-conflicting high-leverage tasks exist;
    - `single-milestone` otherwise.
+
+   Before selecting new feature work, prioritize existing completed PRs or
+   pushed unmerged branches that can be validated and merged.
+
+   Worktree required: yes for two or more concurrent writer agents or
+   independent implementation lanes. Worktree required: no for read-only
+   subagents, serial single-writer work, docs-only serial work,
+   merge/review-only routes, or plan-only output. Reject parallel lanes that
+   touch shared chokepoints: schemas, model score contracts, feature contracts,
+   model artifact contracts, `Makefile`, requirements files, `AGENTS.md`,
+   orchestrator skills, artifact guards, validation policy, storage migrations,
+   or product runtime interfaces.
 
 4. Select highest-leverage next milestone from the experimental AI-NDR roadmap:
    - model disagreement engine;
@@ -81,6 +105,27 @@ Every required read-only review gate must return a final response that begins
 with exactly `MERGE_READY: yes` or `MERGE_READY: no`. Missing, malformed, or
 negative review output blocks merge.
 
+Every plan and final report must include:
+
+```text
+Subagent decision:
+  Read-only subagents:
+  Implementation subagents:
+  Review subagents:
+  Selected agents:
+  Why used:
+  Why skipped:
+Parallel decision:
+  Selected route:
+  Parallel selected:
+  Lane candidates:
+  Rejected lanes:
+  Shared chokepoints:
+Worktree decision:
+  Worktrees required:
+  Why:
+```
+
 ## Hard stops
 
 Stop without commit/merge if:
@@ -111,6 +156,9 @@ Why this technology:
 Why not Python/Rust/C++/Qt for this milestone:
 Migration path if this is a prototype:
 Production-readiness implication:
+Subagent decision:
+Parallel decision:
+Worktree decision:
 Completed capabilities:
 Missing capabilities:
 Why this percentage:

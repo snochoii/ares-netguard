@@ -27,6 +27,16 @@ bash scripts/check_no_generated_artifacts.sh --tracked
 rg "TECHNOLOGY_SELECTION_POLICY|Selected technology|Why this technology|Why not Python/Rust/C\\+\\+/Qt|Migration path|Production-readiness implication" AGENTS.md docs .agents .codex
 ```
 
+## Docs-only orchestration policy change
+
+```bash
+make verify
+git diff --check
+bash scripts/check_no_generated_artifacts.sh --staged
+bash scripts/check_no_generated_artifacts.sh --tracked
+rg "Subagent decision|Parallel decision|Worktree decision|MERGE_READY|same-run merge|worktree required|read-only subagents" AGENTS.md docs .agents
+```
+
 ## Model changes
 
 ```bash

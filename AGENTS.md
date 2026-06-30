@@ -19,6 +19,9 @@ Invoking `$netguard-orchestrator` is the user's explicit request for Codex to au
 - current branch and GitHub PR state;
 - validation health;
 - open branches/worktrees;
+- pushed unmerged branches;
+- dirty worktrees;
+- blocked merge gates;
 - model roadmap gaps;
 - safety and artifact policy.
 
@@ -130,6 +133,33 @@ Why not Python/Rust/C++/Qt for this milestone:
 Migration path if this is a prototype:
 Production-readiness implication:
 ```
+
+Every orchestrator plan and final report must also include explicit execution
+topology decisions:
+
+```text
+Subagent decision:
+  Read-only subagents:
+  Implementation subagents:
+  Review subagents:
+  Selected agents:
+  Why used:
+  Why skipped:
+Parallel decision:
+  Selected route:
+  Parallel selected:
+  Lane candidates:
+  Rejected lanes:
+  Shared chokepoints:
+Worktree decision:
+  Worktrees required:
+  Why:
+```
+
+Use concrete reasons when skipping subagents or worktrees, such as small
+docs-only work, a narrow serial fix, unavailable tools, sufficient local
+context, plan-mode mutation limits, no review gate yet, or a shared chokepoint
+that makes parallel writer lanes unsafe.
 
 ## Final Product Capabilities
 
@@ -395,6 +425,7 @@ The plan must choose one route:
 - `parallel-worktree`
 - `finish-open-prs`
 - `integration-merge`
+- `merge-only`
 - `commit-push-only`
 - `safety-cleanup`
 - `plan-only`
@@ -402,6 +433,9 @@ The plan must choose one route:
 Every plan must also include the selected technology, why it was chosen, why
 the other major technology boundaries were not chosen, any prototype migration
 path, and the production-readiness implication.
+
+Every plan must include the `Subagent decision:`, `Parallel decision:`, and
+`Worktree decision:` blocks defined in this contract.
 
 ## Normal Orchestrator Behavior
 
@@ -412,6 +446,12 @@ $netguard-orchestrator
 ```
 
 Codex may execute the selected route without asking another confirmation, as long as all safety, validation, artifact, branch, PR, and merge gates are satisfied.
+
+Before selecting new feature work, Codex must check the current branch, dirty
+status, open PRs, pushed unmerged branches, open worktrees, and any blocked
+merge gates. If an existing completed branch or PR can be validated and merged,
+choose `finish-open-prs`, `integration-merge`, or the normalized `merge-only`
+route before starting new feature work.
 
 Normal execution must not stop at PR creation when guarded auto-merge is
 allowed. After creating a PR, Codex must immediately continue in the same run
@@ -432,8 +472,15 @@ markers, or any `MERGE_READY: no` result blocks merge.
 
 ## Parallel Work Policy
 
-- Native Codex subagents may run read-only analysis in parallel in one checkout.
-- Writer agents must operate either serially or inside isolated Git worktrees.
+- Native Codex read-only subagents may run in parallel in one checkout for
+  exploration, research, security/privacy review, integration review,
+  test/eval review, and product architecture review.
+- Implementation subagents that write concurrently require isolated Git
+  worktrees.
+- A worktree is required for two or more concurrent writer agents or
+  independent implementation lanes.
+- A worktree is not required for read-only subagents, serial single-writer
+  work, docs-only serial work, merge/review-only routes, or plan-only output.
 - Parallel writer lanes require:
   - separate worktree path;
   - separate `codex/<task>` branch;
@@ -442,20 +489,27 @@ markers, or any `MERGE_READY: no` result blocks merge.
   - exact forbidden files;
   - targeted validation;
   - no shared chokepoint conflicts.
-- Do not run parallel writers against the same file, schema, feature column contract, model artifact contract, Makefile, requirements file, dashboard/model interface, storage migration, or native runtime boundary.
+- Do not run parallel writers against shared chokepoints, including the same
+  file, schemas, model score contracts, feature contracts, model artifact
+  contracts, `Makefile`, requirements files, `AGENTS.md`, orchestrator skills,
+  artifact guards, validation policy, dashboard/model interfaces, storage
+  migrations, or product runtime interfaces.
 
 ## Merge Policy
 
 Guarded auto-merge is allowed when all are true:
 
 1. Local validation passed.
-2. `git diff --check` passed.
-3. Generated artifact guard passed.
-4. No secrets or generated/private telemetry are staged.
-5. GitHub PR checks passed, or no GitHub checks exist and local integration validation passed.
-6. No merge conflicts.
-7. Required reviews return `MERGE_READY: yes`.
-8. Merge method is consistent with `docs/MERGE_POLICY.md`.
+2. `make verify` passed unless the route documents a narrower equivalent.
+3. Relevant fixture smoke validation passed when the changed surface needs it.
+4. `git diff --check` passed.
+5. Generated artifact guards passed for staged and tracked files.
+6. No generated artifacts, secrets, or generated/private telemetry are staged.
+7. GitHub PR checks passed, or no GitHub checks exist and local integration validation passed.
+8. No merge conflicts.
+9. Required reviews return `MERGE_READY: yes`.
+10. Cleanup safety is confirmed for branches and worktrees.
+11. Merge method is consistent with `docs/MERGE_POLICY.md`.
 
 If the orchestrator creates a PR during a normal `$netguard-orchestrator` run,
 it must evaluate these merge gates immediately in the same run. Creating the PR
@@ -463,10 +517,17 @@ is not a terminal state unless a gate blocks merge.
 
 Required review routing:
 
-- Security/privacy changes: `netguard-product-security-reviewer`.
-- Shared model/eval/native/runtime contracts: `netguard-integration-reviewer`.
+- ML/research changes: `netguard-ml-research-architect` and
+  `netguard-integration-reviewer`.
+- Safety/privacy/artifact/capture changes: `netguard-product-security-reviewer`
+  and `netguard-integration-reviewer`.
+- Shared model/eval/native/runtime contracts:
+  `netguard-integration-reviewer` and `netguard-ml-research-architect`.
 - Experimental ML claims/docs: `netguard-ml-research-architect` read-only review.
-- Qt/runtime product architecture: `netguard-product-architect` read-only review.
+- Qt/runtime product architecture: `netguard-product-architect` and
+  `netguard-integration-reviewer` read-only reviews.
+- Low-risk docs-only changes may use integration review only when safety,
+  artifact, cleanup, and merge policy are untouched.
 - Technology boundary, language/runtime, framework, UI toolkit, native inference,
   capture, storage, or packaging changes: follow
   `docs/TECHNOLOGY_SELECTION_POLICY.md` review gates.
@@ -476,15 +537,16 @@ After merge:
 1. Switch to `main`.
 2. Pull with `git pull --ff-only`.
 3. Run final validation.
-4. Confirm clean `git status --short`.
-5. Confirm the merged PR state and final `main` commit.
-6. Delete merged local branch.
-7. Delete merged remote branch when safe.
-8. Remove associated worktree lanes.
-9. Run `git worktree prune`.
-10. Confirm clean `git status --short` on `main`.
+4. Run relevant fixture smoke validation when the route changed that surface.
+5. Confirm clean `git status --short`.
+6. Confirm the merged PR state and final `main` commit.
+7. Delete merged local branch.
+8. Delete merged remote branch when safe.
+9. Remove associated worktree lanes only when they are clean and merged.
+10. Run `git worktree prune`.
+11. Confirm clean `git status --short` on `main`.
 
-Do not delete unmerged branches or worktrees.
+Do not delete unmerged branches or dirty worktrees.
 
 ## Validation Commands
 
@@ -523,6 +585,9 @@ Why this technology:
 Why not Python/Rust/C++/Qt for this milestone:
 Migration path if this is a prototype:
 Production-readiness implication:
+Subagent decision:
+Parallel decision:
+Worktree decision:
 Completed capabilities:
 Missing capabilities:
 Why this percentage:
