@@ -24,3 +24,7 @@ fixture-smoke:
 		tests/fixtures/time_series_residual/synthetic_windows.jsonl \
 		/tmp/ares-netguard/time-series-residual-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/time-series-residual-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.self_supervised_representation \
+		tests/fixtures/self_supervised_representation/synthetic_sequences.jsonl \
+		/tmp/ares-netguard/traffic-representation-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/traffic-representation-report.json >/dev/null
