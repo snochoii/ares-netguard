@@ -413,6 +413,23 @@ $netguard-orchestrator
 
 Codex may execute the selected route without asking another confirmation, as long as all safety, validation, artifact, branch, PR, and merge gates are satisfied.
 
+Normal execution must not stop at PR creation when guarded auto-merge is
+allowed. After creating a PR, Codex must immediately continue in the same run
+into merge-gate evaluation unless blocked by validation failure, artifact or
+secret policy, missing or failed GitHub checks, merge conflict, required review
+failure, malformed review output, branch safety, or explicit user instruction.
+
+Every required read-only review gate must return a final response that begins
+with exactly one of:
+
+```text
+MERGE_READY: yes
+MERGE_READY: no
+```
+
+Missing review output, output that does not begin with one of those exact
+markers, or any `MERGE_READY: no` result blocks merge.
+
 ## Parallel Work Policy
 
 - Native Codex subagents may run read-only analysis in parallel in one checkout.
@@ -440,6 +457,10 @@ Guarded auto-merge is allowed when all are true:
 7. Required reviews return `MERGE_READY: yes`.
 8. Merge method is consistent with `docs/MERGE_POLICY.md`.
 
+If the orchestrator creates a PR during a normal `$netguard-orchestrator` run,
+it must evaluate these merge gates immediately in the same run. Creating the PR
+is not a terminal state unless a gate blocks merge.
+
 Required review routing:
 
 - Security/privacy changes: `netguard-product-security-reviewer`.
@@ -456,10 +477,12 @@ After merge:
 2. Pull with `git pull --ff-only`.
 3. Run final validation.
 4. Confirm clean `git status --short`.
-5. Delete merged local branch.
-6. Delete merged remote branch when safe.
-7. Remove associated worktree lanes.
-8. Run `git worktree prune`.
+5. Confirm the merged PR state and final `main` commit.
+6. Delete merged local branch.
+7. Delete merged remote branch when safe.
+8. Remove associated worktree lanes.
+9. Run `git worktree prune`.
+10. Confirm clean `git status --short` on `main`.
 
 Do not delete unmerged branches or worktrees.
 
@@ -526,4 +549,6 @@ A task is done only when:
 8. Commit/push completed when automation is allowed.
 9. PR/merge completed only when merge policy allowed it.
 10. Post-merge cleanup completed when merge occurred.
-11. Final response includes progress, technology selection, validation, commit hash, push status, PR status, merge status, cleanup status, and next recommended milestone.
+11. Normal `$netguard-orchestrator` runs that create a PR continued into
+    same-run merge-gate evaluation unless a documented gate blocked merge.
+12. Final response includes progress, technology selection, validation, commit hash, push status, PR status, merge status, cleanup status, and next recommended milestone.
