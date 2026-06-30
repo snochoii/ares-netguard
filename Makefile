@@ -1,0 +1,22 @@
+PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
+PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH))
+export PYTHONPATH
+
+.PHONY: verify fixture-smoke
+
+verify:
+	$(PYTHON) -m ruff check .
+	$(PYTHON) -m ruff format --check .
+	$(PYTHON) -m compileall -q src tests
+	$(PYTHON) -m pytest -q
+	git diff --check
+	git diff --cached --check
+	bash scripts/check_no_generated_artifacts.sh --tracked
+	bash scripts/check_no_generated_artifacts.sh --staged
+
+fixture-smoke:
+	mkdir -p /tmp/ares-netguard
+	$(PYTHON) -m ares_netguard.models.disagreement \
+		tests/fixtures/model_disagreement/synthetic_scores.jsonl \
+		/tmp/ares-netguard/model-disagreement-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/model-disagreement-report.json >/dev/null
