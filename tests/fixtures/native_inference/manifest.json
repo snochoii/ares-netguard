@@ -1,0 +1,39 @@
+{
+  "adapter": {
+    "bias": -1.5,
+    "kind": "linear_score.v0",
+    "normalization": "logistic",
+    "weights": [
+      2.0,
+      0.04,
+      0.8
+    ]
+  },
+  "calibration_summary": {
+    "method": "logistic_reference",
+    "scope": "fixture_only"
+  },
+  "evaluation_summary": {
+    "fixture_rows": 3,
+    "scope": "schema_contract_only"
+  },
+  "export_format": "stdlib_linear_score.v0",
+  "feature_columns": [
+    "dns_failure_ratio",
+    "external_connection_count",
+    "bytes_out_zscore"
+  ],
+  "feature_schema_version": "feature_vector_row.v0",
+  "inference_runtime": "stdlib_reference",
+  "model_family": "native_reference",
+  "model_id": "stdlib_linear_native",
+  "privacy_safety_notes": [
+    "synthetic fixture feature vectors only",
+    "no model artifact loading in v0"
+  ],
+  "schema_version": "native_inference_manifest.v0",
+  "training_data_summary": {
+    "rows": 3,
+    "scope": "synthetic_fixture"
+  }
+}

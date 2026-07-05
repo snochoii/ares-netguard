@@ -45,3 +45,8 @@ fixture-smoke:
 		/tmp/ares-netguard/model-disagreement-report.json \
 		/tmp/ares-netguard/detection-candidate-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/detection-candidate-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.native_inference.adapters \
+		tests/fixtures/native_inference/manifest.json \
+		tests/fixtures/native_inference/feature_rows.jsonl \
+		/tmp/ares-netguard/native-inference-score-rows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/native-inference-score-rows.json >/dev/null

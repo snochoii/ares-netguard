@@ -1,0 +1,3 @@
+{"schema_version":"feature_vector_row.v0","entity_id":"host-alpha","window_start":"2026-01-01T00:00:00Z","features":{"dns_failure_ratio":0.12,"external_connection_count":10,"bytes_out_zscore":0.5}}
+{"schema_version":"feature_vector_row.v0","entity_id":"host-beta","window_start":"2026-01-01T00:05:00Z","features":{"dns_failure_ratio":0.72,"external_connection_count":30,"bytes_out_zscore":2.5}}
+{"schema_version":"feature_vector_row.v0","entity_id":"host-gamma","window_start":"2026-01-01T00:10:00Z","features":{"dns_failure_ratio":0.05,"external_connection_count":4,"bytes_out_zscore":-0.2}}
