@@ -169,6 +169,29 @@ def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
 
     metadata = _extract_qml_json_property(qml, "modelRegistryMetadata")
     registry_metadata.validate_registry_metadata(metadata)
+    assert metadata["aggregate_summary"]["model_count"] == 10
+    assert [entry["model_id"] for entry in metadata["entries"]] == [
+        "graph_novelty",
+        "isolation_forest",
+        "model_disagreement",
+        "pyod_copod",
+        "pyod_ecod",
+        "river_hst",
+        "self_supervised_representation",
+        "stdlib_linear_native",
+        "suricata_alert",
+        "time_series_residual",
+    ]
+    assert metadata["aggregate_summary"]["models_with_score_rows"] == [
+        "graph_novelty",
+        "isolation_forest",
+        "pyod_copod",
+        "pyod_ecod",
+        "river_hst",
+        "stdlib_linear_native",
+        "suricata_alert",
+        "time_series_residual",
+    ]
 
     expected_references = [
         "root.modelRegistryMetadata.schema_version",
@@ -189,7 +212,13 @@ def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
         '"model_evaluation_bundle.v0"',
         '"observed_synthetic_only"',
         '"not_promoted"',
+        '"graph_novelty"',
+        '"pyod_copod"',
+        '"river_hst"',
+        '"self_supervised_representation"',
         '"stdlib_linear_native"',
+        '"suricata_alert"',
+        '"time_series_residual"',
     ]
     for value in expected_values:
         assert value in qml
@@ -238,8 +267,10 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "static runtime_handoff_snapshot.v0 envelope in the Rust runtime",
         "runtime_control_plane_adapter.v0",
         "static runtime_control_plane_adapter.v0 contract in the Rust runtime",
-        "future JSON/control-plane adapter from the Rust runtime",
-        "real JSON/control-plane adapter remains future work",
+        "Rust JSON-string parser for local handoff snapshots",
+        "future file/IPC control-plane adapter from the Rust runtime",
+        "not file I/O",
+        "not file I/O, IPC, a live runtime service, Qt data binding",
     ]
     for text in expected_text:
         assert text in normalized_strategy
@@ -256,7 +287,8 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "not a persistent registry",
         "does not read generated reports",
         "runtime_control_plane_adapter.v0",
-        "future JSON/control-plane adapter from the Rust runtime",
+        "Rust JSON-string parser for local handoff snapshots",
+        "future file/IPC control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:
         assert text in normalized_strategy

@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RUST_CORE_DIR = ROOT / "apps" / "rust-core"
 STRATEGY_DOC = ROOT / "docs" / "RUST_CPP_RUNTIME_STRATEGY.md"
+MAKEFILE = ROOT / "Makefile"
 
 
 def _read(relative_path: str) -> str:
@@ -18,9 +19,10 @@ def test_rust_core_scaffold_files_exist() -> None:
     assert (RUST_CORE_DIR / "src" / "lib.rs").is_file()
     assert (RUST_CORE_DIR / "src" / "main.rs").is_file()
     assert STRATEGY_DOC.is_file()
+    assert MAKEFILE.is_file()
 
 
-def test_cargo_manifest_declares_dependency_free_runtime_package() -> None:
+def test_cargo_manifest_declares_only_strict_json_parser_dependencies() -> None:
     manifest = tomllib.loads(_read("Cargo.toml"))
 
     assert manifest["package"]["name"] == "ares-rust-core"
@@ -28,7 +30,10 @@ def test_cargo_manifest_declares_dependency_free_runtime_package() -> None:
     assert manifest["lib"]["name"] == "ares_rust_core"
     assert manifest["lib"]["path"] == "src/lib.rs"
     assert manifest["bin"] == [{"name": "ares-rust-core", "path": "src/main.rs"}]
-    assert manifest.get("dependencies", {}) == {}
+    assert manifest.get("dependencies", {}) == {
+        "serde": {"version": "1", "features": ["derive"]},
+        "serde_json": "1",
+    }
     assert manifest.get("build-dependencies", {}) == {}
     assert manifest.get("dev-dependencies", {}) == {}
 
@@ -65,6 +70,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneInputMode",
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
+        "RuntimeControlPlaneAdapterError",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
         "CompareModelScores",
@@ -78,9 +84,13 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "NotPromoted",
         "StaticSyntheticFixture",
         "StaticContractFixture",
+        "LocalJsonStringParser",
         "AcceptedSchemaDeclarationOnly",
+        "AcceptedLocalJsonString",
+        "JsonStringParserAvailable",
         "RuntimeHandoffSnapshotV0",
         "synthetic_fixture",
+        "parse_handoff_snapshot_json",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -101,20 +111,23 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     )
     assert "fn validate_coarse_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
+    assert "serde_json::from_str" in lib_rs
+    assert "serde_json::from_value" not in lib_rs
+    assert "#[serde(deny_unknown_fields)]" in lib_rs
 
 
 def test_rust_core_exposes_runtime_summary_contract_shape() -> None:
     lib_rs = _read("src/lib.rs")
 
     expected_fields = [
-        "pub schema_version: &'static str",
+        "pub schema_version: String",
         "pub workspace_id: WorkspaceId",
         "pub session_id: SessionId",
         "pub total_job_count: u32",
         "pub queued_job_count: u32",
         "pub running_job_count: u32",
         "pub failed_job_count: u32",
-        "pub last_event_label: &'static str",
+        "pub last_event_label: String",
         "pub native_inference_state: NativeInferenceRuntimeState",
     ]
     for field in expected_fields:
@@ -131,25 +144,25 @@ def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
     lib_rs = _read("src/lib.rs")
 
     expected_fields = [
-        "pub schema_version: &'static str",
-        "pub metadata_scope: &'static str",
-        "pub source_bundle_schema: &'static str",
-        "pub entries: &'static [ModelRegistryEntry]",
+        "pub schema_version: String",
+        "pub metadata_scope: String",
+        "pub source_bundle_schema: String",
+        "pub entries: Vec<ModelRegistryEntry>",
         "pub aggregate_summary: ModelRegistryAggregateSummary",
         "pub safety_flags: ModelRegistrySafetyFlags",
-        "pub non_claims: &'static [&'static str]",
-        "pub model_id: &'static str",
+        "pub non_claims: Vec<String>",
+        "pub model_id: String",
         "pub registry_state: ModelRegistryState",
         "pub promotion_state: ModelPromotionState",
-        "pub observed_source_schemas: &'static [&'static str]",
-        "pub observed_source_names: &'static [&'static str]",
+        "pub observed_source_schemas: Vec<String>",
+        "pub observed_source_names: Vec<String>",
         "pub source_count: u32",
         "pub has_score_rows: bool",
         "pub human_review_required: bool",
         "pub deployment_allowed: bool",
         "pub model_count: u32",
-        "pub schemas_present: &'static [&'static str]",
-        "pub models_with_score_rows: &'static [&'static str]",
+        "pub schemas_present: Vec<String>",
+        "pub models_with_score_rows: Vec<String>",
         "pub local_only: bool",
         "pub strict_json_loaded: bool",
         "pub derived_from_evaluation_bundle_only: bool",
@@ -168,14 +181,14 @@ def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
     assert "impl ModelRegistryMetadata" in lib_rs
     assert "impl ModelRegistryState" in lib_rs
     assert "impl ModelPromotionState" in lib_rs
-    assert "MODEL_REGISTRY_METADATA_ENTRIES" in lib_rs
+    assert "fn model_registry_metadata_entries()" in lib_rs
 
 
 def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
     lib_rs = _read("src/lib.rs")
 
     expected_fields = [
-        "pub schema_version: &'static str",
+        "pub schema_version: String",
         "pub source_kind: RuntimeHandoffSourceKind",
         "pub transport_state: RuntimeHandoffTransportState",
         "pub control_plane_state: RuntimeControlPlaneState",
@@ -187,7 +200,7 @@ def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
         "pub live_runtime_connection: bool",
         "pub external_services_used: bool",
         "pub deployment_allowed: bool",
-        "pub non_claims: &'static [&'static str]",
+        "pub non_claims: Vec<String>",
     ]
     for field in expected_fields:
         assert field in lib_rs
@@ -230,6 +243,11 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "impl RuntimeControlPlaneInputMode" in lib_rs
     assert "impl RuntimeControlPlaneAdapterState" in lib_rs
     assert "impl RuntimeControlPlaneOutputSnapshotSchema" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::InvalidJson" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::NonObjectRoot" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::UnsafeFlag" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::UnsupportedValue" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS" in lib_rs
 
@@ -276,10 +294,9 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"static_contract_fixture"',
-        '"accepted_schema_declaration_only"',
-        '"unavailable"',
-        '"not_json_parser"',
+        '"local_json_string_parser"',
+        '"accepted_local_json_string"',
+        '"json_string_parser_available"',
         '"not_file_io"',
         '"not_live_transport"',
         '"not_qt_binding"',
@@ -291,18 +308,18 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     for value in expected_values:
         assert value in lib_rs
 
-    assert "adapter_kind: RuntimeControlPlaneAdapterKind::StaticContractFixture" in lib_rs
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedSchemaDeclarationOnly" in lib_rs
-    assert "adapter_state: RuntimeControlPlaneAdapterState::Unavailable" in lib_rs
+    assert "adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonStringParser" in lib_rs
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonString" in lib_rs
+    assert "adapter_state: RuntimeControlPlaneAdapterState::JsonStringParserAvailable" in lib_rs
     assert (
         "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
         "RuntimeHandoffSnapshotV0" in " ".join(lib_rs.split())
     )
     assert "accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS" in lib_rs
     assert "local_only: true" in lib_rs
-    assert "dependency_free: true" in lib_rs
+    assert "dependency_free: false" in lib_rs
     assert "static_synthetic_fixture: true" in lib_rs
-    assert "json_parsing_enabled: false" in lib_rs
+    assert "json_parsing_enabled: true" in lib_rs
     assert "file_io_enabled: false" in lib_rs
     assert "live_transport_enabled: false" in lib_rs
     assert "qt_binding_enabled: false" in lib_rs
@@ -333,18 +350,30 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
         '"model_evaluation_bundle.v0"',
         '"observed_synthetic_only"',
         '"not_promoted"',
+        '"graph_novelty"',
         '"isolation_forest"',
         '"model_disagreement"',
+        '"pyod_copod"',
         '"pyod_ecod"',
+        '"river_hst"',
+        '"self_supervised_representation"',
         '"stdlib_linear_native"',
+        '"suricata_alert"',
+        '"time_series_residual"',
         '"agentic_investigation_report.v0"',
         '"detection_candidate_report.v0"',
         '"model_disagreement_report.v0"',
         '"model_score_rows.v0"',
+        '"temporal_security_graph_report.v0"',
+        '"time_series_residual_report.v0"',
+        '"traffic_representation_report.v0"',
         '"agentic_investigation_report_v0_001"',
         '"detection_candidate_report_v0_001"',
         '"model_disagreement_report_v0_001"',
         '"model_score_rows_v0_001"',
+        '"temporal_security_graph_report_v0_001"',
+        '"time_series_residual_report_v0_001"',
+        '"traffic_representation_report_v0_001"',
         '"not_persistent_model_registry"',
         '"not_model_promotion_gate"',
         '"not_deployment_approval"',
@@ -356,7 +385,9 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
     for value in expected_values:
         assert value in lib_rs
 
-    assert "model_count: 4" in lib_rs
+    assert "model_count: 10" in lib_rs
+    assert "source_count: 4" in lib_rs
+    assert "source_count: 3" in lib_rs
     assert "source_count: 2" in lib_rs
     assert "source_count: 1" in lib_rs
     assert "has_score_rows: true" in lib_rs
@@ -377,10 +408,16 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
 
     entry_model_ids = re.findall(r'model_id: "([^"]+)"', lib_rs)
     assert entry_model_ids == [
+        "graph_novelty",
         "isolation_forest",
         "model_disagreement",
+        "pyod_copod",
         "pyod_ecod",
+        "river_hst",
+        "self_supervised_representation",
         "stdlib_linear_native",
+        "suricata_alert",
+        "time_series_residual",
     ]
 
 
@@ -404,10 +441,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
         "std::fs",
         "file::open",
         "read_to_string",
-        "serde",
-        "serde_json",
         "from_reader",
-        "from_str",
         "std::process",
         "command::new",
         "model artifact",
@@ -434,8 +468,20 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     for term in forbidden_terms:
         assert term not in lowered
 
+    assert "serde" in lowered
+    assert "serde_json::from_str" in rust_source
+    assert "serde_json::from_value" not in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
+
+
+def test_makefile_exposes_separate_rust_validation_target() -> None:
+    makefile = MAKEFILE.read_text(encoding="utf-8")
+
+    assert "verify-rust-core" in makefile
+    assert "$(CARGO) fmt --check" in makefile
+    assert "$(CARGO) test" in makefile
+    assert "$(CARGO) clippy -- -D warnings" in makefile
 
 
 def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
@@ -444,7 +490,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
 
     expected_text = [
         "source-only contract",
-        "no-dependency Rust package boundary",
+        "Rust package boundary",
         "runtime_summary.v0",
         "RuntimeSummary",
         "NativeInferenceRuntimeState",
@@ -466,17 +512,17 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
         "accepted local handoff schemas",
-        (
-            "JSON parsing, file I/O, live transport, Qt binding, external services, "
-            "and deployment are all disabled"
-        ),
+        "JSON-string parsing is now enabled through `serde` and `serde_json`",
+        "preserves the exact Python-derived synthetic registry entry order and aggregate metadata",
+        "File I/O, live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
-        "typed JSON/control-plane parser",
+        "local file/IPC adapter",
         "local control-plane adapter",
         "does not implement a daemon",
-        "not real JSON parsing",
-        "does not provide `cargo` or `rustc`",
+        "not file loading",
+        "does not require Rust tooling for `make verify`",
+        "make verify-rust-core",
         "Qt workstation data-flow integration",
         "Python ML Lab report handoff",
         "cargo fmt --check",

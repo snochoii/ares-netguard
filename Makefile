@@ -1,8 +1,9 @@
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
+CARGO ?= $(shell if [ -x $$HOME/.cargo/bin/cargo ]; then echo $$HOME/.cargo/bin/cargo; else echo cargo; fi)
 PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH))
 export PYTHONPATH
 
-.PHONY: verify fixture-smoke
+.PHONY: verify verify-rust-core fixture-smoke
 
 verify:
 	$(PYTHON) -m ruff check .
@@ -13,6 +14,11 @@ verify:
 	git diff --cached --check
 	bash scripts/check_no_generated_artifacts.sh --tracked
 	bash scripts/check_no_generated_artifacts.sh --staged
+
+verify-rust-core:
+	cd apps/rust-core && $(CARGO) fmt --check
+	cd apps/rust-core && $(CARGO) test
+	cd apps/rust-core && $(CARGO) clippy -- -D warnings
 
 fixture-smoke:
 	mkdir -p /tmp/ares-netguard

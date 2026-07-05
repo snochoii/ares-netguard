@@ -50,18 +50,41 @@ ApplicationWindow {
         "source_bundle_schema": "model_evaluation_bundle.v0",
         "entries": [
             {
+                "model_id": "graph_novelty",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0",
+                    "model_disagreement_report.v0",
+                    "temporal_security_graph_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001",
+                    "model_disagreement_report_v0_001",
+                    "temporal_security_graph_report_v0_001"
+                ],
+                "source_count": 4,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
                 "model_id": "isolation_forest",
                 "registry_state": "observed_synthetic_only",
                 "promotion_state": "not_promoted",
                 "observed_source_schemas": [
-                    "model_disagreement_report.v0",
-                    "model_score_rows.v0"
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0",
+                    "model_disagreement_report.v0"
                 ],
                 "observed_source_names": [
-                    "model_disagreement_report_v0_001",
-                    "model_score_rows_v0_001"
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001",
+                    "model_disagreement_report_v0_001"
                 ],
-                "source_count": 2,
+                "source_count": 3,
                 "has_score_rows": true,
                 "human_review_required": true,
                 "deployment_allowed": false
@@ -84,19 +107,74 @@ ApplicationWindow {
                 "deployment_allowed": false
             },
             {
+                "model_id": "pyod_copod",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "model_disagreement_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "model_disagreement_report_v0_001"
+                ],
+                "source_count": 2,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
                 "model_id": "pyod_ecod",
                 "registry_state": "observed_synthetic_only",
                 "promotion_state": "not_promoted",
                 "observed_source_schemas": [
-                    "model_disagreement_report.v0",
-                    "model_score_rows.v0"
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0",
+                    "model_disagreement_report.v0"
                 ],
                 "observed_source_names": [
-                    "model_disagreement_report_v0_001",
-                    "model_score_rows_v0_001"
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001",
+                    "model_disagreement_report_v0_001"
+                ],
+                "source_count": 3,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "river_hst",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0",
+                    "model_disagreement_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001",
+                    "model_disagreement_report_v0_001"
+                ],
+                "source_count": 3,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "self_supervised_representation",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "traffic_representation_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "traffic_representation_report_v0_001"
                 ],
                 "source_count": 2,
-                "has_score_rows": true,
+                "has_score_rows": false,
                 "human_review_required": true,
                 "deployment_allowed": false
             },
@@ -114,20 +192,66 @@ ApplicationWindow {
                 "has_score_rows": true,
                 "human_review_required": true,
                 "deployment_allowed": false
+            },
+            {
+                "model_id": "suricata_alert",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "model_disagreement_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "model_disagreement_report_v0_001"
+                ],
+                "source_count": 2,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "time_series_residual",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0",
+                    "model_disagreement_report.v0",
+                    "time_series_residual_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001",
+                    "model_disagreement_report_v0_001",
+                    "time_series_residual_report_v0_001"
+                ],
+                "source_count": 4,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
             }
         ],
         "aggregate_summary": {
-            "model_count": 4,
+            "model_count": 10,
             "schemas_present": [
                 "agentic_investigation_report.v0",
                 "detection_candidate_report.v0",
                 "model_disagreement_report.v0",
-                "model_score_rows.v0"
+                "model_score_rows.v0",
+                "temporal_security_graph_report.v0",
+                "time_series_residual_report.v0",
+                "traffic_representation_report.v0"
             ],
             "models_with_score_rows": [
+                "graph_novelty",
                 "isolation_forest",
+                "pyod_copod",
                 "pyod_ecod",
-                "stdlib_linear_native"
+                "river_hst",
+                "stdlib_linear_native",
+                "suricata_alert",
+                "time_series_residual"
             ],
             "deployment_allowed": false
         },
