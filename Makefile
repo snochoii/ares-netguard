@@ -60,3 +60,7 @@ fixture-smoke:
 		/tmp/ares-netguard/detection-candidate-report.json \
 		/tmp/ares-netguard/native-inference-score-rows.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/model-evaluation-bundle.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.registry_metadata \
+		/tmp/ares-netguard/model-registry-metadata.json \
+		/tmp/ares-netguard/model-evaluation-bundle.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/model-registry-metadata.json >/dev/null

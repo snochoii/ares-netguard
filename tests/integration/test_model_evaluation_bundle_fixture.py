@@ -9,6 +9,7 @@ from ares_netguard.investigation import agentic_layer
 from ares_netguard.models import (
     disagreement,
     evaluation_bundle,
+    registry_metadata,
     self_supervised_representation,
     time_series_residual,
 )
@@ -24,6 +25,7 @@ def test_fixture_generates_model_evaluation_bundle(tmp_path: Path) -> None:
     candidates_path = tmp_path / "detection-candidate-report.json"
     native_scores_path = tmp_path / "native-inference-score-rows.json"
     bundle_path = tmp_path / "model-evaluation-bundle.json"
+    metadata_path = tmp_path / "model-registry-metadata.json"
 
     disagreement.dump_report(
         disagreement.generate_disagreement_report(
@@ -94,9 +96,21 @@ def test_fixture_generates_model_evaluation_bundle(tmp_path: Path) -> None:
     evaluation_bundle.dump_bundle(bundle, bundle_path)
     persisted = json.loads(bundle_path.read_text(encoding="utf-8"))
     rendered = json.dumps(persisted, sort_keys=True)
+    metadata = registry_metadata.generate_registry_metadata(
+        registry_metadata.load_evaluation_bundle(bundle_path)
+    )
+    registry_metadata.dump_metadata(metadata, metadata_path)
+    persisted_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    rendered_metadata = json.dumps(persisted_metadata, sort_keys=True)
 
     assert persisted["schema_version"] == evaluation_bundle.REPORT_SCHEMA_VERSION
     assert persisted == bundle
+    assert persisted_metadata["schema_version"] == registry_metadata.REPORT_SCHEMA_VERSION
+    assert persisted_metadata == metadata
+    assert persisted_metadata["aggregate_summary"]["deployment_allowed"] is False
+    assert (
+        "stdlib_linear_native" in persisted_metadata["aggregate_summary"]["models_with_score_rows"]
+    )
     assert persisted["aggregate_summary"]["schemas_present"] == [
         "agentic_investigation_report.v0",
         "detection_candidate_report.v0",
@@ -134,3 +148,4 @@ def test_fixture_generates_model_evaluation_bundle(tmp_path: Path) -> None:
         "host-alpha",
     ):
         assert forbidden not in rendered
+        assert forbidden not in rendered_metadata
