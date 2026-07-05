@@ -43,6 +43,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_METADATA_SCOPE",
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "WorkspaceId",
         "SessionId",
         "JobId",
@@ -59,6 +60,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeHandoffSourceKind",
         "RuntimeHandoffTransportState",
         "RuntimeControlPlaneState",
+        "RuntimeControlPlaneAdapterContract",
+        "RuntimeControlPlaneAdapterKind",
+        "RuntimeControlPlaneInputMode",
+        "RuntimeControlPlaneAdapterState",
+        "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
         "CompareModelScores",
@@ -71,6 +77,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "ObservedSyntheticOnly",
         "NotPromoted",
         "StaticSyntheticFixture",
+        "StaticContractFixture",
+        "AcceptedSchemaDeclarationOnly",
+        "RuntimeHandoffSnapshotV0",
         "synthetic_fixture",
     ]
     for anchor in expected_anchors:
@@ -85,6 +94,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "
         '"runtime_handoff_snapshot.v0";' in lib_rs
+    )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_adapter.v0";' in " ".join(lib_rs.split())
     )
     assert "fn validate_coarse_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
@@ -188,6 +201,39 @@ def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
     assert "RUNTIME_HANDOFF_NON_CLAIMS" in lib_rs
 
 
+def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub schema_version: &'static str",
+        "pub adapter_kind: RuntimeControlPlaneAdapterKind",
+        "pub input_mode: RuntimeControlPlaneInputMode",
+        "pub adapter_state: RuntimeControlPlaneAdapterState",
+        "pub output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema",
+        "pub accepted_input_schemas: &'static [&'static str]",
+        "pub local_only: bool",
+        "pub dependency_free: bool",
+        "pub static_synthetic_fixture: bool",
+        "pub json_parsing_enabled: bool",
+        "pub file_io_enabled: bool",
+        "pub live_transport_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub non_claims: &'static [&'static str]",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    assert "impl RuntimeControlPlaneAdapterContract" in lib_rs
+    assert "impl RuntimeControlPlaneAdapterKind" in lib_rs
+    assert "impl RuntimeControlPlaneInputMode" in lib_rs
+    assert "impl RuntimeControlPlaneAdapterState" in lib_rs
+    assert "impl RuntimeControlPlaneOutputSnapshotSchema" in lib_rs
+    assert "RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS" in lib_rs
+    assert "RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS" in lib_rs
+
+
 def test_rust_core_static_handoff_fixture_composes_existing_contracts() -> None:
     lib_rs = _read("src/lib.rs")
 
@@ -220,6 +266,62 @@ def test_rust_core_static_handoff_fixture_composes_existing_contracts() -> None:
     assert "live_runtime_connection: false" in lib_rs
     assert "external_services_used: false" in lib_rs
     assert "deployment_allowed: false" in lib_rs
+
+
+def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_contract() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_values = [
+        '"runtime_control_plane_adapter.v0"',
+        '"runtime_handoff_snapshot.v0"',
+        '"runtime_summary.v0"',
+        '"model_registry_metadata.v0"',
+        '"static_contract_fixture"',
+        '"accepted_schema_declaration_only"',
+        '"unavailable"',
+        '"not_json_parser"',
+        '"not_file_io"',
+        '"not_live_transport"',
+        '"not_qt_binding"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_runtime_service"',
+        '"not_generated_report_loader"',
+    ]
+    for value in expected_values:
+        assert value in lib_rs
+
+    assert "adapter_kind: RuntimeControlPlaneAdapterKind::StaticContractFixture" in lib_rs
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedSchemaDeclarationOnly" in lib_rs
+    assert "adapter_state: RuntimeControlPlaneAdapterState::Unavailable" in lib_rs
+    assert (
+        "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
+        "RuntimeHandoffSnapshotV0" in " ".join(lib_rs.split())
+    )
+    assert "accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS" in lib_rs
+    assert "local_only: true" in lib_rs
+    assert "dependency_free: true" in lib_rs
+    assert "static_synthetic_fixture: true" in lib_rs
+    assert "json_parsing_enabled: false" in lib_rs
+    assert "file_io_enabled: false" in lib_rs
+    assert "live_transport_enabled: false" in lib_rs
+    assert "qt_binding_enabled: false" in lib_rs
+    assert "external_services_used: false" in lib_rs
+    assert "deployment_allowed: false" in lib_rs
+
+    accepted_schema_block = re.search(
+        r"RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &\[&str\] = &\[(.*?)\];",
+        lib_rs,
+        flags=re.DOTALL,
+    )
+    assert accepted_schema_block is not None
+    assert [
+        schema.strip() for schema in accepted_schema_block.group(1).split(",") if schema.strip()
+    ] == [
+        "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
+        "RUNTIME_SUMMARY_SCHEMA_VERSION",
+        "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
+    ]
 
 
 def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot() -> None:
@@ -297,8 +399,15 @@ def test_rust_core_source_stays_local_contract_only() -> None:
         "tcpstream",
         "udp",
         "std::net",
+        "std::io",
+        "std::path",
         "std::fs",
         "file::open",
+        "read_to_string",
+        "serde",
+        "serde_json",
+        "from_reader",
+        "from_str",
         "std::process",
         "command::new",
         "model artifact",
@@ -307,6 +416,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
         "packet capture",
         "http",
         "https",
+        "url",
         "api key",
         "api_key",
         "bearer token",
@@ -345,13 +455,27 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "ModelRegistrySafetyFlags",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
+        "runtime_control_plane_adapter.v0",
+        "RuntimeControlPlaneAdapterContract",
+        "RuntimeControlPlaneAdapterKind",
+        "RuntimeControlPlaneInputMode",
+        "RuntimeControlPlaneAdapterState",
+        "RuntimeControlPlaneOutputSnapshotSchema",
         "static runtime_summary.v0 handoff",
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
+        "static runtime_control_plane_adapter.v0 contract",
+        "accepted local handoff schemas",
+        (
+            "JSON parsing, file I/O, live transport, Qt binding, external services, "
+            "and deployment are all disabled"
+        ),
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
-        "typed JSON/control-plane adapter",
+        "typed JSON/control-plane parser",
+        "local control-plane adapter",
         "does not implement a daemon",
+        "not real JSON parsing",
         "does not provide `cargo` or `rustc`",
         "Qt workstation data-flow integration",
         "Python ML Lab report handoff",

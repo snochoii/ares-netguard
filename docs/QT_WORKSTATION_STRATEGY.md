@@ -34,6 +34,10 @@ The Rust runtime now also defines a static `runtime_handoff_snapshot.v0`
 envelope that composes the runtime summary and model registry metadata fixtures.
 Qt still displays its own static preview objects; it does not read the Rust
 snapshot, open a control-plane transport, or bind to live runtime state yet.
+The Rust runtime also defines a static `runtime_control_plane_adapter.v0`
+contract for the future local handoff path. Qt does not read that adapter
+contract, parse generated JSON, open a live transport, or bind to live runtime
+state yet; the real JSON/control-plane adapter remains future work.
 
 Expected integration path:
 
@@ -43,6 +47,7 @@ QML shell scaffold
   -> static runtime_summary.v0 handoff preview
   -> static model_registry_metadata.v0 handoff preview
   -> static runtime_handoff_snapshot.v0 envelope in the Rust runtime
+  -> static runtime_control_plane_adapter.v0 contract in the Rust runtime
   -> future JSON/control-plane adapter from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
