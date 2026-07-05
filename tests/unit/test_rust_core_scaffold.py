@@ -38,23 +38,55 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
 
     expected_anchors = [
         "RUNTIME_CONTRACT_VERSION",
+        "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "WorkspaceId",
         "SessionId",
         "JobId",
         "JobKind",
         "JobState",
+        "RuntimeSummary",
         "RuntimeEvent",
+        "NativeInferenceRuntimeState",
         "CompareModelScores",
         "RefreshEvidenceIndex",
         "RunNativeInferenceCandidate",
         "RenderWorkstationSnapshot",
+        "Unavailable",
+        "Available",
+        "Disabled",
+        "synthetic_fixture",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
 
     assert 'pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";' in lib_rs
+    assert 'pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";' in lib_rs
     assert "fn validate_coarse_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
+
+
+def test_rust_core_exposes_runtime_summary_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub schema_version: &'static str",
+        "pub workspace_id: WorkspaceId",
+        "pub session_id: SessionId",
+        "pub total_job_count: u32",
+        "pub queued_job_count: u32",
+        "pub running_job_count: u32",
+        "pub failed_job_count: u32",
+        "pub last_event_label: &'static str",
+        "pub native_inference_state: NativeInferenceRuntimeState",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    assert "impl RuntimeSummary" in lib_rs
+    assert "pub fn synthetic_fixture() -> Self" in lib_rs
+    assert 'WorkspaceId::new("fixture-workspace-alpha")' in lib_rs
+    assert 'SessionId::new("fixture-session-runtime-summary")' in lib_rs
+    assert "native_inference_state: NativeInferenceRuntimeState::Disabled" in lib_rs
 
 
 def test_rust_core_source_stays_local_contract_only() -> None:
@@ -97,6 +129,11 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
     expected_text = [
         "source-only contract",
         "no-dependency Rust package boundary",
+        "runtime_summary.v0",
+        "RuntimeSummary",
+        "NativeInferenceRuntimeState",
+        "static runtime_summary.v0 handoff",
+        "real Rust runtime summary provider",
         "does not implement a daemon",
         "does not provide `cargo` or `rustc`",
         "Qt workstation data-flow integration",

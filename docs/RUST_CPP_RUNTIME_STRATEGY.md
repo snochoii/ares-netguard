@@ -21,6 +21,13 @@ contract types for:
 - job states;
 - runtime events.
 
+The v0 runtime also owns a static `runtime_summary.v0` handoff contract through
+`RuntimeSummary` and `NativeInferenceRuntimeState`. The summary is deliberately
+coarse: workspace/session identifiers, total/queued/running/failed job counts, a
+last event label, and native inference availability state. The checked-in
+fixture values are local and synthetic so the Qt shell can display the contract
+shape without owning runtime lifecycle or job state.
+
 The v0 scaffold is intentionally a source-only contract. It does not implement a
 daemon, storage engine, process supervisor, capture wrapper, native inference
 executor, model artifact loader, external service client, packaging flow, or UI
@@ -32,7 +39,9 @@ Expected integration path:
 ```text
 Rust source contract
   -> buildable Cargo project in an environment with Rust tooling
+  -> static runtime_summary.v0 handoff displayed by the Qt shell
   -> typed JSON/control-plane adapters for local evidence summaries
+  -> real Rust runtime summary provider
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
   -> runtime storage, job supervision, and stable native inference adapters

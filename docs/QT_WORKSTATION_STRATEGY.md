@@ -15,18 +15,24 @@ The v0 screen is intentionally operational rather than promotional:
 - left navigation for workspace, model disagreement, evidence graph,
   investigation, detection candidates, and model registry;
 - central model evidence matrix using static synthetic rows;
+- compact Runtime Boundary panel that mirrors the Rust-owned
+  `runtime_summary.v0` fields from a static synthetic QML object;
 - right detail panel for selected entity context, evidence, analyst actions,
   and registry status.
 
 This milestone makes no packaged application, runtime integration, model
 execution, live capture, external service, or private telemetry claim. All v0 UI
-content is static and synthetic.
+content is static and synthetic. The Runtime Boundary panel is a source-level
+handoff preview only; it is not a live runtime connection and does not make the
+Qt shell the owner of workspace, session, job, or native inference state.
 
 Expected integration path:
 
 ```text
 QML shell scaffold
   -> buildable Qt project in an environment with Qt 6 and CMake
+  -> static runtime_summary.v0 handoff preview
+  -> future JSON/control-plane adapter from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging

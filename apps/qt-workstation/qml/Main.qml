@@ -32,6 +32,18 @@ ApplicationWindow {
         "Model Registry"
     ]
 
+    readonly property var runtimeSummary: ({
+        "schema_version": "runtime_summary.v0",
+        "workspace_id": "fixture-workspace-alpha",
+        "session_id": "fixture-session-runtime-summary",
+        "total_job_count": 4,
+        "queued_job_count": 1,
+        "running_job_count": 1,
+        "failed_job_count": 0,
+        "last_event_label": "synthetic workstation snapshot rendered",
+        "native_inference_state": "disabled"
+    })
+
     readonly property var evidenceRows: [
         {
             "entity": "asset-alpha",
@@ -487,6 +499,133 @@ ApplicationWindow {
                             color: root.mutedTextColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Rectangle {
+                        objectName: "runtimeBoundaryPanel"
+                        Layout.fillWidth: true
+                        implicitHeight: 170
+                        radius: 4
+                        color: root.panelColor
+                        border.color: root.borderColor
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: "Runtime Boundary"
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    text: root.runtimeSummary.schema_version
+                                    color: root.accentColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: "Static synthetic fixture / no live runtime connection"
+                                color: root.mutedTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                columnSpacing: 12
+                                rowSpacing: 5
+
+                                Label {
+                                    text: "Workspace"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.runtimeSummary.workspace_id
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Session"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.runtimeSummary.session_id
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Jobs"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.runtimeSummary.total_job_count + " total / "
+                                        + root.runtimeSummary.queued_job_count + " queued / "
+                                        + root.runtimeSummary.running_job_count + " running / "
+                                        + root.runtimeSummary.failed_job_count + " failed"
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Label {
+                                    text: "Native"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.runtimeSummary.native_inference_state
+                                    color: root.amberColor
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    text: "Last event"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.runtimeSummary.last_event_label
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
 
