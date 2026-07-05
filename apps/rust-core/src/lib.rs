@@ -1,11 +1,12 @@
+use serde::{Deserialize, Deserializer};
+
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
 pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_metadata";
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
-pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str =
-    "runtime_control_plane_adapter.v0";
+pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeIdError {
@@ -14,6 +15,38 @@ pub enum RuntimeIdError {
     InvalidPrefix,
     InvalidCharacter,
     RawIdentifier,
+}
+
+impl std::fmt::Display for RuntimeIdError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => formatter.write_str("runtime identifier is empty"),
+            Self::TooLong => formatter.write_str("runtime identifier is too long"),
+            Self::InvalidPrefix => formatter.write_str("runtime identifier has an invalid prefix"),
+            Self::InvalidCharacter => {
+                formatter.write_str("runtime identifier contains an invalid character")
+            }
+            Self::RawIdentifier => {
+                formatter.write_str("runtime identifier contains raw identifier syntax")
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneAdapterError {
+    InvalidJson,
+    NonObjectRoot,
+    UnsupportedSchemaVersion {
+        field: &'static str,
+        expected: &'static str,
+    },
+    UnsupportedValue {
+        field: &'static str,
+    },
+    UnsafeFlag {
+        field: &'static str,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,7 +58,8 @@ pub struct SessionId(String);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JobId(String);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum JobKind {
     CompareModelScores,
     RefreshEvidenceIndex,
@@ -33,7 +67,8 @@ pub enum JobKind {
     RenderWorkstationSnapshot,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum JobState {
     Queued,
     Running,
@@ -42,104 +77,122 @@ pub enum JobState {
     Cancelled,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum NativeInferenceRuntimeState {
     Unavailable,
     Available,
     Disabled,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelRegistryState {
     ObservedSyntheticOnly,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelPromotionState {
     NotPromoted,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeHandoffSourceKind {
     StaticSyntheticFixture,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeHandoffTransportState {
     Unavailable,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneState {
     Unavailable,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneAdapterKind {
     StaticContractFixture,
+    LocalJsonStringParser,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneInputMode {
     AcceptedSchemaDeclarationOnly,
+    AcceptedLocalJsonString,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneAdapterState {
     Unavailable,
+    JsonStringParserAvailable,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneOutputSnapshotSchema {
     RuntimeHandoffSnapshotV0,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeSummary {
-    pub schema_version: &'static str,
+    pub schema_version: String,
     pub workspace_id: WorkspaceId,
     pub session_id: SessionId,
     pub total_job_count: u32,
     pub queued_job_count: u32,
     pub running_job_count: u32,
     pub failed_job_count: u32,
-    pub last_event_label: &'static str,
+    pub last_event_label: String,
     pub native_inference_state: NativeInferenceRuntimeState,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ModelRegistryMetadata {
-    pub schema_version: &'static str,
-    pub metadata_scope: &'static str,
-    pub source_bundle_schema: &'static str,
-    pub entries: &'static [ModelRegistryEntry],
+    pub schema_version: String,
+    pub metadata_scope: String,
+    pub source_bundle_schema: String,
+    pub entries: Vec<ModelRegistryEntry>,
     pub aggregate_summary: ModelRegistryAggregateSummary,
     pub safety_flags: ModelRegistrySafetyFlags,
-    pub non_claims: &'static [&'static str],
+    pub non_claims: Vec<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ModelRegistryEntry {
-    pub model_id: &'static str,
+    pub model_id: String,
     pub registry_state: ModelRegistryState,
     pub promotion_state: ModelPromotionState,
-    pub observed_source_schemas: &'static [&'static str],
-    pub observed_source_names: &'static [&'static str],
+    pub observed_source_schemas: Vec<String>,
+    pub observed_source_names: Vec<String>,
     pub source_count: u32,
     pub has_score_rows: bool,
     pub human_review_required: bool,
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ModelRegistryAggregateSummary {
     pub model_count: u32,
-    pub schemas_present: &'static [&'static str],
-    pub models_with_score_rows: &'static [&'static str],
+    pub schemas_present: Vec<String>,
+    pub models_with_score_rows: Vec<String>,
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ModelRegistrySafetyFlags {
     pub local_only: bool,
     pub strict_json_loaded: bool,
@@ -155,9 +208,10 @@ pub struct ModelRegistrySafetyFlags {
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeHandoffSnapshot {
-    pub schema_version: &'static str,
+    pub schema_version: String,
     pub source_kind: RuntimeHandoffSourceKind,
     pub transport_state: RuntimeHandoffTransportState,
     pub control_plane_state: RuntimeControlPlaneState,
@@ -169,7 +223,7 @@ pub struct RuntimeHandoffSnapshot {
     pub live_runtime_connection: bool,
     pub external_services_used: bool,
     pub deployment_allowed: bool,
-    pub non_claims: &'static [&'static str],
+    pub non_claims: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -194,7 +248,9 @@ pub struct RuntimeControlPlaneAdapterContract {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeEvent {
-    WorkspaceOpened { workspace_id: WorkspaceId },
+    WorkspaceOpened {
+        workspace_id: WorkspaceId,
+    },
     SessionStarted {
         workspace_id: WorkspaceId,
         session_id: SessionId,
@@ -204,7 +260,40 @@ pub enum RuntimeEvent {
         job_id: JobId,
         kind: JobKind,
     },
-    JobStateChanged { job_id: JobId, state: JobState },
+    JobStateChanged {
+        job_id: JobId,
+        state: JobState,
+    },
+}
+
+impl<'de> Deserialize<'de> for WorkspaceId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for SessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for JobId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
 }
 
 impl WorkspaceId {
@@ -303,6 +392,7 @@ impl RuntimeControlPlaneAdapterKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::StaticContractFixture => "static_contract_fixture",
+            Self::LocalJsonStringParser => "local_json_string_parser",
         }
     }
 }
@@ -311,6 +401,7 @@ impl RuntimeControlPlaneInputMode {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::AcceptedSchemaDeclarationOnly => "accepted_schema_declaration_only",
+            Self::AcceptedLocalJsonString => "accepted_local_json_string",
         }
     }
 }
@@ -319,6 +410,7 @@ impl RuntimeControlPlaneAdapterState {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Unavailable => "unavailable",
+            Self::JsonStringParserAvailable => "json_string_parser_available",
         }
     }
 }
@@ -334,7 +426,7 @@ impl RuntimeControlPlaneOutputSnapshotSchema {
 impl RuntimeSummary {
     pub fn synthetic_fixture() -> Self {
         Self {
-            schema_version: RUNTIME_SUMMARY_SCHEMA_VERSION,
+            schema_version: RUNTIME_SUMMARY_SCHEMA_VERSION.to_owned(),
             workspace_id: WorkspaceId::new("fixture-workspace-alpha")
                 .expect("static fixture workspace id must be valid"),
             session_id: SessionId::new("fixture-session-runtime-summary")
@@ -343,7 +435,7 @@ impl RuntimeSummary {
             queued_job_count: 1,
             running_job_count: 1,
             failed_job_count: 0,
-            last_event_label: "synthetic workstation snapshot rendered",
+            last_event_label: "synthetic workstation snapshot rendered".to_owned(),
             native_inference_state: NativeInferenceRuntimeState::Disabled,
         }
     }
@@ -352,14 +444,14 @@ impl RuntimeSummary {
 impl ModelRegistryMetadata {
     pub fn synthetic_fixture() -> Self {
         Self {
-            schema_version: MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
-            metadata_scope: MODEL_REGISTRY_METADATA_SCOPE,
-            source_bundle_schema: MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION,
-            entries: MODEL_REGISTRY_METADATA_ENTRIES,
+            schema_version: MODEL_REGISTRY_METADATA_SCHEMA_VERSION.to_owned(),
+            metadata_scope: MODEL_REGISTRY_METADATA_SCOPE.to_owned(),
+            source_bundle_schema: MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION.to_owned(),
+            entries: model_registry_metadata_entries(),
             aggregate_summary: ModelRegistryAggregateSummary {
-                model_count: 4,
-                schemas_present: MODEL_REGISTRY_AGGREGATE_SCHEMAS,
-                models_with_score_rows: MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS,
+                model_count: 10,
+                schemas_present: static_str_vec(MODEL_REGISTRY_AGGREGATE_SCHEMAS),
+                models_with_score_rows: static_str_vec(MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS),
                 deployment_allowed: false,
             },
             safety_flags: ModelRegistrySafetyFlags {
@@ -376,7 +468,7 @@ impl ModelRegistryMetadata {
                 external_services_used: false,
                 deployment_allowed: false,
             },
-            non_claims: MODEL_REGISTRY_NON_CLAIMS,
+            non_claims: static_str_vec(MODEL_REGISTRY_NON_CLAIMS),
         }
     }
 }
@@ -384,7 +476,7 @@ impl ModelRegistryMetadata {
 impl RuntimeHandoffSnapshot {
     pub fn synthetic_fixture() -> Self {
         Self {
-            schema_version: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            schema_version: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION.to_owned(),
             source_kind: RuntimeHandoffSourceKind::StaticSyntheticFixture,
             transport_state: RuntimeHandoffTransportState::Unavailable,
             control_plane_state: RuntimeControlPlaneState::Unavailable,
@@ -396,7 +488,7 @@ impl RuntimeHandoffSnapshot {
             live_runtime_connection: false,
             external_services_used: false,
             deployment_allowed: false,
-            non_claims: RUNTIME_HANDOFF_NON_CLAIMS,
+            non_claims: static_str_vec(RUNTIME_HANDOFF_NON_CLAIMS),
         }
     }
 }
@@ -405,15 +497,16 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::StaticContractFixture,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedSchemaDeclarationOnly,
-            adapter_state: RuntimeControlPlaneAdapterState::Unavailable,
-            output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonStringParser,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonString,
+            adapter_state: RuntimeControlPlaneAdapterState::JsonStringParserAvailable,
+            output_snapshot_schema:
+                RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
             local_only: true,
-            dependency_free: true,
+            dependency_free: false,
             static_synthetic_fixture: true,
-            json_parsing_enabled: false,
+            json_parsing_enabled: true,
             file_io_enabled: false,
             live_transport_enabled: false,
             qt_binding_enabled: false,
@@ -422,6 +515,420 @@ impl RuntimeControlPlaneAdapterContract {
             non_claims: RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS,
         }
     }
+
+    pub fn parse_handoff_snapshot_json(
+        input: &str,
+    ) -> Result<RuntimeHandoffSnapshot, RuntimeControlPlaneAdapterError> {
+        match input.trim_start().as_bytes().first() {
+            Some(b'{') => {}
+            Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+            None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+        }
+
+        let snapshot: RuntimeHandoffSnapshot = serde_json::from_str(input)
+            .map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+        validate_runtime_handoff_snapshot(&snapshot)?;
+        Ok(snapshot)
+    }
+}
+
+fn validate_runtime_handoff_snapshot(
+    snapshot: &RuntimeHandoffSnapshot,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "schema_version",
+        &snapshot.schema_version,
+        RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_summary.schema_version",
+        &snapshot.runtime_summary.schema_version,
+        RUNTIME_SUMMARY_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "model_registry_metadata.schema_version",
+        &snapshot.model_registry_metadata.schema_version,
+        MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+    )?;
+
+    validate_required_flag("local_only", snapshot.local_only, true)?;
+    validate_required_flag(
+        "static_synthetic_fixture",
+        snapshot.static_synthetic_fixture,
+        true,
+    )?;
+    validate_required_flag(
+        "generated_json_loaded",
+        snapshot.generated_json_loaded,
+        false,
+    )?;
+    validate_required_flag(
+        "live_runtime_connection",
+        snapshot.live_runtime_connection,
+        false,
+    )?;
+    validate_required_flag(
+        "external_services_used",
+        snapshot.external_services_used,
+        false,
+    )?;
+    validate_required_flag("deployment_allowed", snapshot.deployment_allowed, false)?;
+    validate_exact_strings(
+        "non_claims",
+        &snapshot.non_claims,
+        RUNTIME_HANDOFF_NON_CLAIMS,
+    )?;
+    validate_runtime_summary(&snapshot.runtime_summary)?;
+    validate_model_registry_metadata(&snapshot.model_registry_metadata)?;
+
+    Ok(())
+}
+
+fn validate_runtime_summary(
+    summary: &RuntimeSummary,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if summary.total_job_count < summary.queued_job_count
+        || summary.total_job_count < summary.running_job_count
+        || summary.total_job_count < summary.failed_job_count
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_summary.job_counts",
+        });
+    }
+    if summary.last_event_label.trim().is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_summary.last_event_label",
+        });
+    }
+    validate_safe_event_label(
+        "runtime_summary.last_event_label",
+        &summary.last_event_label,
+    )?;
+    Ok(())
+}
+
+fn validate_model_registry_metadata(
+    metadata: &ModelRegistryMetadata,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_exact_string(
+        "model_registry_metadata.metadata_scope",
+        &metadata.metadata_scope,
+        MODEL_REGISTRY_METADATA_SCOPE,
+    )?;
+    validate_exact_string(
+        "model_registry_metadata.source_bundle_schema",
+        &metadata.source_bundle_schema,
+        MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION,
+    )?;
+    validate_exact_strings(
+        "model_registry_metadata.non_claims",
+        &metadata.non_claims,
+        MODEL_REGISTRY_NON_CLAIMS,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.aggregate_summary.deployment_allowed",
+        metadata.aggregate_summary.deployment_allowed,
+        false,
+    )?;
+    validate_exact_strings(
+        "model_registry_metadata.aggregate_summary.schemas_present",
+        &metadata.aggregate_summary.schemas_present,
+        MODEL_REGISTRY_AGGREGATE_SCHEMAS,
+    )?;
+    validate_exact_strings(
+        "model_registry_metadata.aggregate_summary.models_with_score_rows",
+        &metadata.aggregate_summary.models_with_score_rows,
+        MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS,
+    )?;
+    if metadata.aggregate_summary.model_count != metadata.entries.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.aggregate_summary.model_count",
+        });
+    }
+    validate_model_registry_entry_order(&metadata.entries)?;
+    validate_model_registry_safety_flags(&metadata.safety_flags)?;
+    for entry in &metadata.entries {
+        validate_model_registry_entry(entry)?;
+    }
+
+    Ok(())
+}
+
+fn validate_model_registry_entry_order(
+    entries: &[ModelRegistryEntry],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if entries.len() != MODEL_REGISTRY_MODEL_IDS.len()
+        || !entries
+            .iter()
+            .zip(MODEL_REGISTRY_MODEL_IDS.iter())
+            .all(|(entry, expected_model_id)| entry.model_id == *expected_model_id)
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.entries",
+        });
+    }
+    Ok(())
+}
+
+fn validate_model_registry_safety_flags(
+    flags: &ModelRegistrySafetyFlags,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.local_only",
+        flags.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.strict_json_loaded",
+        flags.strict_json_loaded,
+        true,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.derived_from_evaluation_bundle_only",
+        flags.derived_from_evaluation_bundle_only,
+        true,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.input_paths_copied",
+        flags.input_paths_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.source_filenames_copied",
+        flags.source_filenames_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.raw_identifiers_copied",
+        flags.raw_identifiers_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.generated_artifact_references_copied",
+        flags.generated_artifact_references_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.secrets_detected",
+        flags.secrets_detected,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.report_payload_copied",
+        flags.report_payload_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.live_capture_used",
+        flags.live_capture_used,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.external_services_used",
+        flags.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.safety_flags.deployment_allowed",
+        flags.deployment_allowed,
+        false,
+    )?;
+    Ok(())
+}
+
+fn validate_model_registry_entry(
+    entry: &ModelRegistryEntry,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_safe_label("model_registry_metadata.entries.model_id", &entry.model_id)?;
+    let expected = expected_model_registry_entry(&entry.model_id)?;
+    validate_exact_strings(
+        "model_registry_metadata.entries.observed_source_schemas",
+        &entry.observed_source_schemas,
+        expected.observed_source_schemas,
+    )?;
+    validate_exact_strings(
+        "model_registry_metadata.entries.observed_source_names",
+        &entry.observed_source_names,
+        expected.observed_source_names,
+    )?;
+    if entry.source_count != expected.source_count
+        || entry.has_score_rows != expected.has_score_rows
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.entries.model_shape",
+        });
+    }
+    validate_required_flag(
+        "model_registry_metadata.entries.human_review_required",
+        entry.human_review_required,
+        true,
+    )?;
+    validate_required_flag(
+        "model_registry_metadata.entries.deployment_allowed",
+        entry.deployment_allowed,
+        false,
+    )?;
+    if entry.source_count != entry.observed_source_schemas.len() as u32
+        || entry.source_count != entry.observed_source_names.len() as u32
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.entries.source_count",
+        });
+    }
+    for source_name in &entry.observed_source_names {
+        validate_safe_label(
+            "model_registry_metadata.entries.observed_source_names",
+            source_name,
+        )?;
+    }
+    Ok(())
+}
+
+struct ExpectedModelRegistryEntry {
+    observed_source_schemas: &'static [&'static str],
+    observed_source_names: &'static [&'static str],
+    source_count: u32,
+    has_score_rows: bool,
+}
+
+fn expected_model_registry_entry(
+    model_id: &str,
+) -> Result<ExpectedModelRegistryEntry, RuntimeControlPlaneAdapterError> {
+    match model_id {
+        "graph_novelty" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_GRAPH_NOVELTY_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_GRAPH_NOVELTY_SOURCE_NAMES,
+            source_count: 4,
+            has_score_rows: true,
+        }),
+        "isolation_forest" | "pyod_ecod" | "river_hst" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES,
+            source_count: 3,
+            has_score_rows: true,
+        }),
+        "model_disagreement" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_INVESTIGATION_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_INVESTIGATION_SOURCE_NAMES,
+            source_count: 2,
+            has_score_rows: false,
+        }),
+        "pyod_copod" | "suricata_alert" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SOURCE_NAMES,
+            source_count: 2,
+            has_score_rows: true,
+        }),
+        "self_supervised_representation" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_REPRESENTATION_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_REPRESENTATION_SOURCE_NAMES,
+            source_count: 2,
+            has_score_rows: false,
+        }),
+        "stdlib_linear_native" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_NATIVE_SCORE_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_NATIVE_SCORE_SOURCE_NAMES,
+            source_count: 1,
+            has_score_rows: true,
+        }),
+        "time_series_residual" => Ok(ExpectedModelRegistryEntry {
+            observed_source_schemas: MODEL_REGISTRY_TIME_SERIES_SCHEMAS,
+            observed_source_names: MODEL_REGISTRY_TIME_SERIES_SOURCE_NAMES,
+            source_count: 4,
+            has_score_rows: true,
+        }),
+        _ => Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.entries.model_id",
+        }),
+    }
+}
+
+fn validate_schema_version(
+    field: &'static str,
+    actual: &str,
+    expected: &'static str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if actual != expected {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion { field, expected });
+    }
+    Ok(())
+}
+
+fn validate_exact_string(
+    field: &'static str,
+    actual: &str,
+    expected: &'static str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if actual != expected {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_exact_strings(
+    field: &'static str,
+    actual: &[String],
+    expected: &[&str],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if actual.len() != expected.len()
+        || !actual
+            .iter()
+            .zip(expected.iter())
+            .all(|(actual, expected)| actual == expected)
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_required_flag(
+    field: &'static str,
+    actual: bool,
+    expected: bool,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if actual != expected {
+        return Err(RuntimeControlPlaneAdapterError::UnsafeFlag { field });
+    }
+    Ok(())
+}
+
+fn validate_safe_label(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if value.is_empty()
+        || value.len() > 96
+        || value.contains('.')
+        || value.contains(':')
+        || value.contains('@')
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+        })
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_safe_event_label(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if value.len() > 128
+        || value.contains('.')
+        || value.contains(':')
+        || value.contains('@')
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || byte == b' '
+                || byte == b'-'
+                || byte == b'_'
+        })
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
 }
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
@@ -431,7 +938,6 @@ const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
 ];
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
-    "not_json_parser",
     "not_file_io",
     "not_live_transport",
     "not_qt_binding",
@@ -452,10 +958,28 @@ const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
     "not_native_runtime_execution",
 ];
 
-const MODEL_REGISTRY_SCORE_SCHEMAS: &[&str] =
-    &["model_disagreement_report.v0", "model_score_rows.v0"];
-const MODEL_REGISTRY_SCORE_SOURCE_NAMES: &[&str] =
-    &["model_disagreement_report_v0_001", "model_score_rows_v0_001"];
+const MODEL_REGISTRY_GRAPH_NOVELTY_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "detection_candidate_report.v0",
+    "model_disagreement_report.v0",
+    "temporal_security_graph_report.v0",
+];
+const MODEL_REGISTRY_GRAPH_NOVELTY_SOURCE_NAMES: &[&str] = &[
+    "agentic_investigation_report_v0_001",
+    "detection_candidate_report_v0_001",
+    "model_disagreement_report_v0_001",
+    "temporal_security_graph_report_v0_001",
+];
+const MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "detection_candidate_report.v0",
+    "model_disagreement_report.v0",
+];
+const MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES: &[&str] = &[
+    "agentic_investigation_report_v0_001",
+    "detection_candidate_report_v0_001",
+    "model_disagreement_report_v0_001",
+];
 const MODEL_REGISTRY_INVESTIGATION_SCHEMAS: &[&str] = &[
     "agentic_investigation_report.v0",
     "detection_candidate_report.v0",
@@ -464,16 +988,67 @@ const MODEL_REGISTRY_INVESTIGATION_SOURCE_NAMES: &[&str] = &[
     "agentic_investigation_report_v0_001",
     "detection_candidate_report_v0_001",
 ];
+const MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "model_disagreement_report.v0",
+];
+const MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SOURCE_NAMES: &[&str] = &[
+    "agentic_investigation_report_v0_001",
+    "model_disagreement_report_v0_001",
+];
+const MODEL_REGISTRY_REPRESENTATION_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "traffic_representation_report.v0",
+];
+const MODEL_REGISTRY_REPRESENTATION_SOURCE_NAMES: &[&str] = &[
+    "agentic_investigation_report_v0_001",
+    "traffic_representation_report_v0_001",
+];
 const MODEL_REGISTRY_NATIVE_SCORE_SCHEMAS: &[&str] = &["model_score_rows.v0"];
 const MODEL_REGISTRY_NATIVE_SCORE_SOURCE_NAMES: &[&str] = &["model_score_rows_v0_001"];
+const MODEL_REGISTRY_TIME_SERIES_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "detection_candidate_report.v0",
+    "model_disagreement_report.v0",
+    "time_series_residual_report.v0",
+];
+const MODEL_REGISTRY_TIME_SERIES_SOURCE_NAMES: &[&str] = &[
+    "agentic_investigation_report_v0_001",
+    "detection_candidate_report_v0_001",
+    "model_disagreement_report_v0_001",
+    "time_series_residual_report_v0_001",
+];
 const MODEL_REGISTRY_AGGREGATE_SCHEMAS: &[&str] = &[
     "agentic_investigation_report.v0",
     "detection_candidate_report.v0",
     "model_disagreement_report.v0",
     "model_score_rows.v0",
+    "temporal_security_graph_report.v0",
+    "time_series_residual_report.v0",
+    "traffic_representation_report.v0",
 ];
-const MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS: &[&str] =
-    &["isolation_forest", "pyod_ecod", "stdlib_linear_native"];
+const MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS: &[&str] = &[
+    "graph_novelty",
+    "isolation_forest",
+    "pyod_copod",
+    "pyod_ecod",
+    "river_hst",
+    "stdlib_linear_native",
+    "suricata_alert",
+    "time_series_residual",
+];
+const MODEL_REGISTRY_MODEL_IDS: &[&str] = &[
+    "graph_novelty",
+    "isolation_forest",
+    "model_disagreement",
+    "pyod_copod",
+    "pyod_ecod",
+    "river_hst",
+    "self_supervised_representation",
+    "stdlib_linear_native",
+    "suricata_alert",
+    "time_series_residual",
+];
 const MODEL_REGISTRY_NON_CLAIMS: &[&str] = &[
     "not_persistent_model_registry",
     "not_model_promotion_gate",
@@ -483,52 +1058,137 @@ const MODEL_REGISTRY_NON_CLAIMS: &[&str] = &[
     "not_rule_deployment",
     "not_native_runtime_execution",
 ];
-const MODEL_REGISTRY_METADATA_ENTRIES: &[ModelRegistryEntry] = &[
-    ModelRegistryEntry {
-        model_id: "isolation_forest",
-        registry_state: ModelRegistryState::ObservedSyntheticOnly,
-        promotion_state: ModelPromotionState::NotPromoted,
-        observed_source_schemas: MODEL_REGISTRY_SCORE_SCHEMAS,
-        observed_source_names: MODEL_REGISTRY_SCORE_SOURCE_NAMES,
-        source_count: 2,
-        has_score_rows: true,
-        human_review_required: true,
-        deployment_allowed: false,
-    },
-    ModelRegistryEntry {
-        model_id: "model_disagreement",
-        registry_state: ModelRegistryState::ObservedSyntheticOnly,
-        promotion_state: ModelPromotionState::NotPromoted,
-        observed_source_schemas: MODEL_REGISTRY_INVESTIGATION_SCHEMAS,
-        observed_source_names: MODEL_REGISTRY_INVESTIGATION_SOURCE_NAMES,
-        source_count: 2,
-        has_score_rows: false,
-        human_review_required: true,
-        deployment_allowed: false,
-    },
-    ModelRegistryEntry {
-        model_id: "pyod_ecod",
-        registry_state: ModelRegistryState::ObservedSyntheticOnly,
-        promotion_state: ModelPromotionState::NotPromoted,
-        observed_source_schemas: MODEL_REGISTRY_SCORE_SCHEMAS,
-        observed_source_names: MODEL_REGISTRY_SCORE_SOURCE_NAMES,
-        source_count: 2,
-        has_score_rows: true,
-        human_review_required: true,
-        deployment_allowed: false,
-    },
-    ModelRegistryEntry {
-        model_id: "stdlib_linear_native",
-        registry_state: ModelRegistryState::ObservedSyntheticOnly,
-        promotion_state: ModelPromotionState::NotPromoted,
-        observed_source_schemas: MODEL_REGISTRY_NATIVE_SCORE_SCHEMAS,
-        observed_source_names: MODEL_REGISTRY_NATIVE_SCORE_SOURCE_NAMES,
-        source_count: 1,
-        has_score_rows: true,
-        human_review_required: true,
-        deployment_allowed: false,
-    },
-];
+
+fn model_registry_metadata_entries() -> Vec<ModelRegistryEntry> {
+    vec![
+        ModelRegistryEntry {
+            model_id: "graph_novelty".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_GRAPH_NOVELTY_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_GRAPH_NOVELTY_SOURCE_NAMES),
+            source_count: 4,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "isolation_forest".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS,
+            ),
+            observed_source_names: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES,
+            ),
+            source_count: 3,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "model_disagreement".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_INVESTIGATION_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_INVESTIGATION_SOURCE_NAMES),
+            source_count: 2,
+            has_score_rows: false,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "pyod_copod".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SOURCE_NAMES),
+            source_count: 2,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "pyod_ecod".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS,
+            ),
+            observed_source_names: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES,
+            ),
+            source_count: 3,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "river_hst".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS,
+            ),
+            observed_source_names: static_str_vec(
+                MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES,
+            ),
+            source_count: 3,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "self_supervised_representation".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_REPRESENTATION_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_REPRESENTATION_SOURCE_NAMES),
+            source_count: 2,
+            has_score_rows: false,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "stdlib_linear_native".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_NATIVE_SCORE_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_NATIVE_SCORE_SOURCE_NAMES),
+            source_count: 1,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "suricata_alert".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SOURCE_NAMES),
+            source_count: 2,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+        ModelRegistryEntry {
+            model_id: "time_series_residual".to_owned(),
+            registry_state: ModelRegistryState::ObservedSyntheticOnly,
+            promotion_state: ModelPromotionState::NotPromoted,
+            observed_source_schemas: static_str_vec(MODEL_REGISTRY_TIME_SERIES_SCHEMAS),
+            observed_source_names: static_str_vec(MODEL_REGISTRY_TIME_SERIES_SOURCE_NAMES),
+            source_count: 4,
+            has_score_rows: true,
+            human_review_required: true,
+            deployment_allowed: false,
+        },
+    ]
+}
+
+fn static_str_vec(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_owned()).collect()
+}
 
 fn validate_coarse_id(value: &str, allowed_prefixes: &[&str]) -> Result<(), RuntimeIdError> {
     if value.is_empty() {
@@ -546,10 +1206,9 @@ fn validate_coarse_id(value: &str, allowed_prefixes: &[&str]) -> Result<(), Runt
     if value.contains('.') || value.contains(':') || value.contains('@') {
         return Err(RuntimeIdError::RawIdentifier);
     }
-    if !value
-        .bytes()
-        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_')
-    {
+    if !value.bytes().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+    }) {
         return Err(RuntimeIdError::InvalidCharacter);
     }
     Ok(())
@@ -558,6 +1217,285 @@ fn validate_coarse_id(value: &str, allowed_prefixes: &[&str]) -> Result<(), Runt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    fn synthetic_handoff_json() -> &'static str {
+        r#"{
+  "schema_version": "runtime_handoff_snapshot.v0",
+  "source_kind": "static_synthetic_fixture",
+  "transport_state": "unavailable",
+  "control_plane_state": "unavailable",
+  "runtime_summary": {
+    "schema_version": "runtime_summary.v0",
+    "workspace_id": "fixture-workspace-alpha",
+    "session_id": "fixture-session-runtime-summary",
+    "total_job_count": 4,
+    "queued_job_count": 1,
+    "running_job_count": 1,
+    "failed_job_count": 0,
+    "last_event_label": "synthetic workstation snapshot rendered",
+    "native_inference_state": "disabled"
+  },
+  "model_registry_metadata": {
+    "schema_version": "model_registry_metadata.v0",
+    "metadata_scope": "local_synthetic_model_registry_metadata",
+    "source_bundle_schema": "model_evaluation_bundle.v0",
+    "entries": [
+      {
+        "model_id": "graph_novelty",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0",
+          "model_disagreement_report.v0",
+          "temporal_security_graph_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001",
+          "model_disagreement_report_v0_001",
+          "temporal_security_graph_report_v0_001"
+        ],
+        "source_count": 4,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "isolation_forest",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0",
+          "model_disagreement_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001",
+          "model_disagreement_report_v0_001"
+        ],
+        "source_count": 3,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "model_disagreement",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001"
+        ],
+        "source_count": 2,
+        "has_score_rows": false,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "pyod_copod",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "model_disagreement_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "model_disagreement_report_v0_001"
+        ],
+        "source_count": 2,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "pyod_ecod",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0",
+          "model_disagreement_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001",
+          "model_disagreement_report_v0_001"
+        ],
+        "source_count": 3,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "river_hst",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0",
+          "model_disagreement_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001",
+          "model_disagreement_report_v0_001"
+        ],
+        "source_count": 3,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "self_supervised_representation",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "traffic_representation_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "traffic_representation_report_v0_001"
+        ],
+        "source_count": 2,
+        "has_score_rows": false,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "stdlib_linear_native",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "model_score_rows.v0"
+        ],
+        "observed_source_names": [
+          "model_score_rows_v0_001"
+        ],
+        "source_count": 1,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "suricata_alert",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "model_disagreement_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "model_disagreement_report_v0_001"
+        ],
+        "source_count": 2,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      },
+      {
+        "model_id": "time_series_residual",
+        "registry_state": "observed_synthetic_only",
+        "promotion_state": "not_promoted",
+        "observed_source_schemas": [
+          "agentic_investigation_report.v0",
+          "detection_candidate_report.v0",
+          "model_disagreement_report.v0",
+          "time_series_residual_report.v0"
+        ],
+        "observed_source_names": [
+          "agentic_investigation_report_v0_001",
+          "detection_candidate_report_v0_001",
+          "model_disagreement_report_v0_001",
+          "time_series_residual_report_v0_001"
+        ],
+        "source_count": 4,
+        "has_score_rows": true,
+        "human_review_required": true,
+        "deployment_allowed": false
+      }
+    ],
+    "aggregate_summary": {
+      "model_count": 10,
+      "schemas_present": [
+        "agentic_investigation_report.v0",
+        "detection_candidate_report.v0",
+        "model_disagreement_report.v0",
+        "model_score_rows.v0",
+        "temporal_security_graph_report.v0",
+        "time_series_residual_report.v0",
+        "traffic_representation_report.v0"
+      ],
+      "models_with_score_rows": [
+        "graph_novelty",
+        "isolation_forest",
+        "pyod_copod",
+        "pyod_ecod",
+        "river_hst",
+        "stdlib_linear_native",
+        "suricata_alert",
+        "time_series_residual"
+      ],
+      "deployment_allowed": false
+    },
+    "safety_flags": {
+      "local_only": true,
+      "strict_json_loaded": true,
+      "derived_from_evaluation_bundle_only": true,
+      "input_paths_copied": false,
+      "source_filenames_copied": false,
+      "raw_identifiers_copied": false,
+      "generated_artifact_references_copied": false,
+      "secrets_detected": false,
+      "report_payload_copied": false,
+      "live_capture_used": false,
+      "external_services_used": false,
+      "deployment_allowed": false
+    },
+    "non_claims": [
+      "not_persistent_model_registry",
+      "not_model_promotion_gate",
+      "not_deployment_approval",
+      "not_live_capture",
+      "not_external_enrichment",
+      "not_rule_deployment",
+      "not_native_runtime_execution"
+    ]
+  },
+  "local_only": true,
+  "static_synthetic_fixture": true,
+  "generated_json_loaded": false,
+  "live_runtime_connection": false,
+  "external_services_used": false,
+  "deployment_allowed": false,
+  "non_claims": [
+    "not_live_runtime_connection",
+    "not_generated_json_loader",
+    "not_control_plane_transport",
+    "not_persistent_storage",
+    "not_qt_runtime_integration",
+    "not_model_promotion_gate",
+    "not_deployment_approval",
+    "not_native_runtime_execution"
+  ]
+}"#
+    }
+
+    fn patched_json(target: &str, replacement: &str) -> String {
+        synthetic_handoff_json().replacen(target, replacement, 1)
+    }
 
     #[test]
     fn accepts_coarse_runtime_identifiers() {
@@ -592,12 +1530,18 @@ mod tests {
 
         assert_eq!(summary.schema_version, RUNTIME_SUMMARY_SCHEMA_VERSION);
         assert_eq!(summary.workspace_id.as_str(), "fixture-workspace-alpha");
-        assert_eq!(summary.session_id.as_str(), "fixture-session-runtime-summary");
+        assert_eq!(
+            summary.session_id.as_str(),
+            "fixture-session-runtime-summary"
+        );
         assert_eq!(summary.total_job_count, 4);
         assert_eq!(summary.queued_job_count, 1);
         assert_eq!(summary.running_job_count, 1);
         assert_eq!(summary.failed_job_count, 0);
-        assert_eq!(summary.last_event_label, "synthetic workstation snapshot rendered");
+        assert_eq!(
+            summary.last_event_label,
+            "synthetic workstation snapshot rendered"
+        );
         assert_eq!(summary.native_inference_state.as_str(), "disabled");
     }
 
@@ -605,28 +1549,40 @@ mod tests {
     fn emits_static_model_registry_metadata_fixture() {
         let metadata = ModelRegistryMetadata::synthetic_fixture();
 
-        assert_eq!(metadata.schema_version, MODEL_REGISTRY_METADATA_SCHEMA_VERSION);
+        assert_eq!(
+            metadata.schema_version,
+            MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+        );
         assert_eq!(metadata.metadata_scope, MODEL_REGISTRY_METADATA_SCOPE);
         assert_eq!(
             metadata.source_bundle_schema,
             MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION
         );
-        assert_eq!(metadata.entries.len(), 4);
-        assert_eq!(metadata.entries[0].model_id, "isolation_forest");
+        assert_eq!(metadata.entries.len(), 10);
+        assert_eq!(metadata.entries[0].model_id, "graph_novelty");
         assert_eq!(
             metadata.entries[0].registry_state.as_str(),
             "observed_synthetic_only"
         );
         assert_eq!(metadata.entries[0].promotion_state.as_str(), "not_promoted");
-        assert_eq!(metadata.entries[0].source_count, 2);
+        assert_eq!(metadata.entries[0].source_count, 4);
         assert!(metadata.entries[0].has_score_rows);
         assert!(metadata.entries[0].human_review_required);
         assert!(!metadata.entries[0].deployment_allowed);
-        assert_eq!(metadata.entries[3].model_id, "stdlib_linear_native");
-        assert_eq!(metadata.aggregate_summary.model_count, 4);
+        assert_eq!(metadata.entries[9].model_id, "time_series_residual");
+        assert_eq!(metadata.aggregate_summary.model_count, 10);
         assert_eq!(
             metadata.aggregate_summary.models_with_score_rows,
-            &["isolation_forest", "pyod_ecod", "stdlib_linear_native"]
+            strings(&[
+                "graph_novelty",
+                "isolation_forest",
+                "pyod_copod",
+                "pyod_ecod",
+                "river_hst",
+                "stdlib_linear_native",
+                "suricata_alert",
+                "time_series_residual"
+            ])
         );
         assert!(!metadata.aggregate_summary.deployment_allowed);
         assert!(metadata.safety_flags.local_only);
@@ -635,7 +1591,7 @@ mod tests {
         assert!(!metadata.safety_flags.deployment_allowed);
         assert_eq!(
             metadata.non_claims,
-            &[
+            strings(&[
                 "not_persistent_model_registry",
                 "not_model_promotion_gate",
                 "not_deployment_approval",
@@ -643,7 +1599,7 @@ mod tests {
                 "not_external_enrichment",
                 "not_rule_deployment",
                 "not_native_runtime_execution"
-            ]
+            ])
         );
     }
 
@@ -651,7 +1607,10 @@ mod tests {
     fn emits_static_runtime_handoff_snapshot_fixture() {
         let snapshot = RuntimeHandoffSnapshot::synthetic_fixture();
 
-        assert_eq!(snapshot.schema_version, RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(
+            snapshot.schema_version,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
         assert_eq!(snapshot.source_kind.as_str(), "static_synthetic_fixture");
         assert_eq!(snapshot.transport_state.as_str(), "unavailable");
         assert_eq!(snapshot.control_plane_state.as_str(), "unavailable");
@@ -671,7 +1630,7 @@ mod tests {
         assert!(!snapshot.deployment_allowed);
         assert_eq!(
             snapshot.non_claims,
-            &[
+            strings(&[
                 "not_live_runtime_connection",
                 "not_generated_json_loader",
                 "not_control_plane_transport",
@@ -680,7 +1639,7 @@ mod tests {
                 "not_model_promotion_gate",
                 "not_deployment_approval",
                 "not_native_runtime_execution"
-            ]
+            ])
         );
     }
 
@@ -692,12 +1651,12 @@ mod tests {
             contract.schema_version,
             RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION
         );
-        assert_eq!(contract.adapter_kind.as_str(), "static_contract_fixture");
+        assert_eq!(contract.adapter_kind.as_str(), "local_json_string_parser");
+        assert_eq!(contract.input_mode.as_str(), "accepted_local_json_string");
         assert_eq!(
-            contract.input_mode.as_str(),
-            "accepted_schema_declaration_only"
+            contract.adapter_state.as_str(),
+            "json_string_parser_available"
         );
-        assert_eq!(contract.adapter_state.as_str(), "unavailable");
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
             RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
@@ -711,9 +1670,9 @@ mod tests {
             ]
         );
         assert!(contract.local_only);
-        assert!(contract.dependency_free);
+        assert!(!contract.dependency_free);
         assert!(contract.static_synthetic_fixture);
-        assert!(!contract.json_parsing_enabled);
+        assert!(contract.json_parsing_enabled);
         assert!(!contract.file_io_enabled);
         assert!(!contract.live_transport_enabled);
         assert!(!contract.qt_binding_enabled);
@@ -722,7 +1681,6 @@ mod tests {
         assert_eq!(
             contract.non_claims,
             &[
-                "not_json_parser",
                 "not_file_io",
                 "not_live_transport",
                 "not_qt_binding",
@@ -731,6 +1689,337 @@ mod tests {
                 "not_runtime_service",
                 "not_generated_report_loader"
             ]
+        );
+    }
+
+    #[test]
+    fn parses_runtime_handoff_snapshot_json_string() {
+        let snapshot = RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(
+            synthetic_handoff_json(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            snapshot.schema_version,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            snapshot.runtime_summary.workspace_id.as_str(),
+            "fixture-workspace-alpha"
+        );
+        assert_eq!(
+            snapshot.runtime_summary.session_id.as_str(),
+            "fixture-session-runtime-summary"
+        );
+        assert_eq!(snapshot.runtime_summary.total_job_count, 4);
+        assert_eq!(
+            snapshot.runtime_summary.last_event_label,
+            "synthetic workstation snapshot rendered"
+        );
+        assert_eq!(
+            snapshot.runtime_summary.native_inference_state.as_str(),
+            "disabled"
+        );
+        assert_eq!(
+            snapshot.model_registry_metadata.metadata_scope,
+            MODEL_REGISTRY_METADATA_SCOPE
+        );
+        assert_eq!(snapshot.model_registry_metadata.entries.len(), 10);
+        assert_eq!(
+            snapshot.model_registry_metadata.entries[0].model_id,
+            "graph_novelty"
+        );
+        assert_eq!(
+            snapshot
+                .model_registry_metadata
+                .aggregate_summary
+                .models_with_score_rows,
+            strings(&[
+                "graph_novelty",
+                "isolation_forest",
+                "pyod_copod",
+                "pyod_ecod",
+                "river_hst",
+                "stdlib_linear_native",
+                "suricata_alert",
+                "time_series_residual"
+            ])
+        );
+        assert!(snapshot.local_only);
+        assert!(!snapshot.live_runtime_connection);
+        assert!(!snapshot.external_services_used);
+        assert!(!snapshot.deployment_allowed);
+    }
+
+    #[test]
+    fn rejects_malformed_or_non_object_json_strings() {
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json("{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json("[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_schema_versions() {
+        let err = RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+            r#""schema_version": "runtime_handoff_snapshot.v0""#,
+            r#""schema_version": "runtime_handoff_snapshot.v1""#,
+        ))
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_mismatched_nested_schema_versions() {
+        let err = RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+            r#""schema_version": "runtime_summary.v0""#,
+            r#""schema_version": "runtime_summary.v1""#,
+        ))
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "runtime_summary.schema_version",
+                expected: RUNTIME_SUMMARY_SCHEMA_VERSION,
+            }
+        );
+
+        let err = RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+            r#""schema_version": "model_registry_metadata.v0""#,
+            r#""schema_version": "model_registry_metadata.v1""#,
+        ))
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "model_registry_metadata.schema_version",
+                expected: MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_fields_and_enum_values() {
+        let with_unknown_field =
+            synthetic_handoff_json().replacen("{\n", "{\n  \"unexpected_field\": true,\n", 1);
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&with_unknown_field)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let duplicate_unsafe_key = synthetic_handoff_json().replacen(
+            "  \"generated_json_loaded\": false,",
+            "  \"generated_json_loaded\": true,\n  \"generated_json_loaded\": false,",
+            1,
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&duplicate_unsafe_key)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""source_kind": "static_synthetic_fixture""#,
+                r#""source_kind": "live_runtime""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_ids_and_safety_flags() {
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""workspace_id": "fixture-workspace-alpha""#,
+                r#""workspace_id": "analyst@example""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                "  \"local_only\": true,\n  \"static_synthetic_fixture\": true",
+                "  \"local_only\": false,\n  \"static_synthetic_fixture\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "local_only",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                "  \"generated_json_loaded\": false,\n  \"live_runtime_connection\": false",
+                "  \"generated_json_loaded\": true,\n  \"live_runtime_connection\": false",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "generated_json_loaded",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""live_runtime_connection": false"#,
+                r#""live_runtime_connection": true"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "live_runtime_connection",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                "  \"external_services_used\": false,\n  \"deployment_allowed\": false",
+                "  \"external_services_used\": true,\n  \"deployment_allowed\": false",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "external_services_used",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                "  \"external_services_used\": false,\n  \"deployment_allowed\": false",
+                "  \"external_services_used\": false,\n  \"deployment_allowed\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "deployment_allowed",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                "        \"human_review_required\": true,\n        \"deployment_allowed\": false",
+                "        \"human_review_required\": true,\n        \"deployment_allowed\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.entries.deployment_allowed",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_caller_controlled_private_or_unexpected_registry_strings() {
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""last_event_label": "synthetic workstation snapshot rendered""#,
+                r#""last_event_label": "analyst@example""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary.last_event_label",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""model_id": "model_disagreement""#,
+                r#""model_id": "isolation_forest""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""model_disagreement_report.v0""#,
+                r#""private_report.v0""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_schemas",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""model_count": 10"#,
+                r#""model_count": 9"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.model_count",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""schemas_present": [
+        "agentic_investigation_report.v0",
+        "detection_candidate_report.v0",
+        "model_disagreement_report.v0",
+        "model_score_rows.v0",
+        "temporal_security_graph_report.v0",
+        "time_series_residual_report.v0",
+        "traffic_representation_report.v0"
+      ]"#,
+                r#""schemas_present": [
+        "agentic_investigation_report.v0",
+        "detection_candidate_report.v0",
+        "private_report.v0",
+        "model_score_rows.v0",
+        "temporal_security_graph_report.v0",
+        "time_series_residual_report.v0",
+        "traffic_representation_report.v0"
+      ]"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.schemas_present",
+            }
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(&patched_json(
+                r#""models_with_score_rows": [
+        "graph_novelty",
+        "isolation_forest",
+        "pyod_copod",
+        "pyod_ecod",
+        "river_hst",
+        "stdlib_linear_native",
+        "suricata_alert",
+        "time_series_residual"
+      ]"#,
+                r#""models_with_score_rows": [
+        "graph_novelty",
+        "isolation_forest",
+        "pyod_copod",
+        "pyod_ecod",
+        "river_hst",
+        "stdlib_linear_native",
+        "suricata_alert",
+        "private_model"
+      ]"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.models_with_score_rows",
+            }
         );
     }
 }

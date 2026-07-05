@@ -11,8 +11,7 @@ workstation UI.
 ## v0 source scaffold
 
 The first source-controlled Rust runtime shell lives under `apps/rust-core/`.
-It establishes a no-dependency Rust package boundary with coarse runtime
-contract types for:
+It establishes a Rust package boundary with coarse runtime contract types for:
 
 - workspace identifiers;
 - session identifiers;
@@ -34,7 +33,7 @@ contract through `ModelRegistryMetadata`, `ModelRegistryEntry`,
 the validated Python `model_registry_metadata.v0` output shape and the Qt
 workstation snapshot using source-only Rust constants. The static fixture lists
 the local synthetic model registry scope, its `model_evaluation_bundle.v0`
-source schema, four sanitized model entries, derived aggregate metadata, safety
+source schema, ten sanitized model entries, derived aggregate metadata, safety
 flags, and non-claim strings. Every entry remains `observed_synthetic_only`,
 `not_promoted`, `human_review_required`, and `deployment_allowed: false`.
 
@@ -47,29 +46,35 @@ live runtime connection exists, no external services are used, and deployment is
 not allowed. This gives the future adapter a runtime-owned shape without
 claiming adapter behavior.
 
-The scaffold now also owns a static `runtime_control_plane_adapter.v0` contract
-through `RuntimeControlPlaneAdapterContract`. The adapter contract declares the
-accepted local handoff schemas, `runtime_handoff_snapshot.v0`,
-`runtime_summary.v0`, and `model_registry_metadata.v0`, and exposes
-`RuntimeControlPlaneAdapterKind`, `RuntimeControlPlaneInputMode`,
-`RuntimeControlPlaneAdapterState`, and
-`RuntimeControlPlaneOutputSnapshotSchema`. Its fixture is dependency-free,
-local-only, static, and unavailable: JSON parsing, file I/O, live transport, Qt
-binding, external services, and deployment are all disabled. It is an API shape
-for the future local control-plane path, not a parser or runtime adapter.
+The scaffold now also owns a `runtime_control_plane_adapter.v0` contract through
+`RuntimeControlPlaneAdapterContract`. The adapter contract declares the accepted
+local handoff schemas, `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
+`model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
+`RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
+`RuntimeControlPlaneOutputSnapshotSchema`. JSON-string parsing is now enabled
+through `serde` and `serde_json` using
+`RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
+accepts only a caller-provided local JSON string, denies unknown fields, rejects
+unsupported schema versions and enum values, validates coarse runtime IDs,
+enforces local-only and non-deployment safety flags, preserves the exact
+Python-derived synthetic registry entry order and aggregate metadata, and
+returns a typed `RuntimeHandoffSnapshot`. File I/O, live transport, Qt binding,
+external services, and deployment remain disabled.
 
-The v0 scaffold is intentionally a source-only contract. It does not implement a
-daemon, storage engine, process supervisor, capture wrapper, native inference
-executor, model artifact loader, external service client, packaging flow, or UI
-data adapter. It does not read PCAPs, private telemetry, logs, model binaries,
-databases, or runtime artifacts. The registry metadata preview is not a
-persistent model registry, promotion gate, deployment approval workflow,
-database-backed registry provider, generated JSON loader, or native inference
-execution path. The handoff snapshot is not a JSON/control-plane transport,
-runtime service, Qt data binding, storage provider, generated report loader, or
-live state feed. The control-plane adapter contract is not real JSON parsing,
-file I/O, live transport, Qt binding, external-service integration, storage, or
-deployment behavior.
+The v0 scaffold is intentionally a source-only contract with bounded parser
+behavior. It does not implement a daemon, storage engine, process supervisor,
+capture wrapper, native inference executor, model artifact loader, external
+service client, packaging flow, or UI data adapter. It does not read PCAPs,
+private telemetry, logs, model binaries, databases, runtime artifacts, or
+generated report files. The registry metadata preview is not a persistent model
+registry, promotion gate, deployment approval workflow, database-backed
+registry provider, generated JSON file loader, or native inference execution
+path. The handoff snapshot is not a live
+control-plane transport, runtime service, Qt data binding, storage provider,
+generated report loader, or live state feed. The control-plane adapter is
+JSON-string parsing only; it is not file loading, file watching, socket/IPC
+transport, Qt binding, external-service integration, storage, deployment
+behavior, capture behavior, or native inference execution.
 
 Expected integration path:
 
@@ -80,7 +85,8 @@ Rust source contract
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
-  -> typed JSON/control-plane parser for local evidence summaries
+  -> typed JSON-string parser for local handoff snapshots
+  -> local file/IPC adapter with strict path policy
   -> local control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
@@ -90,12 +96,11 @@ Rust source contract
   -> runtime storage, job supervision, and stable native inference adapters
 ```
 
-Local validation is currently static because the implementation environment does
-not provide `cargo` or `rustc`. The v0 gate therefore checks source layout,
-dependency absence, public runtime anchors, and local-only safety constraints
-through pytest and repository validation. Once Rust tooling is available, add
-`cargo fmt --check`, `cargo test`, and `cargo clippy` to the runtime validation
-gate.
+The repository does not require Rust tooling for `make verify`; that target
+remains Python/static-compatible for every validation run. Rust-specific
+validation is available through `make verify-rust-core`, which runs
+`cargo fmt --check`, `cargo test`, and `cargo clippy -- -D warnings` when Cargo
+is available.
 
 ## Runtime priorities
 

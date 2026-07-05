@@ -37,7 +37,11 @@ snapshot, open a control-plane transport, or bind to live runtime state yet.
 The Rust runtime also defines a static `runtime_control_plane_adapter.v0`
 contract for the future local handoff path. Qt does not read that adapter
 contract, parse generated JSON, open a live transport, or bind to live runtime
-state yet; the real JSON/control-plane adapter remains future work.
+state yet. Rust can now parse a caller-provided local
+`runtime_handoff_snapshot.v0` JSON string into typed contract structs, but that
+is not file I/O, IPC, a live runtime service, Qt data binding, generated report
+loading, external service use, deployment behavior, capture behavior, or native
+inference execution.
 
 Expected integration path:
 
@@ -48,7 +52,8 @@ QML shell scaffold
   -> static model_registry_metadata.v0 handoff preview
   -> static runtime_handoff_snapshot.v0 envelope in the Rust runtime
   -> static runtime_control_plane_adapter.v0 contract in the Rust runtime
-  -> future JSON/control-plane adapter from the Rust runtime
+  -> Rust JSON-string parser for local handoff snapshots
+  -> future file/IPC control-plane adapter from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging
