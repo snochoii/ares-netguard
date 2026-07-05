@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = ROOT / "apps" / "qt-workstation"
+STRATEGY_DOC = ROOT / "docs" / "QT_WORKSTATION_STRATEGY.md"
 
 
 def _read(relative_path: str) -> str:
@@ -55,6 +56,7 @@ def test_qml_imports_and_workstation_areas() -> None:
         "modelEvidenceMatrix",
         "rightDetailPanel",
         "selectedEntityDetail",
+        "runtimeBoundaryPanel",
         "evidenceDetailPanel",
         "analystActionPanel",
         "modelRegistrySnapshot",
@@ -71,9 +73,35 @@ def test_qml_imports_and_workstation_areas() -> None:
         "Model Registry",
         "Entity Evidence Matrix",
         "Next Analyst Actions",
+        "Runtime Boundary",
+        "no live runtime connection",
     ]
     for text in expected_text:
         assert text in qml
+
+
+def test_qml_runtime_summary_fields_mirror_rust_contract() -> None:
+    qml = _read("qml/Main.qml")
+
+    expected_fields = [
+        "schema_version",
+        "workspace_id",
+        "session_id",
+        "total_job_count",
+        "queued_job_count",
+        "running_job_count",
+        "failed_job_count",
+        "last_event_label",
+        "native_inference_state",
+    ]
+    for field in expected_fields:
+        assert f'"{field}"' in qml
+        assert f"root.runtimeSummary.{field}" in qml
+
+    assert '"runtime_summary.v0"' in qml
+    assert '"fixture-workspace-alpha"' in qml
+    assert '"fixture-session-runtime-summary"' in qml
+    assert '"disabled"' in qml
 
 
 def test_qml_uses_static_synthetic_local_content_only() -> None:
@@ -101,3 +129,19 @@ def test_qml_uses_static_synthetic_local_content_only() -> None:
 
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", qml) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", qml) is None
+
+
+def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
+    strategy = STRATEGY_DOC.read_text(encoding="utf-8")
+    normalized_strategy = " ".join(strategy.split())
+
+    expected_text = [
+        "Runtime Boundary panel",
+        "Rust-owned `runtime_summary.v0` fields",
+        "static synthetic QML object",
+        "not a live runtime connection",
+        "static runtime_summary.v0 handoff preview",
+        "future JSON/control-plane adapter from the Rust runtime",
+    ]
+    for text in expected_text:
+        assert text in normalized_strategy
