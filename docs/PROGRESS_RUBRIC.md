@@ -26,9 +26,10 @@ Total: 100%
 - Count only validated, merged capabilities.
 - Code without tests receives at most half credit.
 - Docs-only strategy does not count as implemented capability, but improves confidence.
-- A local aggregate evaluation bundle counts as partial model registry and
-  evaluation report capability only; persistent registry, promotion workflow,
-  and runtime integration remain separate work.
+- A local aggregate evaluation bundle plus synthetic-only registry metadata
+  counts as partial model registry and evaluation report capability only;
+  persistent registry, promotion workflow, deployment gates, storage, UI, and
+  runtime integration remain separate work.
 - Streamlit counts as developer/debug UI only.
 - Capture/ingestion is necessary foundation but must not dominate the score.
 - IsolationForest is only baseline ML.

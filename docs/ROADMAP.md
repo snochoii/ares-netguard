@@ -44,13 +44,21 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
    - ONNX/LightGBM native path.
 
 10. **Model Evaluation Bundle**
-   - Local `model_evaluation_bundle.v0` summary over synthetic reports and
-     score-row lists.
-   - Reproducible evaluation counts and privacy guardrails.
-   - See `docs/MODEL_EVALUATION_BUNDLE.md`.
+    - Local `model_evaluation_bundle.v0` summary over synthetic reports and
+      score-row lists.
+    - Reproducible evaluation counts and privacy guardrails.
+    - See `docs/MODEL_EVALUATION_BUNDLE.md`.
 
-11. **Qt/QML AI-NDR Workstation Shell**
-   - Product UI begins once ML evidence artifacts are meaningful.
+11. **Model Registry Metadata**
+    - Local `model_registry_metadata.v0` derived from the evaluation bundle.
+    - Synthetic-only observed model entries, source schema/name references, and
+      promotion/deployment false-claim guardrails.
+    - Not a persistent registry, promotion workflow, deployment gate, runtime
+      service, or UI integration.
+    - See `docs/MODEL_REGISTRY_METADATA.md`.
 
-12. **Rust/C++ Product Runtime**
+12. **Qt/QML AI-NDR Workstation Shell**
+    - Product UI begins once ML evidence artifacts are meaningful.
+
+13. **Rust/C++ Product Runtime**
     - Workspace/session/job/storage/native inference core.
