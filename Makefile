@@ -41,3 +41,7 @@ fixture-smoke:
 		--evidence-report /tmp/ares-netguard/traffic-representation-report.json \
 		--evidence-report /tmp/ares-netguard/temporal-security-graph-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/agentic-investigation-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.detection_engineering.candidates \
+		/tmp/ares-netguard/model-disagreement-report.json \
+		/tmp/ares-netguard/detection-candidate-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/detection-candidate-report.json >/dev/null
