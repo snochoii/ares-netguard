@@ -44,6 +44,53 @@ ApplicationWindow {
         "native_inference_state": "disabled"
     })
 
+    readonly property var modelRegistryMetadata: ({
+        "schema_version": "model_registry_metadata.v0",
+        "metadata_scope": "local_synthetic_model_registry_metadata",
+        "source_bundle_schema": "model_evaluation_bundle.v0",
+        "entries": [
+            {
+                "model_id": "model_disagreement",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "model_disagreement_report.v0",
+                    "model_score_rows.v0"
+                ],
+                "source_count": 2,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "stdlib_linear_native",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "model_score_rows.v0"
+                ],
+                "source_count": 1,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            }
+        ],
+        "aggregate_summary": {
+            "model_count": 4,
+            "schemas_present": [
+                "model_disagreement_report.v0",
+                "model_score_rows.v0"
+            ],
+            "models_with_score_rows": [
+                "isolation_forest",
+                "model_disagreement",
+                "pyod_ecod",
+                "stdlib_linear_native"
+            ],
+            "deployment_allowed": false
+        }
+    })
+
     readonly property var evidenceRows: [
         {
             "entity": "asset-alpha",
@@ -723,7 +770,7 @@ ApplicationWindow {
                     Rectangle {
                         objectName: "modelRegistrySnapshot"
                         Layout.fillWidth: true
-                        implicitHeight: 108
+                        implicitHeight: 174
                         radius: 4
                         color: root.panelColor
                         border.color: root.borderColor
@@ -742,8 +789,52 @@ ApplicationWindow {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: "4 detectors / 1 disagreement report / 0 exported artifacts"
+                                text: root.modelRegistryMetadata.schema_version
+                                    + " / "
+                                    + root.modelRegistryMetadata.source_bundle_schema
                                 color: root.mutedTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.aggregate_summary.model_count
+                                    + " observed models / "
+                                    + root.modelRegistryMetadata.aggregate_summary.models_with_score_rows.length
+                                    + " with score rows"
+                                color: root.primaryTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: "State: "
+                                    + root.modelRegistryMetadata.entries[0].registry_state
+                                    + " / "
+                                    + root.modelRegistryMetadata.entries[0].promotion_state
+                                color: root.mutedTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.entries[0].human_review_required
+                                    ? "Human review required"
+                                    : "Human review not required"
+                                color: root.amberColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.aggregate_summary.deployment_allowed
+                                    ? "Deployment enabled"
+                                    : "Deployment disabled"
+                                color: root.greenColor
                                 font.pixelSize: 12
                                 wrapMode: Text.WordWrap
                             }

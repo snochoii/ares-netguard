@@ -104,6 +104,57 @@ def test_qml_runtime_summary_fields_mirror_rust_contract() -> None:
     assert '"disabled"' in qml
 
 
+def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
+    qml = _read("qml/Main.qml")
+
+    expected_fields = [
+        "schema_version",
+        "metadata_scope",
+        "source_bundle_schema",
+        "entries",
+        "aggregate_summary",
+        "model_id",
+        "registry_state",
+        "promotion_state",
+        "observed_source_schemas",
+        "source_count",
+        "has_score_rows",
+        "human_review_required",
+        "deployment_allowed",
+        "model_count",
+        "schemas_present",
+        "models_with_score_rows",
+    ]
+    for field in expected_fields:
+        assert f'"{field}"' in qml
+
+    expected_references = [
+        "root.modelRegistryMetadata.schema_version",
+        "root.modelRegistryMetadata.source_bundle_schema",
+        "root.modelRegistryMetadata.aggregate_summary.model_count",
+        "root.modelRegistryMetadata.aggregate_summary.models_with_score_rows.length",
+        "root.modelRegistryMetadata.entries[0].registry_state",
+        "root.modelRegistryMetadata.entries[0].promotion_state",
+        "root.modelRegistryMetadata.entries[0].human_review_required",
+        "root.modelRegistryMetadata.aggregate_summary.deployment_allowed",
+    ]
+    for reference in expected_references:
+        assert reference in qml
+
+    expected_values = [
+        '"model_registry_metadata.v0"',
+        '"local_synthetic_model_registry_metadata"',
+        '"model_evaluation_bundle.v0"',
+        '"observed_synthetic_only"',
+        '"not_promoted"',
+        '"stdlib_linear_native"',
+    ]
+    for value in expected_values:
+        assert value in qml
+
+    assert "4 detectors / 1 disagreement report / 0 exported artifacts" not in qml
+
+
 def test_qml_uses_static_synthetic_local_content_only() -> None:
     qml = _read("qml/Main.qml")
     lowered = qml.lower()
@@ -141,6 +192,22 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "static synthetic QML object",
         "not a live runtime connection",
         "static runtime_summary.v0 handoff preview",
+        "future JSON/control-plane adapter from the Rust runtime",
+    ]
+    for text in expected_text:
+        assert text in normalized_strategy
+
+
+def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
+    strategy = STRATEGY_DOC.read_text(encoding="utf-8")
+    normalized_strategy = " ".join(strategy.split())
+
+    expected_text = [
+        "Model Registry Snapshot panel",
+        "`model_registry_metadata.v0` fields",
+        "static synthetic QML object",
+        "not a persistent registry",
+        "does not read generated reports",
         "future JSON/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:
