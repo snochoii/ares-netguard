@@ -38,6 +38,15 @@ source schema, four sanitized model entries, derived aggregate metadata, safety
 flags, and non-claim strings. Every entry remains `observed_synthetic_only`,
 `not_promoted`, `human_review_required`, and `deployment_allowed: false`.
 
+The scaffold also exposes a static `runtime_handoff_snapshot.v0` handoff
+envelope through `RuntimeHandoffSnapshot`. The envelope composes the existing
+`RuntimeSummary` and `ModelRegistryMetadata` fixtures and records that the
+source is a static synthetic fixture, transport is unavailable, the
+control-plane adapter is unavailable, no generated JSON has been loaded, no
+live runtime connection exists, no external services are used, and deployment is
+not allowed. This gives the future adapter a runtime-owned shape without
+claiming adapter behavior.
+
 The v0 scaffold is intentionally a source-only contract. It does not implement a
 daemon, storage engine, process supervisor, capture wrapper, native inference
 executor, model artifact loader, external service client, packaging flow, or UI
@@ -45,7 +54,9 @@ data adapter. It does not read PCAPs, private telemetry, logs, model binaries,
 databases, or runtime artifacts. The registry metadata preview is not a
 persistent model registry, promotion gate, deployment approval workflow,
 database-backed registry provider, generated JSON loader, or native inference
-execution path.
+execution path. The handoff snapshot is not a JSON/control-plane transport,
+runtime service, Qt data binding, storage provider, generated report loader, or
+live state feed.
 
 Expected integration path:
 
@@ -54,6 +65,7 @@ Rust source contract
   -> buildable Cargo project in an environment with Rust tooling
   -> static runtime_summary.v0 handoff displayed by the Qt shell
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
+  -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> typed JSON/control-plane adapters for local evidence summaries
   -> typed registry metadata adapter
   -> real Rust runtime summary provider

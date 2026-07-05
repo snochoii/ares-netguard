@@ -42,6 +42,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
+        "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "WorkspaceId",
         "SessionId",
         "JobId",
@@ -54,6 +55,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "ModelRegistrySafetyFlags",
         "ModelRegistryState",
         "ModelPromotionState",
+        "RuntimeHandoffSnapshot",
+        "RuntimeHandoffSourceKind",
+        "RuntimeHandoffTransportState",
+        "RuntimeControlPlaneState",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
         "CompareModelScores",
@@ -65,6 +70,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "Disabled",
         "ObservedSyntheticOnly",
         "NotPromoted",
+        "StaticSyntheticFixture",
         "synthetic_fixture",
     ]
     for anchor in expected_anchors:
@@ -75,6 +81,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         'pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";'
         in lib_rs
+    )
+    assert (
+        "pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "
+        '"runtime_handoff_snapshot.v0";' in lib_rs
     )
     assert "fn validate_coarse_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
@@ -146,6 +156,70 @@ def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
     assert "impl ModelRegistryState" in lib_rs
     assert "impl ModelPromotionState" in lib_rs
     assert "MODEL_REGISTRY_METADATA_ENTRIES" in lib_rs
+
+
+def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub schema_version: &'static str",
+        "pub source_kind: RuntimeHandoffSourceKind",
+        "pub transport_state: RuntimeHandoffTransportState",
+        "pub control_plane_state: RuntimeControlPlaneState",
+        "pub runtime_summary: RuntimeSummary",
+        "pub model_registry_metadata: ModelRegistryMetadata",
+        "pub local_only: bool",
+        "pub static_synthetic_fixture: bool",
+        "pub generated_json_loaded: bool",
+        "pub live_runtime_connection: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub non_claims: &'static [&'static str]",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    assert "impl RuntimeHandoffSnapshot" in lib_rs
+    assert "impl RuntimeHandoffSourceKind" in lib_rs
+    assert "impl RuntimeHandoffTransportState" in lib_rs
+    assert "impl RuntimeControlPlaneState" in lib_rs
+    assert "RuntimeSummary::synthetic_fixture()" in lib_rs
+    assert "ModelRegistryMetadata::synthetic_fixture()" in lib_rs
+    assert "RUNTIME_HANDOFF_NON_CLAIMS" in lib_rs
+
+
+def test_rust_core_static_handoff_fixture_composes_existing_contracts() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_values = [
+        '"runtime_handoff_snapshot.v0"',
+        '"runtime_summary.v0"',
+        '"model_registry_metadata.v0"',
+        '"static_synthetic_fixture"',
+        '"unavailable"',
+        '"not_live_runtime_connection"',
+        '"not_generated_json_loader"',
+        '"not_control_plane_transport"',
+        '"not_persistent_storage"',
+        '"not_qt_runtime_integration"',
+        '"not_model_promotion_gate"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+    ]
+    for value in expected_values:
+        assert value in lib_rs
+
+    assert "source_kind: RuntimeHandoffSourceKind::StaticSyntheticFixture" in lib_rs
+    assert "transport_state: RuntimeHandoffTransportState::Unavailable" in lib_rs
+    assert "control_plane_state: RuntimeControlPlaneState::Unavailable" in lib_rs
+    assert "runtime_summary: RuntimeSummary::synthetic_fixture()" in lib_rs
+    assert "model_registry_metadata: ModelRegistryMetadata::synthetic_fixture()" in lib_rs
+    assert "local_only: true" in lib_rs
+    assert "static_synthetic_fixture: true" in lib_rs
+    assert "generated_json_loaded: false" in lib_rs
+    assert "live_runtime_connection: false" in lib_rs
+    assert "external_services_used: false" in lib_rs
+    assert "deployment_allowed: false" in lib_rs
 
 
 def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot() -> None:
@@ -269,10 +343,14 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
         "ModelRegistrySafetyFlags",
+        "runtime_handoff_snapshot.v0",
+        "RuntimeHandoffSnapshot",
         "static runtime_summary.v0 handoff",
         "static model_registry_metadata.v0 handoff",
+        "static runtime_handoff_snapshot.v0 handoff",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
+        "typed JSON/control-plane adapter",
         "does not implement a daemon",
         "does not provide `cargo` or `rustc`",
         "Qt workstation data-flow integration",

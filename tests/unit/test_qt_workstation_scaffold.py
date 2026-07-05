@@ -234,6 +234,8 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "static synthetic QML object",
         "not a live runtime connection",
         "static runtime_summary.v0 handoff preview",
+        "runtime_handoff_snapshot.v0",
+        "static runtime_handoff_snapshot.v0 envelope in the Rust runtime",
         "future JSON/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:

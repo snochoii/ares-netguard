@@ -3,6 +3,7 @@ pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
 pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_metadata";
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
+pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeIdError {
@@ -54,6 +55,21 @@ pub enum ModelRegistryState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ModelPromotionState {
     NotPromoted,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeHandoffSourceKind {
+    StaticSyntheticFixture,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeHandoffTransportState {
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneState {
+    Unavailable,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -115,6 +131,23 @@ pub struct ModelRegistrySafetyFlags {
     pub live_capture_used: bool,
     pub external_services_used: bool,
     pub deployment_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeHandoffSnapshot {
+    pub schema_version: &'static str,
+    pub source_kind: RuntimeHandoffSourceKind,
+    pub transport_state: RuntimeHandoffTransportState,
+    pub control_plane_state: RuntimeControlPlaneState,
+    pub runtime_summary: RuntimeSummary,
+    pub model_registry_metadata: ModelRegistryMetadata,
+    pub local_only: bool,
+    pub static_synthetic_fixture: bool,
+    pub generated_json_loaded: bool,
+    pub live_runtime_connection: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub non_claims: &'static [&'static str],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -200,6 +233,30 @@ impl ModelPromotionState {
     }
 }
 
+impl RuntimeHandoffSourceKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::StaticSyntheticFixture => "static_synthetic_fixture",
+        }
+    }
+}
+
+impl RuntimeHandoffTransportState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+impl RuntimeControlPlaneState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
 impl RuntimeSummary {
     pub fn synthetic_fixture() -> Self {
         Self {
@@ -249,6 +306,37 @@ impl ModelRegistryMetadata {
         }
     }
 }
+
+impl RuntimeHandoffSnapshot {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            source_kind: RuntimeHandoffSourceKind::StaticSyntheticFixture,
+            transport_state: RuntimeHandoffTransportState::Unavailable,
+            control_plane_state: RuntimeControlPlaneState::Unavailable,
+            runtime_summary: RuntimeSummary::synthetic_fixture(),
+            model_registry_metadata: ModelRegistryMetadata::synthetic_fixture(),
+            local_only: true,
+            static_synthetic_fixture: true,
+            generated_json_loaded: false,
+            live_runtime_connection: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            non_claims: RUNTIME_HANDOFF_NON_CLAIMS,
+        }
+    }
+}
+
+const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
+    "not_live_runtime_connection",
+    "not_generated_json_loader",
+    "not_control_plane_transport",
+    "not_persistent_storage",
+    "not_qt_runtime_integration",
+    "not_model_promotion_gate",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
 
 const MODEL_REGISTRY_SCORE_SCHEMAS: &[&str] =
     &["model_disagreement_report.v0", "model_score_rows.v0"];
@@ -440,6 +528,43 @@ mod tests {
                 "not_live_capture",
                 "not_external_enrichment",
                 "not_rule_deployment",
+                "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_handoff_snapshot_fixture() {
+        let snapshot = RuntimeHandoffSnapshot::synthetic_fixture();
+
+        assert_eq!(snapshot.schema_version, RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(snapshot.source_kind.as_str(), "static_synthetic_fixture");
+        assert_eq!(snapshot.transport_state.as_str(), "unavailable");
+        assert_eq!(snapshot.control_plane_state.as_str(), "unavailable");
+        assert_eq!(
+            snapshot.runtime_summary.schema_version,
+            RUNTIME_SUMMARY_SCHEMA_VERSION
+        );
+        assert_eq!(
+            snapshot.model_registry_metadata.schema_version,
+            MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+        );
+        assert!(snapshot.local_only);
+        assert!(snapshot.static_synthetic_fixture);
+        assert!(!snapshot.generated_json_loaded);
+        assert!(!snapshot.live_runtime_connection);
+        assert!(!snapshot.external_services_used);
+        assert!(!snapshot.deployment_allowed);
+        assert_eq!(
+            snapshot.non_claims,
+            &[
+                "not_live_runtime_connection",
+                "not_generated_json_loader",
+                "not_control_plane_transport",
+                "not_persistent_storage",
+                "not_qt_runtime_integration",
+                "not_model_promotion_gate",
+                "not_deployment_approval",
                 "not_native_runtime_execution"
             ]
         );
