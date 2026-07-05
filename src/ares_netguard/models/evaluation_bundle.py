@@ -302,6 +302,8 @@ def validate_evaluation_bundle(bundle: Mapping[str, Any]) -> None:
         _validate_source_summary(summary)
 
     _validate_aggregate_summary(bundle["aggregate_summary"])
+    if bundle["aggregate_summary"] != _aggregate_summaries(source_summaries):
+        raise ValueError("aggregate_summary must be derived from source_summaries")
     _validate_safety_flags(bundle["safety_flags"])
 
     non_claims = _bounded_list(bundle["non_claims"], "non_claims")
@@ -834,18 +836,27 @@ def _validated_output_path(path: str | Path, *, repo_root: str | Path | None) ->
         raise ValueError(f"output path must be a file, not a directory: {output}")
 
     resolved = output.resolve(strict=False)
-    repo = Path(repo_root).resolve() if repo_root is not None else Path.cwd().resolve()
+    repo = Path(repo_root).resolve() if repo_root is not None else _default_repo_root()
     if _is_relative_to(resolved, repo):
         allowed_roots = (
-            repo / "data",
+            repo / "data" / "reports",
+            repo / "data" / "registry",
             repo / ".runtime",
             repo / "artifacts",
         )
         if not any(_is_relative_to(resolved, root.resolve(strict=False)) for root in allowed_roots):
             raise ValueError(
-                "output path inside the repository must be under data/, .runtime/, or artifacts/"
+                "output path inside the repository must be under data/reports/, "
+                "data/registry/, .runtime/, or artifacts/"
             )
     return output
+
+
+def _default_repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / ".git").exists() or (parent / "AGENTS.md").exists():
+            return parent.resolve()
+    return Path.cwd().resolve()
 
 
 def _is_relative_to(child: Path, parent: Path) -> bool:

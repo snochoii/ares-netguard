@@ -55,8 +55,9 @@ The loader uses strict JSON parsing and rejects `NaN`, `Infinity`, and
   database, and JSONL filenames.
 
 The CLI writes to the caller-provided output path, but ordinary repository
-paths are rejected unless they are under ignored runtime roots: `data/`,
-`.runtime/`, or `artifacts/`. The fixture smoke target writes to `/tmp`.
+paths are rejected unless they are under ignored runtime roots used for reports:
+`data/reports/`, `data/registry/`, `.runtime/`, or `artifacts/`. The fixture
+smoke target writes to `/tmp`.
 
 ## Non-claims
 

@@ -155,6 +155,24 @@ def test_generated_artifact_references_are_rejected() -> None:
         evaluation_bundle.generate_evaluation_bundle([[_score_row(evidence=["model.onnx"])]])
 
 
+def test_validate_bundle_rejects_tampered_aggregate_count() -> None:
+    bundle = evaluation_bundle.generate_evaluation_bundle(_bundle_sources())
+    tampered = json.loads(json.dumps(bundle))
+    tampered["aggregate_summary"]["score_row_count"] += 1
+
+    with pytest.raises(ValueError, match="derived from source_summaries"):
+        evaluation_bundle.validate_evaluation_bundle(tampered)
+
+
+def test_validate_bundle_rejects_tampered_aggregate_schema_counts() -> None:
+    bundle = evaluation_bundle.generate_evaluation_bundle(_bundle_sources())
+    tampered = json.loads(json.dumps(bundle))
+    tampered["aggregate_summary"]["source_count_by_schema"]["model_score_rows.v0"] += 1
+
+    with pytest.raises(ValueError, match="derived from source_summaries"):
+        evaluation_bundle.validate_evaluation_bundle(tampered)
+
+
 def test_dump_bundle_rejects_ordinary_repo_output_path(tmp_path: Path) -> None:
     bundle = evaluation_bundle.generate_evaluation_bundle([_bundle_sources()[0]])
     repo_root = tmp_path / "repo"
@@ -163,7 +181,33 @@ def test_dump_bundle_rejects_ordinary_repo_output_path(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="inside the repository"):
         evaluation_bundle.dump_bundle(bundle, repo_root / "report.json", repo_root=repo_root)
 
+    with pytest.raises(ValueError, match="inside the repository"):
+        evaluation_bundle.dump_bundle(
+            bundle, repo_root / "data" / "model-evaluation-bundle.json", repo_root=repo_root
+        )
+
     output = repo_root / "data" / "reports" / "bundle.json"
     output.parent.mkdir(parents=True)
     evaluation_bundle.dump_bundle(bundle, output, repo_root=repo_root)
     assert json.loads(output.read_text(encoding="utf-8")) == bundle
+
+
+def test_cli_rejects_repo_output_when_invoked_outside_repo(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = tmp_path / "model-disagreement-report.json"
+    source_path.write_text(
+        json.dumps(generate_disagreement_report([_score_row()]), allow_nan=False),
+        encoding="utf-8",
+    )
+    repo_root = Path(__file__).resolve().parents[2]
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="inside the repository"):
+        evaluation_bundle.main(
+            [
+                str(repo_root / "docs" / "generated-model-evaluation-bundle.json"),
+                str(source_path),
+            ]
+        )
