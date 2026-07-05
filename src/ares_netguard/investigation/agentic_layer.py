@@ -716,6 +716,7 @@ def _validate_key(key: str, label: str) -> None:
     lowered = key.lower()
     if any(part in lowered for part in FORBIDDEN_KEY_PARTS):
         raise ValueError(f"{label} contains forbidden raw field '{key}'")
+    _reject_unsafe_text(key, f"{label} object key")
 
 
 def _required_entity_id(value: Any, field: str) -> str:
@@ -772,15 +773,30 @@ def _reject_unsafe_text(value: str, field: str) -> None:
 
 def _contains_ip_literal(value: str) -> bool:
     for candidate in re.split(r"[\s,;|/]+", value):
-        cleaned = candidate.strip("[](){}<>")
-        if not cleaned:
-            continue
-        try:
-            ipaddress.ip_address(cleaned)
-        except ValueError:
-            continue
-        return True
+        for cleaned in _ip_literal_candidates(candidate):
+            try:
+                ipaddress.ip_address(cleaned)
+            except ValueError:
+                continue
+            return True
     return False
+
+
+def _ip_literal_candidates(candidate: str) -> list[str]:
+    stripped = candidate.strip()
+    if not stripped:
+        return []
+
+    bracketed = re.fullmatch(r"\[([^\]]+)](?::[0-9]{1,5})?[.!?]*", stripped)
+    if bracketed:
+        return [bracketed.group(1)]
+
+    normalized = stripped.strip("[](){}<>\"'")
+    normalized = normalized.rstrip(".!?")
+    if not normalized:
+        return []
+
+    return [normalized]
 
 
 def _bounded_list(raw_value: Any, field: str) -> list[Any]:

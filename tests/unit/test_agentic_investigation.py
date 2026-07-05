@@ -173,10 +173,28 @@ def test_privacy_rejects_raw_identifiers() -> None:
         generate_investigation_report(report)
 
 
-def test_privacy_rejects_ipv6_literals() -> None:
+@pytest.mark.parametrize(
+    "raw_text",
+    [
+        "connected to 2001:db8::1",
+        "connected to 2001:db8::1.",
+        "connected to [2001:db8::1]:443",
+    ],
+)
+def test_privacy_rejects_ipv6_literals(raw_text: str) -> None:
     report = _disagreement_report()
     row = report["row_reports"][0]  # type: ignore[index]
-    row["evidence_by_model"]["isolation_forest"] = ["connected to 2001:db8::1"]  # type: ignore[index]
+    row["evidence_by_model"]["isolation_forest"] = [raw_text]  # type: ignore[index]
+
+    with pytest.raises(ValueError, match="unsafe raw identifier"):
+        generate_investigation_report(report)
+
+
+@pytest.mark.parametrize("raw_key", ["2001:db8::1", "192.168.1.10", "example.com"])
+def test_privacy_rejects_raw_identifier_keys(raw_key: str) -> None:
+    report = _disagreement_report()
+    row = report["row_reports"][0]  # type: ignore[index]
+    row["evidence_by_model"][raw_key] = []  # type: ignore[index]
 
     with pytest.raises(ValueError, match="unsafe raw identifier"):
         generate_investigation_report(report)
