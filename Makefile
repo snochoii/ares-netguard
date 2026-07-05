@@ -34,3 +34,10 @@ fixture-smoke:
 		--history-window 3 \
 		--min-history-windows 2
 	$(PYTHON) -m json.tool /tmp/ares-netguard/temporal-security-graph-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.investigation.agentic_layer \
+		/tmp/ares-netguard/model-disagreement-report.json \
+		/tmp/ares-netguard/agentic-investigation-report.json \
+		--evidence-report /tmp/ares-netguard/time-series-residual-report.json \
+		--evidence-report /tmp/ares-netguard/traffic-representation-report.json \
+		--evidence-report /tmp/ares-netguard/temporal-security-graph-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/agentic-investigation-report.json >/dev/null
