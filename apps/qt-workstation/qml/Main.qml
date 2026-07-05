@@ -367,6 +367,7 @@ ApplicationWindow {
                                 model: root.evidenceRows
 
                                 delegate: Rectangle {
+                                    required property int index
                                     required property var modelData
 
                                     Layout.fillWidth: true

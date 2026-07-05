@@ -44,6 +44,8 @@ def test_qml_imports_and_workstation_areas() -> None:
     assert "import QtQuick" in qml
     assert "import QtQuick.Controls" in qml
     assert "import QtQuick.Layouts" in qml
+    assert "required property int index" in qml
+    assert "required property var modelData" in qml
 
     expected_anchors = [
         "workstationShellRoot",
