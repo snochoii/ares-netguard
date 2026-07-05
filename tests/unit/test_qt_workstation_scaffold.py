@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
+
+from ares_netguard.models import registry_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = ROOT / "apps" / "qt-workstation"
@@ -10,6 +13,39 @@ STRATEGY_DOC = ROOT / "docs" / "QT_WORKSTATION_STRATEGY.md"
 
 def _read(relative_path: str) -> str:
     return (APP_DIR / relative_path).read_text(encoding="utf-8")
+
+
+def _extract_qml_json_property(qml: str, property_name: str) -> dict[str, object]:
+    marker = f"readonly property var {property_name}: ("
+    start = qml.index(marker) + len(marker)
+    while qml[start].isspace():
+        start += 1
+    if qml[start] != "{":
+        raise AssertionError(f"{property_name} must begin with a JSON object")
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(qml)):
+        char = qml[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(qml[start : index + 1])
+
+    raise AssertionError(f"{property_name} JSON object was not closed")
 
 
 def test_qt_workstation_scaffold_files_exist() -> None:
@@ -117,6 +153,7 @@ def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
         "registry_state",
         "promotion_state",
         "observed_source_schemas",
+        "observed_source_names",
         "source_count",
         "has_score_rows",
         "human_review_required",
@@ -124,9 +161,14 @@ def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
         "model_count",
         "schemas_present",
         "models_with_score_rows",
+        "safety_flags",
+        "non_claims",
     ]
     for field in expected_fields:
         assert f'"{field}"' in qml
+
+    metadata = _extract_qml_json_property(qml, "modelRegistryMetadata")
+    registry_metadata.validate_registry_metadata(metadata)
 
     expected_references = [
         "root.modelRegistryMetadata.schema_version",
