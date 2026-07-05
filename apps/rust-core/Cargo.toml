@@ -1,0 +1,14 @@
+[package]
+name = "ares-rust-core"
+version = "0.1.0"
+edition = "2021"
+description = "Source-only ARES NetGuard-ML product runtime boundary scaffold"
+license = "UNLICENSED"
+
+[lib]
+name = "ares_rust_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ares-rust-core"
+path = "src/main.rs"
