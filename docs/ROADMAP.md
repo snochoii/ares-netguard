@@ -43,8 +43,14 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
 9. **Native Inference Adapters**
    - ONNX/LightGBM native path.
 
-10. **Qt/QML AI-NDR Workstation Shell**
+10. **Model Evaluation Bundle**
+   - Local `model_evaluation_bundle.v0` summary over synthetic reports and
+     score-row lists.
+   - Reproducible evaluation counts and privacy guardrails.
+   - See `docs/MODEL_EVALUATION_BUNDLE.md`.
+
+11. **Qt/QML AI-NDR Workstation Shell**
    - Product UI begins once ML evidence artifacts are meaningful.
 
-11. **Rust/C++ Product Runtime**
+12. **Rust/C++ Product Runtime**
     - Workspace/session/job/storage/native inference core.

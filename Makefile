@@ -50,3 +50,13 @@ fixture-smoke:
 		tests/fixtures/native_inference/feature_rows.jsonl \
 		/tmp/ares-netguard/native-inference-score-rows.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/native-inference-score-rows.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.evaluation_bundle \
+		/tmp/ares-netguard/model-evaluation-bundle.json \
+		/tmp/ares-netguard/model-disagreement-report.json \
+		/tmp/ares-netguard/time-series-residual-report.json \
+		/tmp/ares-netguard/traffic-representation-report.json \
+		/tmp/ares-netguard/temporal-security-graph-report.json \
+		/tmp/ares-netguard/agentic-investigation-report.json \
+		/tmp/ares-netguard/detection-candidate-report.json \
+		/tmp/ares-netguard/native-inference-score-rows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/model-evaluation-bundle.json >/dev/null
