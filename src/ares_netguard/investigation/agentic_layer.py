@@ -8,6 +8,7 @@ final incident decisions.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import math
 import re
@@ -764,8 +765,22 @@ def _reject_unsafe_text(value: str, field: str) -> None:
         or PATH_RE.search(value)
         or SECRET_RE.search(value)
         or COMMAND_LINE_RE.search(value)
+        or _contains_ip_literal(value)
     ):
         raise ValueError(f"{field} contains unsafe raw identifier content")
+
+
+def _contains_ip_literal(value: str) -> bool:
+    for candidate in re.split(r"[\s,;|/]+", value):
+        cleaned = candidate.strip("[](){}<>")
+        if not cleaned:
+            continue
+        try:
+            ipaddress.ip_address(cleaned)
+        except ValueError:
+            continue
+        return True
+    return False
 
 
 def _bounded_list(raw_value: Any, field: str) -> list[Any]:

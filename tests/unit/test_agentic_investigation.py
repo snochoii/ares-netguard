@@ -173,6 +173,15 @@ def test_privacy_rejects_raw_identifiers() -> None:
         generate_investigation_report(report)
 
 
+def test_privacy_rejects_ipv6_literals() -> None:
+    report = _disagreement_report()
+    row = report["row_reports"][0]  # type: ignore[index]
+    row["evidence_by_model"]["isolation_forest"] = ["connected to 2001:db8::1"]  # type: ignore[index]
+
+    with pytest.raises(ValueError, match="unsafe raw identifier"):
+        generate_investigation_report(report)
+
+
 def test_payload_field_is_rejected() -> None:
     report = _disagreement_report()
     row = report["row_reports"][0]  # type: ignore[index]
