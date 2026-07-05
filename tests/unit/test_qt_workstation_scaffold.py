@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
+
+from ares_netguard.models import registry_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = ROOT / "apps" / "qt-workstation"
@@ -10,6 +13,39 @@ STRATEGY_DOC = ROOT / "docs" / "QT_WORKSTATION_STRATEGY.md"
 
 def _read(relative_path: str) -> str:
     return (APP_DIR / relative_path).read_text(encoding="utf-8")
+
+
+def _extract_qml_json_property(qml: str, property_name: str) -> dict[str, object]:
+    marker = f"readonly property var {property_name}: ("
+    start = qml.index(marker) + len(marker)
+    while qml[start].isspace():
+        start += 1
+    if qml[start] != "{":
+        raise AssertionError(f"{property_name} must begin with a JSON object")
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(qml)):
+        char = qml[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(qml[start : index + 1])
+
+    raise AssertionError(f"{property_name} JSON object was not closed")
 
 
 def test_qt_workstation_scaffold_files_exist() -> None:
@@ -104,6 +140,63 @@ def test_qml_runtime_summary_fields_mirror_rust_contract() -> None:
     assert '"disabled"' in qml
 
 
+def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
+    qml = _read("qml/Main.qml")
+
+    expected_fields = [
+        "schema_version",
+        "metadata_scope",
+        "source_bundle_schema",
+        "entries",
+        "aggregate_summary",
+        "model_id",
+        "registry_state",
+        "promotion_state",
+        "observed_source_schemas",
+        "observed_source_names",
+        "source_count",
+        "has_score_rows",
+        "human_review_required",
+        "deployment_allowed",
+        "model_count",
+        "schemas_present",
+        "models_with_score_rows",
+        "safety_flags",
+        "non_claims",
+    ]
+    for field in expected_fields:
+        assert f'"{field}"' in qml
+
+    metadata = _extract_qml_json_property(qml, "modelRegistryMetadata")
+    registry_metadata.validate_registry_metadata(metadata)
+
+    expected_references = [
+        "root.modelRegistryMetadata.schema_version",
+        "root.modelRegistryMetadata.source_bundle_schema",
+        "root.modelRegistryMetadata.aggregate_summary.model_count",
+        "root.modelRegistryMetadata.aggregate_summary.models_with_score_rows.length",
+        "root.modelRegistryMetadata.entries[0].registry_state",
+        "root.modelRegistryMetadata.entries[0].promotion_state",
+        "root.modelRegistryMetadata.entries[0].human_review_required",
+        "root.modelRegistryMetadata.aggregate_summary.deployment_allowed",
+    ]
+    for reference in expected_references:
+        assert reference in qml
+
+    expected_values = [
+        '"model_registry_metadata.v0"',
+        '"local_synthetic_model_registry_metadata"',
+        '"model_evaluation_bundle.v0"',
+        '"observed_synthetic_only"',
+        '"not_promoted"',
+        '"stdlib_linear_native"',
+    ]
+    for value in expected_values:
+        assert value in qml
+
+    assert "4 detectors / 1 disagreement report / 0 exported artifacts" not in qml
+
+
 def test_qml_uses_static_synthetic_local_content_only() -> None:
     qml = _read("qml/Main.qml")
     lowered = qml.lower()
@@ -141,6 +234,22 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "static synthetic QML object",
         "not a live runtime connection",
         "static runtime_summary.v0 handoff preview",
+        "future JSON/control-plane adapter from the Rust runtime",
+    ]
+    for text in expected_text:
+        assert text in normalized_strategy
+
+
+def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
+    strategy = STRATEGY_DOC.read_text(encoding="utf-8")
+    normalized_strategy = " ".join(strategy.split())
+
+    expected_text = [
+        "Model Registry Snapshot panel",
+        "`model_registry_metadata.v0` fields",
+        "static synthetic QML object",
+        "not a persistent registry",
+        "does not read generated reports",
         "future JSON/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:

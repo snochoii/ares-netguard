@@ -44,6 +44,118 @@ ApplicationWindow {
         "native_inference_state": "disabled"
     })
 
+    readonly property var modelRegistryMetadata: ({
+        "schema_version": "model_registry_metadata.v0",
+        "metadata_scope": "local_synthetic_model_registry_metadata",
+        "source_bundle_schema": "model_evaluation_bundle.v0",
+        "entries": [
+            {
+                "model_id": "isolation_forest",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "model_disagreement_report.v0",
+                    "model_score_rows.v0"
+                ],
+                "observed_source_names": [
+                    "model_disagreement_report_v0_001",
+                    "model_score_rows_v0_001"
+                ],
+                "source_count": 2,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "model_disagreement",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "agentic_investigation_report.v0",
+                    "detection_candidate_report.v0"
+                ],
+                "observed_source_names": [
+                    "agentic_investigation_report_v0_001",
+                    "detection_candidate_report_v0_001"
+                ],
+                "source_count": 2,
+                "has_score_rows": false,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "pyod_ecod",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "model_disagreement_report.v0",
+                    "model_score_rows.v0"
+                ],
+                "observed_source_names": [
+                    "model_disagreement_report_v0_001",
+                    "model_score_rows_v0_001"
+                ],
+                "source_count": 2,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            },
+            {
+                "model_id": "stdlib_linear_native",
+                "registry_state": "observed_synthetic_only",
+                "promotion_state": "not_promoted",
+                "observed_source_schemas": [
+                    "model_score_rows.v0"
+                ],
+                "observed_source_names": [
+                    "model_score_rows_v0_001"
+                ],
+                "source_count": 1,
+                "has_score_rows": true,
+                "human_review_required": true,
+                "deployment_allowed": false
+            }
+        ],
+        "aggregate_summary": {
+            "model_count": 4,
+            "schemas_present": [
+                "agentic_investigation_report.v0",
+                "detection_candidate_report.v0",
+                "model_disagreement_report.v0",
+                "model_score_rows.v0"
+            ],
+            "models_with_score_rows": [
+                "isolation_forest",
+                "pyod_ecod",
+                "stdlib_linear_native"
+            ],
+            "deployment_allowed": false
+        },
+        "safety_flags": {
+            "local_only": true,
+            "strict_json_loaded": true,
+            "derived_from_evaluation_bundle_only": true,
+            "input_paths_copied": false,
+            "source_filenames_copied": false,
+            "raw_identifiers_copied": false,
+            "generated_artifact_references_copied": false,
+            "secrets_detected": false,
+            "report_payload_copied": false,
+            "live_capture_used": false,
+            "external_services_used": false,
+            "deployment_allowed": false
+        },
+        "non_claims": [
+            "not_persistent_model_registry",
+            "not_model_promotion_gate",
+            "not_deployment_approval",
+            "not_live_capture",
+            "not_external_enrichment",
+            "not_rule_deployment",
+            "not_native_runtime_execution"
+        ]
+    })
+
     readonly property var evidenceRows: [
         {
             "entity": "asset-alpha",
@@ -723,7 +835,7 @@ ApplicationWindow {
                     Rectangle {
                         objectName: "modelRegistrySnapshot"
                         Layout.fillWidth: true
-                        implicitHeight: 108
+                        implicitHeight: 174
                         radius: 4
                         color: root.panelColor
                         border.color: root.borderColor
@@ -742,8 +854,52 @@ ApplicationWindow {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: "4 detectors / 1 disagreement report / 0 exported artifacts"
+                                text: root.modelRegistryMetadata.schema_version
+                                    + " / "
+                                    + root.modelRegistryMetadata.source_bundle_schema
                                 color: root.mutedTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.aggregate_summary.model_count
+                                    + " observed models / "
+                                    + root.modelRegistryMetadata.aggregate_summary.models_with_score_rows.length
+                                    + " with score rows"
+                                color: root.primaryTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: "State: "
+                                    + root.modelRegistryMetadata.entries[0].registry_state
+                                    + " / "
+                                    + root.modelRegistryMetadata.entries[0].promotion_state
+                                color: root.mutedTextColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.entries[0].human_review_required
+                                    ? "Human review required"
+                                    : "Human review not required"
+                                color: root.amberColor
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.modelRegistryMetadata.aggregate_summary.deployment_allowed
+                                    ? "Deployment enabled"
+                                    : "Deployment disabled"
+                                color: root.greenColor
                                 font.pixelSize: 12
                                 wrapMode: Text.WordWrap
                             }
