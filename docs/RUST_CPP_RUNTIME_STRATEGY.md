@@ -28,11 +28,24 @@ last event label, and native inference availability state. The checked-in
 fixture values are local and synthetic so the Qt shell can display the contract
 shape without owning runtime lifecycle or job state.
 
+The scaffold now also owns a static `model_registry_metadata.v0` handoff
+contract through `ModelRegistryMetadata`, `ModelRegistryEntry`,
+`ModelRegistryAggregateSummary`, and `ModelRegistrySafetyFlags`. This mirrors
+the validated Python `model_registry_metadata.v0` output shape and the Qt
+workstation snapshot using source-only Rust constants. The static fixture lists
+the local synthetic model registry scope, its `model_evaluation_bundle.v0`
+source schema, four sanitized model entries, derived aggregate metadata, safety
+flags, and non-claim strings. Every entry remains `observed_synthetic_only`,
+`not_promoted`, `human_review_required`, and `deployment_allowed: false`.
+
 The v0 scaffold is intentionally a source-only contract. It does not implement a
 daemon, storage engine, process supervisor, capture wrapper, native inference
 executor, model artifact loader, external service client, packaging flow, or UI
 data adapter. It does not read PCAPs, private telemetry, logs, model binaries,
-databases, or runtime artifacts.
+databases, or runtime artifacts. The registry metadata preview is not a
+persistent model registry, promotion gate, deployment approval workflow,
+database-backed registry provider, generated JSON loader, or native inference
+execution path.
 
 Expected integration path:
 
@@ -40,8 +53,11 @@ Expected integration path:
 Rust source contract
   -> buildable Cargo project in an environment with Rust tooling
   -> static runtime_summary.v0 handoff displayed by the Qt shell
+  -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> typed JSON/control-plane adapters for local evidence summaries
+  -> typed registry metadata adapter
   -> real Rust runtime summary provider
+  -> runtime registry/storage provider
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
   -> runtime storage, job supervision, and stable native inference adapters
