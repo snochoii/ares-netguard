@@ -47,6 +47,17 @@ live runtime connection exists, no external services are used, and deployment is
 not allowed. This gives the future adapter a runtime-owned shape without
 claiming adapter behavior.
 
+The scaffold now also owns a static `runtime_control_plane_adapter.v0` contract
+through `RuntimeControlPlaneAdapterContract`. The adapter contract declares the
+accepted local handoff schemas, `runtime_handoff_snapshot.v0`,
+`runtime_summary.v0`, and `model_registry_metadata.v0`, and exposes
+`RuntimeControlPlaneAdapterKind`, `RuntimeControlPlaneInputMode`,
+`RuntimeControlPlaneAdapterState`, and
+`RuntimeControlPlaneOutputSnapshotSchema`. Its fixture is dependency-free,
+local-only, static, and unavailable: JSON parsing, file I/O, live transport, Qt
+binding, external services, and deployment are all disabled. It is an API shape
+for the future local control-plane path, not a parser or runtime adapter.
+
 The v0 scaffold is intentionally a source-only contract. It does not implement a
 daemon, storage engine, process supervisor, capture wrapper, native inference
 executor, model artifact loader, external service client, packaging flow, or UI
@@ -56,7 +67,9 @@ persistent model registry, promotion gate, deployment approval workflow,
 database-backed registry provider, generated JSON loader, or native inference
 execution path. The handoff snapshot is not a JSON/control-plane transport,
 runtime service, Qt data binding, storage provider, generated report loader, or
-live state feed.
+live state feed. The control-plane adapter contract is not real JSON parsing,
+file I/O, live transport, Qt binding, external-service integration, storage, or
+deployment behavior.
 
 Expected integration path:
 
@@ -66,7 +79,9 @@ Rust source contract
   -> static runtime_summary.v0 handoff displayed by the Qt shell
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
-  -> typed JSON/control-plane adapters for local evidence summaries
+  -> static runtime_control_plane_adapter.v0 contract over accepted schemas
+  -> typed JSON/control-plane parser for local evidence summaries
+  -> local control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
   -> runtime registry/storage provider

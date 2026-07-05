@@ -236,7 +236,10 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "static runtime_summary.v0 handoff preview",
         "runtime_handoff_snapshot.v0",
         "static runtime_handoff_snapshot.v0 envelope in the Rust runtime",
+        "runtime_control_plane_adapter.v0",
+        "static runtime_control_plane_adapter.v0 contract in the Rust runtime",
         "future JSON/control-plane adapter from the Rust runtime",
+        "real JSON/control-plane adapter remains future work",
     ]
     for text in expected_text:
         assert text in normalized_strategy
@@ -252,6 +255,7 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "static synthetic QML object",
         "not a persistent registry",
         "does not read generated reports",
+        "runtime_control_plane_adapter.v0",
         "future JSON/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:

@@ -4,6 +4,8 @@ pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadat
 pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_metadata";
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
+pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str =
+    "runtime_control_plane_adapter.v0";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeIdError {
@@ -70,6 +72,26 @@ pub enum RuntimeHandoffTransportState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeControlPlaneState {
     Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneAdapterKind {
+    StaticContractFixture,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneInputMode {
+    AcceptedSchemaDeclarationOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneAdapterState {
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneOutputSnapshotSchema {
+    RuntimeHandoffSnapshotV0,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -145,6 +167,26 @@ pub struct RuntimeHandoffSnapshot {
     pub static_synthetic_fixture: bool,
     pub generated_json_loaded: bool,
     pub live_runtime_connection: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneAdapterContract {
+    pub schema_version: &'static str,
+    pub adapter_kind: RuntimeControlPlaneAdapterKind,
+    pub input_mode: RuntimeControlPlaneInputMode,
+    pub adapter_state: RuntimeControlPlaneAdapterState,
+    pub output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema,
+    pub accepted_input_schemas: &'static [&'static str],
+    pub local_only: bool,
+    pub dependency_free: bool,
+    pub static_synthetic_fixture: bool,
+    pub json_parsing_enabled: bool,
+    pub file_io_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub qt_binding_enabled: bool,
     pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub non_claims: &'static [&'static str],
@@ -257,6 +299,38 @@ impl RuntimeControlPlaneState {
     }
 }
 
+impl RuntimeControlPlaneAdapterKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::StaticContractFixture => "static_contract_fixture",
+        }
+    }
+}
+
+impl RuntimeControlPlaneInputMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AcceptedSchemaDeclarationOnly => "accepted_schema_declaration_only",
+        }
+    }
+}
+
+impl RuntimeControlPlaneAdapterState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+impl RuntimeControlPlaneOutputSnapshotSchema {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RuntimeHandoffSnapshotV0 => RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+        }
+    }
+}
+
 impl RuntimeSummary {
     pub fn synthetic_fixture() -> Self {
         Self {
@@ -326,6 +400,46 @@ impl RuntimeHandoffSnapshot {
         }
     }
 }
+
+impl RuntimeControlPlaneAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
+            adapter_kind: RuntimeControlPlaneAdapterKind::StaticContractFixture,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedSchemaDeclarationOnly,
+            adapter_state: RuntimeControlPlaneAdapterState::Unavailable,
+            output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
+            accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
+            local_only: true,
+            dependency_free: true,
+            static_synthetic_fixture: true,
+            json_parsing_enabled: false,
+            file_io_enabled: false,
+            live_transport_enabled: false,
+            qt_binding_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            non_claims: RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS,
+        }
+    }
+}
+
+const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
+    RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+    RUNTIME_SUMMARY_SCHEMA_VERSION,
+    MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+];
+
+const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
+    "not_json_parser",
+    "not_file_io",
+    "not_live_transport",
+    "not_qt_binding",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_runtime_service",
+    "not_generated_report_loader",
+];
 
 const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
     "not_live_runtime_connection",
@@ -566,6 +680,56 @@ mod tests {
                 "not_model_promotion_gate",
                 "not_deployment_approval",
                 "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_control_plane_adapter_contract_fixture() {
+        let contract = RuntimeControlPlaneAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION
+        );
+        assert_eq!(contract.adapter_kind.as_str(), "static_contract_fixture");
+        assert_eq!(
+            contract.input_mode.as_str(),
+            "accepted_schema_declaration_only"
+        );
+        assert_eq!(contract.adapter_state.as_str(), "unavailable");
+        assert_eq!(
+            contract.output_snapshot_schema.as_str(),
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_input_schemas,
+            &[
+                RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+                RUNTIME_SUMMARY_SCHEMA_VERSION,
+                MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+            ]
+        );
+        assert!(contract.local_only);
+        assert!(contract.dependency_free);
+        assert!(contract.static_synthetic_fixture);
+        assert!(!contract.json_parsing_enabled);
+        assert!(!contract.file_io_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_json_parser",
+                "not_file_io",
+                "not_live_transport",
+                "not_qt_binding",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_runtime_service",
+                "not_generated_report_loader"
             ]
         );
     }
