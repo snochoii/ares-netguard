@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -9,7 +9,9 @@ pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
+pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
 pub const RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES: u64 = 256 * 1024;
+pub const RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES: usize = 96;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeIdError {
@@ -68,16 +70,16 @@ pub enum RuntimeControlPlaneAdapterError {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct WorkspaceId(String);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct SessionId(String);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct JobId(String);
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobKind {
     CompareModelScores,
@@ -86,7 +88,7 @@ pub enum JobKind {
     RenderWorkstationSnapshot,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobState {
     Queued,
@@ -96,7 +98,7 @@ pub enum JobState {
     Cancelled,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NativeInferenceRuntimeState {
     Unavailable,
@@ -104,67 +106,70 @@ pub enum NativeInferenceRuntimeState {
     Disabled,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelRegistryState {
     ObservedSyntheticOnly,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelPromotionState {
     NotPromoted,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeHandoffSourceKind {
     StaticSyntheticFixture,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeHandoffTransportState {
     Unavailable,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneState {
     Unavailable,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneAdapterKind {
     StaticContractFixture,
     LocalJsonStringParser,
     LocalJsonFileAdapter,
+    LocalControlPlaneMessageEnvelope,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneInputMode {
     AcceptedSchemaDeclarationOnly,
     AcceptedLocalJsonString,
     AcceptedLocalJsonFile,
+    AcceptedLocalMessageEnvelope,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneAdapterState {
     Unavailable,
     JsonStringParserAvailable,
     LocalFileAdapterAvailable,
+    LocalMessageEnvelopeAvailable,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeControlPlaneOutputSnapshotSchema {
     RuntimeHandoffSnapshotV0,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeSummary {
     pub schema_version: String,
@@ -178,7 +183,7 @@ pub struct RuntimeSummary {
     pub native_inference_state: NativeInferenceRuntimeState,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelRegistryMetadata {
     pub schema_version: String,
@@ -190,7 +195,7 @@ pub struct ModelRegistryMetadata {
     pub non_claims: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelRegistryEntry {
     pub model_id: String,
@@ -204,7 +209,7 @@ pub struct ModelRegistryEntry {
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelRegistryAggregateSummary {
     pub model_count: u32,
@@ -213,7 +218,7 @@ pub struct ModelRegistryAggregateSummary {
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelRegistrySafetyFlags {
     pub local_only: bool,
@@ -230,7 +235,7 @@ pub struct ModelRegistrySafetyFlags {
     pub deployment_allowed: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeHandoffSnapshot {
     pub schema_version: String,
@@ -268,7 +273,8 @@ pub struct RuntimeControlPlaneAdapterContract {
     pub non_claims: &'static [&'static str],
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeControlPlaneFilePolicy {
     pub allowed_root: PathBuf,
 }
@@ -282,6 +288,76 @@ pub enum RuntimeControlPlaneCommand {
         path: PathBuf,
         policy: RuntimeControlPlaneFilePolicy,
     },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct RuntimeControlPlaneRequestId(String);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneMessageRequest {
+    pub schema_version: String,
+    pub request_id: RuntimeControlPlaneRequestId,
+    pub command: RuntimeControlPlaneCommand,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeControlPlaneMessageResponse {
+    pub schema_version: String,
+    pub request_id: RuntimeControlPlaneRequestId,
+    pub outcome: RuntimeControlPlaneMessageOutcome,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<RuntimeHandoffSnapshot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<RuntimeControlPlaneMessageErrorCode>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeControlPlaneMessageOutcome {
+    Success,
+    Failure,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeControlPlaneMessageErrorCode {
+    InvalidJson,
+    NonObjectRoot,
+    RelativeFilePath,
+    RelativeAllowedRoot,
+    MissingFile,
+    MissingAllowedRoot,
+    AllowedRootSymlink,
+    AllowedRootNotDirectory,
+    SymlinkPath,
+    DirectoryPath,
+    NonRegularFile,
+    UnsupportedFileExtension,
+    OutsideAllowedRoot,
+    OversizedFile,
+    FileReadFailed,
+    InvalidUtf8,
+    UnsupportedSchemaVersion,
+    UnsupportedValue,
+    UnsafeFlag,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct RawRuntimeControlPlaneMessageRequest {
+    schema_version: String,
+    request_id: String,
+    command: RawRuntimeControlPlaneMessageCommand,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct RawRuntimeControlPlaneMessageCommand {
+    command_kind: String,
+    input: Option<String>,
+    path: Option<PathBuf>,
+    policy: Option<RuntimeControlPlaneFilePolicy>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -334,6 +410,17 @@ impl<'de> Deserialize<'de> for JobId {
     }
 }
 
+impl<'de> Deserialize<'de> for RuntimeControlPlaneRequestId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value)
+            .map_err(|_| serde::de::Error::custom("runtime control-plane request id is unsafe"))
+    }
+}
+
 impl WorkspaceId {
     pub fn new(value: impl Into<String>) -> Result<Self, RuntimeIdError> {
         let value = value.into();
@@ -362,6 +449,18 @@ impl JobId {
     pub fn new(value: impl Into<String>) -> Result<Self, RuntimeIdError> {
         let value = value.into();
         validate_coarse_id(&value, &["job-", "fixture-job-"])?;
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl RuntimeControlPlaneRequestId {
+    pub fn new(value: impl Into<String>) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        let value = value.into();
+        validate_control_plane_request_id(&value)?;
         Ok(Self(value))
     }
 
@@ -432,6 +531,7 @@ impl RuntimeControlPlaneAdapterKind {
             Self::StaticContractFixture => "static_contract_fixture",
             Self::LocalJsonStringParser => "local_json_string_parser",
             Self::LocalJsonFileAdapter => "local_json_file_adapter",
+            Self::LocalControlPlaneMessageEnvelope => "local_control_plane_message_envelope",
         }
     }
 }
@@ -442,6 +542,7 @@ impl RuntimeControlPlaneInputMode {
             Self::AcceptedSchemaDeclarationOnly => "accepted_schema_declaration_only",
             Self::AcceptedLocalJsonString => "accepted_local_json_string",
             Self::AcceptedLocalJsonFile => "accepted_local_json_file",
+            Self::AcceptedLocalMessageEnvelope => "accepted_local_message_envelope",
         }
     }
 }
@@ -452,6 +553,7 @@ impl RuntimeControlPlaneAdapterState {
             Self::Unavailable => "unavailable",
             Self::JsonStringParserAvailable => "json_string_parser_available",
             Self::LocalFileAdapterAvailable => "local_file_adapter_available",
+            Self::LocalMessageEnvelopeAvailable => "local_message_envelope_available",
         }
     }
 }
@@ -460,6 +562,73 @@ impl RuntimeControlPlaneOutputSnapshotSchema {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::RuntimeHandoffSnapshotV0 => RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+        }
+    }
+}
+
+impl RuntimeControlPlaneMessageOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Success => "success",
+            Self::Failure => "failure",
+        }
+    }
+}
+
+impl RuntimeControlPlaneMessageErrorCode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidJson => "invalid_json",
+            Self::NonObjectRoot => "non_object_root",
+            Self::RelativeFilePath => "relative_file_path",
+            Self::RelativeAllowedRoot => "relative_allowed_root",
+            Self::MissingFile => "missing_file",
+            Self::MissingAllowedRoot => "missing_allowed_root",
+            Self::AllowedRootSymlink => "allowed_root_symlink",
+            Self::AllowedRootNotDirectory => "allowed_root_not_directory",
+            Self::SymlinkPath => "symlink_path",
+            Self::DirectoryPath => "directory_path",
+            Self::NonRegularFile => "non_regular_file",
+            Self::UnsupportedFileExtension => "unsupported_file_extension",
+            Self::OutsideAllowedRoot => "outside_allowed_root",
+            Self::OversizedFile => "oversized_file",
+            Self::FileReadFailed => "file_read_failed",
+            Self::InvalidUtf8 => "invalid_utf8",
+            Self::UnsupportedSchemaVersion => "unsupported_schema_version",
+            Self::UnsupportedValue => "unsupported_value",
+            Self::UnsafeFlag => "unsafe_flag",
+        }
+    }
+}
+
+impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorCode {
+    fn from(error: &RuntimeControlPlaneAdapterError) -> Self {
+        match error {
+            RuntimeControlPlaneAdapterError::InvalidJson => Self::InvalidJson,
+            RuntimeControlPlaneAdapterError::NonObjectRoot => Self::NonObjectRoot,
+            RuntimeControlPlaneAdapterError::RelativeFilePath => Self::RelativeFilePath,
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot => Self::RelativeAllowedRoot,
+            RuntimeControlPlaneAdapterError::MissingFile => Self::MissingFile,
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot => Self::MissingAllowedRoot,
+            RuntimeControlPlaneAdapterError::AllowedRootSymlink => Self::AllowedRootSymlink,
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory => {
+                Self::AllowedRootNotDirectory
+            }
+            RuntimeControlPlaneAdapterError::SymlinkPath => Self::SymlinkPath,
+            RuntimeControlPlaneAdapterError::DirectoryPath => Self::DirectoryPath,
+            RuntimeControlPlaneAdapterError::NonRegularFile => Self::NonRegularFile,
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension => {
+                Self::UnsupportedFileExtension
+            }
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot => Self::OutsideAllowedRoot,
+            RuntimeControlPlaneAdapterError::OversizedFile { .. } => Self::OversizedFile,
+            RuntimeControlPlaneAdapterError::FileReadFailed => Self::FileReadFailed,
+            RuntimeControlPlaneAdapterError::InvalidUtf8 => Self::InvalidUtf8,
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion { .. } => {
+                Self::UnsupportedSchemaVersion
+            }
+            RuntimeControlPlaneAdapterError::UnsupportedValue { .. } => Self::UnsupportedValue,
+            RuntimeControlPlaneAdapterError::UnsafeFlag { .. } => Self::UnsafeFlag,
         }
     }
 }
@@ -538,9 +707,9 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonFileAdapter,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonFile,
-            adapter_state: RuntimeControlPlaneAdapterState::LocalFileAdapterAvailable,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneMessageEnvelope,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageEnvelope,
+            adapter_state: RuntimeControlPlaneAdapterState::LocalMessageEnvelopeAvailable,
             output_snapshot_schema:
                 RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
@@ -601,6 +770,55 @@ impl RuntimeControlPlaneAdapterContract {
             }
         }
     }
+
+    pub fn parse_control_plane_message_request_json(
+        input: &str,
+    ) -> Result<RuntimeControlPlaneMessageRequest, RuntimeControlPlaneAdapterError> {
+        match input.trim_start().as_bytes().first() {
+            Some(b'{') => {}
+            Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+            None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+        }
+
+        let raw_request: RawRuntimeControlPlaneMessageRequest = serde_json::from_str(input)
+            .map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+        validate_schema_version(
+            "schema_version",
+            &raw_request.schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+        )?;
+        let request_id = RuntimeControlPlaneRequestId::new(raw_request.request_id)?;
+        let command = parse_runtime_control_plane_message_command(raw_request.command)?;
+
+        Ok(RuntimeControlPlaneMessageRequest {
+            schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION.to_owned(),
+            request_id,
+            command,
+        })
+    }
+
+    pub fn execute_control_plane_message_request(
+        request: RuntimeControlPlaneMessageRequest,
+    ) -> RuntimeControlPlaneMessageResponse {
+        let request_id = request.request_id;
+        match Self::execute_local_command(request.command) {
+            Ok(snapshot) => RuntimeControlPlaneMessageResponse::success(request_id, snapshot),
+            Err(error) => RuntimeControlPlaneMessageResponse::failure(request_id, (&error).into()),
+        }
+    }
+
+    pub fn execute_control_plane_message_json(
+        input: &str,
+    ) -> Result<RuntimeControlPlaneMessageResponse, RuntimeControlPlaneAdapterError> {
+        let request = Self::parse_control_plane_message_request_json(input)?;
+        Ok(Self::execute_control_plane_message_request(request))
+    }
+
+    pub fn serialize_control_plane_message_response_json(
+        response: &RuntimeControlPlaneMessageResponse,
+    ) -> Result<String, RuntimeControlPlaneAdapterError> {
+        serde_json::to_string(response).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)
+    }
 }
 
 impl RuntimeControlPlaneFilePolicy {
@@ -641,6 +859,91 @@ impl RuntimeControlPlaneCommand {
 
     pub fn output_snapshot_schema(&self) -> RuntimeControlPlaneOutputSnapshotSchema {
         RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0
+    }
+}
+
+impl RuntimeControlPlaneMessageRequest {
+    pub fn new(
+        request_id: impl Into<String>,
+        command: RuntimeControlPlaneCommand,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        Ok(Self {
+            schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION.to_owned(),
+            request_id: RuntimeControlPlaneRequestId::new(request_id)?,
+            command,
+        })
+    }
+}
+
+impl RuntimeControlPlaneMessageResponse {
+    pub fn success(
+        request_id: RuntimeControlPlaneRequestId,
+        snapshot: RuntimeHandoffSnapshot,
+    ) -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION.to_owned(),
+            request_id,
+            outcome: RuntimeControlPlaneMessageOutcome::Success,
+            snapshot: Some(snapshot),
+            error_code: None,
+        }
+    }
+
+    pub fn failure(
+        request_id: RuntimeControlPlaneRequestId,
+        error_code: RuntimeControlPlaneMessageErrorCode,
+    ) -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION.to_owned(),
+            request_id,
+            outcome: RuntimeControlPlaneMessageOutcome::Failure,
+            snapshot: None,
+            error_code: Some(error_code),
+        }
+    }
+}
+
+fn parse_runtime_control_plane_message_command(
+    raw_command: RawRuntimeControlPlaneMessageCommand,
+) -> Result<RuntimeControlPlaneCommand, RuntimeControlPlaneAdapterError> {
+    match raw_command.command_kind.as_str() {
+        "parse_handoff_snapshot_json" => {
+            if raw_command.path.is_some() || raw_command.policy.is_some() {
+                return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field: "command" });
+            }
+            let input =
+                raw_command
+                    .input
+                    .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "command.input",
+                    })?;
+            Ok(RuntimeControlPlaneCommand::parse_handoff_snapshot_json(
+                input,
+            ))
+        }
+        "parse_handoff_snapshot_file" => {
+            if raw_command.input.is_some() {
+                return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field: "command" });
+            }
+            let path =
+                raw_command
+                    .path
+                    .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "command.path",
+                    })?;
+            let policy =
+                raw_command
+                    .policy
+                    .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "command.policy",
+                    })?;
+            Ok(RuntimeControlPlaneCommand::parse_handoff_snapshot_file(
+                path, policy,
+            ))
+        }
+        _ => Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "command.command_kind",
+        }),
     }
 }
 
@@ -1094,17 +1397,48 @@ fn validate_safe_event_label(
     Ok(())
 }
 
+fn validate_control_plane_request_id(value: &str) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if value.is_empty() || value.len() > RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "request_id",
+        });
+    }
+    let lowered = value.to_ascii_lowercase();
+    if value.contains('.')
+        || value.contains(':')
+        || value.contains('@')
+        || value.contains('/')
+        || value.contains('\\')
+        || lowered
+            .split(['-', '_'])
+            .any(|part| RUNTIME_CONTROL_PLANE_REQUEST_ID_BLOCKED_PARTS.contains(&part))
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+        })
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "request_id",
+        });
+    }
+    Ok(())
+}
+
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
+    RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
     RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
     RUNTIME_SUMMARY_SCHEMA_VERSION,
     MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
 ];
+
+const RUNTIME_CONTROL_PLANE_REQUEST_ID_BLOCKED_PARTS: &[&str] =
+    &["private", "secret", "credential"];
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_arbitrary_file_loader",
     "not_file_watcher",
     "not_ipc_or_socket_transport",
     "not_live_transport",
+    "not_message_transport",
     "not_qt_binding",
     "not_external_service",
     "not_deployment_approval",
@@ -1706,6 +2040,42 @@ mod tests {
         )
     }
 
+    fn json_message_request(request_id: &str, input: &str) -> String {
+        format!(
+            r#"{{
+  "schema_version": "{schema_version}",
+  "request_id": {request_id},
+  "command": {{
+    "command_kind": "parse_handoff_snapshot_json",
+    "input": {input}
+  }}
+}}"#,
+            schema_version = RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            request_id = serde_json::to_string(request_id).unwrap(),
+            input = serde_json::to_string(input).unwrap()
+        )
+    }
+
+    fn file_message_request(request_id: &str, path: &Path, allowed_root: &Path) -> String {
+        format!(
+            r#"{{
+  "schema_version": "{schema_version}",
+  "request_id": {request_id},
+  "command": {{
+    "command_kind": "parse_handoff_snapshot_file",
+    "path": {path},
+    "policy": {{
+      "allowed_root": {allowed_root}
+    }}
+  }}
+}}"#,
+            schema_version = RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            request_id = serde_json::to_string(request_id).unwrap(),
+            path = serde_json::to_string(path.to_str().unwrap()).unwrap(),
+            allowed_root = serde_json::to_string(allowed_root.to_str().unwrap()).unwrap()
+        )
+    }
+
     fn remove_temp_root(root: &Path) {
         let _ = std::fs::remove_dir_all(root);
     }
@@ -1877,11 +2247,17 @@ mod tests {
             contract.schema_version,
             RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION
         );
-        assert_eq!(contract.adapter_kind.as_str(), "local_json_file_adapter");
-        assert_eq!(contract.input_mode.as_str(), "accepted_local_json_file");
+        assert_eq!(
+            contract.adapter_kind.as_str(),
+            "local_control_plane_message_envelope"
+        );
+        assert_eq!(
+            contract.input_mode.as_str(),
+            "accepted_local_message_envelope"
+        );
         assert_eq!(
             contract.adapter_state.as_str(),
-            "local_file_adapter_available"
+            "local_message_envelope_available"
         );
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
@@ -1890,6 +2266,7 @@ mod tests {
         assert_eq!(
             contract.accepted_input_schemas,
             &[
+                RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
                 RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
                 RUNTIME_SUMMARY_SCHEMA_VERSION,
                 MODEL_REGISTRY_METADATA_SCHEMA_VERSION
@@ -1911,6 +2288,7 @@ mod tests {
                 "not_file_watcher",
                 "not_ipc_or_socket_transport",
                 "not_live_transport",
+                "not_message_transport",
                 "not_qt_binding",
                 "not_external_service",
                 "not_deployment_approval",
@@ -1954,6 +2332,48 @@ mod tests {
         );
 
         remove_temp_root(&root);
+    }
+
+    #[test]
+    fn exposes_runtime_control_plane_message_envelope_types() {
+        let request = RuntimeControlPlaneMessageRequest::new(
+            "request-json-001",
+            RuntimeControlPlaneCommand::parse_handoff_snapshot_json(synthetic_handoff_json()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            request.schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(request.request_id.as_str(), "request-json-001");
+        assert_eq!(
+            request.command.command_kind(),
+            "parse_handoff_snapshot_json"
+        );
+
+        let success = RuntimeControlPlaneMessageResponse::success(
+            request.request_id.clone(),
+            RuntimeHandoffSnapshot::synthetic_fixture(),
+        );
+        assert_eq!(
+            success.schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(success.outcome.as_str(), "success");
+        assert!(success.snapshot.is_some());
+        assert!(success.error_code.is_none());
+
+        let failure = RuntimeControlPlaneMessageResponse::failure(
+            request.request_id,
+            RuntimeControlPlaneMessageErrorCode::InvalidJson,
+        );
+        assert_eq!(failure.outcome.as_str(), "failure");
+        assert!(failure.snapshot.is_none());
+        assert_eq!(
+            failure.error_code.unwrap().as_str(),
+            RuntimeControlPlaneMessageErrorCode::InvalidJson.as_str()
+        );
     }
 
     #[test]
@@ -2032,6 +2452,36 @@ mod tests {
     }
 
     #[test]
+    fn dispatches_runtime_control_plane_json_message_request() {
+        let response = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+            &json_message_request("request-json-001", synthetic_handoff_json()),
+        )
+        .unwrap();
+        let from_command = RuntimeControlPlaneAdapterContract::execute_local_command(
+            RuntimeControlPlaneCommand::parse_handoff_snapshot_json(synthetic_handoff_json()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            response.schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(response.request_id.as_str(), "request-json-001");
+        assert_eq!(response.outcome, RuntimeControlPlaneMessageOutcome::Success);
+        assert_eq!(response.snapshot.as_ref().unwrap(), &from_command);
+        assert!(response.error_code.is_none());
+
+        let serialized =
+            RuntimeControlPlaneAdapterContract::serialize_control_plane_message_response_json(
+                &response,
+            )
+            .unwrap();
+        let parsed_response: RuntimeControlPlaneMessageResponse =
+            serde_json::from_str(&serialized).unwrap();
+        assert_eq!(parsed_response, response);
+    }
+
+    #[test]
     fn parses_runtime_handoff_snapshot_file_under_allowed_root() {
         let root = temp_policy_root("valid-file");
         let path = write_test_file(
@@ -2056,6 +2506,32 @@ mod tests {
             from_file.runtime_summary.workspace_id.as_str(),
             "fixture-workspace-alpha"
         );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn dispatches_runtime_control_plane_file_message_request() {
+        let root = temp_policy_root("valid-file-message");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        let response = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+            &file_message_request("request-file-001", &path, &root),
+        )
+        .unwrap();
+        let from_file =
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&path, &policy)
+                .unwrap();
+
+        assert_eq!(response.request_id.as_str(), "request-file-001");
+        assert_eq!(response.outcome, RuntimeControlPlaneMessageOutcome::Success);
+        assert_eq!(response.snapshot.as_ref().unwrap(), &from_file);
+        assert!(response.error_code.is_none());
 
         remove_temp_root(&root);
     }
@@ -2137,6 +2613,191 @@ mod tests {
         assert_eq!(
             execute_json_command(unsupported_schema_shape).unwrap_err(),
             RuntimeControlPlaneAdapterError::InvalidJson
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_runtime_control_plane_request_ids() {
+        for request_id in [
+            "",
+            "request.raw",
+            "request@example",
+            "scheme:/request",
+            "private-request",
+            "secret_request",
+        ] {
+            assert_eq!(
+                RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                    &json_message_request(request_id, synthetic_handoff_json()),
+                )
+                .unwrap_err(),
+                RuntimeControlPlaneAdapterError::UnsupportedValue {
+                    field: "request_id",
+                }
+            );
+        }
+
+        let too_long_request_id = format!(
+            "request-{}",
+            "a".repeat(RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES)
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                &json_message_request(&too_long_request_id, synthetic_handoff_json()),
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "request_id",
+            }
+        );
+    }
+
+    #[test]
+    fn message_request_parsing_fails_closed_for_schema_and_command_drift() {
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json("{")
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json("[]")
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let unsupported_schema = json_message_request("request-json-002", synthetic_handoff_json())
+            .replacen(
+                RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+                "runtime_control_plane_message.v1",
+                1,
+            );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                &unsupported_schema,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            }
+        );
+
+        let unknown_root_field = json_message_request("request-json-003", synthetic_handoff_json())
+            .replacen(
+                r#"  "request_id": "request-json-003","#,
+                r#"  "request_id": "request-json-003",
+  "unexpected_field": true,"#,
+                1,
+            );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                &unknown_root_field,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let unsupported_command = json_message_request(
+            "request-json-004",
+            synthetic_handoff_json(),
+        )
+        .replacen("parse_handoff_snapshot_json", "open_runtime_service", 1);
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                &unsupported_command,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "command.command_kind",
+            }
+        );
+
+        let mixed_command = json_message_request("request-json-005", synthetic_handoff_json())
+            .replacen(
+                r#"    "input": "#,
+                r#"    "path": "/tmp/runtime_handoff_snapshot.json",
+    "input": "#,
+                1,
+            );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(
+                &mixed_command,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue { field: "command" }
+        );
+    }
+
+    #[test]
+    fn message_execution_returns_failure_responses_for_nested_handoff_rejections() {
+        let malformed = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+            &json_message_request("request-json-006", "{"),
+        )
+        .unwrap();
+        assert_eq!(malformed.request_id.as_str(), "request-json-006");
+        assert_eq!(
+            malformed.outcome,
+            RuntimeControlPlaneMessageOutcome::Failure
+        );
+        assert!(malformed.snapshot.is_none());
+        assert_eq!(
+            malformed.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidJson)
+        );
+
+        let unsafe_flag = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+            &json_message_request(
+                "request-json-007",
+                &patched_json(
+                    "  \"generated_json_loaded\": false,\n  \"live_runtime_connection\": false",
+                    "  \"generated_json_loaded\": true,\n  \"live_runtime_connection\": false",
+                ),
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            unsafe_flag.outcome,
+            RuntimeControlPlaneMessageOutcome::Failure
+        );
+        assert_eq!(
+            unsafe_flag.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::UnsafeFlag)
+        );
+
+        let schema_drift = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+            &json_message_request(
+                "request-json-008",
+                &patched_json(
+                    r#""schema_version": "runtime_handoff_snapshot.v0""#,
+                    r#""schema_version": "runtime_handoff_snapshot.v1""#,
+                ),
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            schema_drift.outcome,
+            RuntimeControlPlaneMessageOutcome::Failure
+        );
+        assert_eq!(
+            schema_drift.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::UnsupportedSchemaVersion)
+        );
+
+        let registry_drift =
+            RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
+                &json_message_request(
+                    "request-json-009",
+                    &patched_json(r#""model_count": 10"#, r#""model_count": 9"#),
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            registry_drift.outcome,
+            RuntimeControlPlaneMessageOutcome::Failure
+        );
+        assert_eq!(
+            registry_drift.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::UnsupportedValue)
         );
     }
 
