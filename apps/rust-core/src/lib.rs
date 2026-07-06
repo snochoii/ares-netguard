@@ -1959,7 +1959,7 @@ fn validate_model_registry_entry(
             source_schema,
         )?;
     }
-    validate_sorted_strings(
+    validate_sorted_unique_strings(
         "model_registry_metadata.entries.observed_source_names",
         &entry.observed_source_names,
     )?;
@@ -2084,16 +2084,6 @@ fn validate_exact_strings(
             .zip(expected.iter())
             .all(|(actual, expected)| actual == expected)
     {
-        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
-    }
-    Ok(())
-}
-
-fn validate_sorted_strings(
-    field: &'static str,
-    values: &[String],
-) -> Result<(), RuntimeControlPlaneAdapterError> {
-    if values.windows(2).any(|pair| pair[0] > pair[1]) {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
     }
     Ok(())
@@ -5534,6 +5524,18 @@ mod tests {
             parse_model_registry_metadata_json(&patched_metadata_json(
                 r#""temporal_security_graph_report_v0_001""#,
                 r#""temporal_security_graph_report.json""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_names",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""detection_candidate_report_v0_001",
+        "model_disagreement_report_v0_001""#,
+                r#""detection_candidate_report_v0_001",
+        "detection_candidate_report_v0_001""#,
             ))
             .unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
