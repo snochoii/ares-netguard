@@ -72,6 +72,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFilePolicy",
+        "RuntimeControlPlaneCommand",
         "RuntimeControlPlaneAdapterError",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
@@ -94,9 +95,14 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "JsonStringParserAvailable",
         "LocalFileAdapterAvailable",
         "RuntimeHandoffSnapshotV0",
+        "ParseHandoffSnapshotJson",
+        "ParseHandoffSnapshotFile",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
         "parse_handoff_snapshot_file",
+        "execute_local_command",
+        "command_kind",
+        "output_snapshot_schema",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -276,6 +282,17 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub allowed_root: PathBuf" in lib_rs
     assert "pub fn new(allowed_root: impl Into<PathBuf>) -> Self" in lib_rs
     assert "pub fn max_bytes(&self) -> u64" in lib_rs
+    assert "pub enum RuntimeControlPlaneCommand" in lib_rs
+    assert "ParseHandoffSnapshotJson {" in lib_rs
+    assert "input: String" in lib_rs
+    assert "ParseHandoffSnapshotFile {" in lib_rs
+    assert "policy: RuntimeControlPlaneFilePolicy" in lib_rs
+    assert "pub fn execute_local_command(" in lib_rs
+    assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
+    assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
+    assert "pub fn command_kind(&self) -> &'static str" in lib_rs
+    assert '=> "parse_handoff_snapshot_json"' in lib_rs
+    assert '=> "parse_handoff_snapshot_file"' in lib_rs
     assert "!file_metadata.file_type().is_file()" in lib_rs
 
 
@@ -500,7 +517,9 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "std::fs" in rust_source
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
+    assert "RuntimeControlPlaneCommand" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
+    assert "execute_local_command" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
@@ -539,6 +558,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFilePolicy",
+        "RuntimeControlPlaneCommand",
         "static runtime_summary.v0 handoff",
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
@@ -546,6 +566,11 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "accepted local handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
         "bounded local file adapter is now enabled",
+        "typed local command dispatcher",
+        "RuntimeControlPlaneCommand",
+        "execute_local_command",
+        "ParseHandoffSnapshotJson",
+        "ParseHandoffSnapshotFile",
         "parse_handoff_snapshot_file",
         "absolute `.json` path",
         "canonical allowed root",
@@ -558,8 +583,8 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "Live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
+        "typed local control-plane command dispatcher over JSON/file parsers",
         "local IPC/control-plane adapter",
-        "local control-plane adapter",
         "does not implement a daemon",
         "not arbitrary file loading",
         "not file watching",

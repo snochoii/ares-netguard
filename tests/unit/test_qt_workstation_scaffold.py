@@ -268,6 +268,7 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "runtime_control_plane_adapter.v0",
         "static runtime_control_plane_adapter.v0 contract in the Rust runtime",
         "Rust JSON-string parser and bounded local file adapter for local handoff snapshots",
+        "typed local control-plane command dispatcher",
         "future local IPC/control-plane adapter from the Rust runtime",
         "Qt still performs no file I/O",
         "has no IPC, live runtime service, Qt data binding",
@@ -288,6 +289,7 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "does not read generated reports",
         "runtime_control_plane_adapter.v0",
         "Rust JSON-string parser and bounded local file adapter for local handoff snapshots",
+        "typed local control-plane command dispatcher",
         "future local IPC/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:
