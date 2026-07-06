@@ -48,7 +48,8 @@ claiming adapter behavior.
 
 The scaffold now also owns a `runtime_control_plane_adapter.v0` contract through
 `RuntimeControlPlaneAdapterContract`. The adapter contract declares the accepted
-local handoff schemas, `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
+local message and handoff schemas, `runtime_control_plane_message.v0`,
+`runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
 `model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
 `RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
 `RuntimeControlPlaneOutputSnapshotSchema`. JSON-string parsing is now enabled
@@ -87,6 +88,26 @@ is still local and pre-IPC; it does not add sockets, daemon lifecycle,
 watching, storage, generated report loading, Qt binding, capture, deployment,
 external services, or native inference execution.
 
+The scaffold now adds a strict local `runtime_control_plane_message.v0`
+request/response message envelope over the typed local command dispatcher.
+`RuntimeControlPlaneMessageRequest` carries the schema version, a
+caller-supplied `RuntimeControlPlaneRequestId`, and exactly one local command.
+The request parser rejects malformed JSON, unknown fields, unsupported message
+schema versions, unsafe request identifiers, unsupported command variants,
+mixed command fields, and then delegates nested handoff snapshots to the same
+strict JSON-string or bounded local file command paths. `RuntimeControlPlaneMessageResponse`
+returns the same schema version and request identifier with
+`RuntimeControlPlaneMessageOutcome::Success` plus a typed
+`RuntimeHandoffSnapshot`, or `RuntimeControlPlaneMessageOutcome::Failure` plus a
+`RuntimeControlPlaneMessageErrorCode` mapped from the existing
+`RuntimeControlPlaneAdapterError` categories. Response serialization is
+available through
+`RuntimeControlPlaneAdapterContract::serialize_control_plane_message_response_json`.
+This remains pre-transport contract code only: it adds no daemon, listener,
+socket, file watcher, process spawning, storage provider, Qt binding, generated
+report loader, capture behavior, deployment behavior, external service, or
+native inference execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
@@ -99,10 +120,10 @@ path. The handoff snapshot is not a live
 control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
-local command dispatcher only; it is not arbitrary file loading, not file
-watching, not socket/IPC transport, not Qt binding, not external-service
-integration, not storage, not deployment behavior, not capture behavior, and
-not native inference execution.
+local command dispatcher and strict local request/response message envelope
+only; it is not arbitrary file loading, not file watching, not socket/IPC
+transport, not Qt binding, not external-service integration, not storage, not
+deployment behavior, not capture behavior, and not native inference execution.
 
 Expected integration path:
 
@@ -115,6 +136,7 @@ Rust source contract
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
   -> typed JSON-string parser and bounded local file adapter for handoff snapshots
   -> typed local control-plane command dispatcher over JSON/file parsers
+  -> strict runtime_control_plane_message.v0 local request/response envelope
   -> local IPC/control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider

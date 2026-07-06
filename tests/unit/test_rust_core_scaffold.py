@@ -49,7 +49,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES",
+        "RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES",
         "WorkspaceId",
         "SessionId",
         "JobId",
@@ -73,6 +75,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
+        "RuntimeControlPlaneRequestId",
+        "RuntimeControlPlaneMessageRequest",
+        "RuntimeControlPlaneMessageResponse",
+        "RuntimeControlPlaneMessageOutcome",
+        "RuntimeControlPlaneMessageErrorCode",
         "RuntimeControlPlaneAdapterError",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
@@ -89,18 +96,29 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "StaticContractFixture",
         "LocalJsonStringParser",
         "LocalJsonFileAdapter",
+        "LocalControlPlaneMessageEnvelope",
         "AcceptedSchemaDeclarationOnly",
         "AcceptedLocalJsonString",
         "AcceptedLocalJsonFile",
+        "AcceptedLocalMessageEnvelope",
         "JsonStringParserAvailable",
         "LocalFileAdapterAvailable",
+        "LocalMessageEnvelopeAvailable",
         "RuntimeHandoffSnapshotV0",
         "ParseHandoffSnapshotJson",
         "ParseHandoffSnapshotFile",
+        "Success",
+        "Failure",
+        "InvalidJson",
+        "UnsafeFlag",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
         "parse_handoff_snapshot_file",
         "execute_local_command",
+        "parse_control_plane_message_request_json",
+        "execute_control_plane_message_request",
+        "execute_control_plane_message_json",
+        "serialize_control_plane_message_response_json",
         "command_kind",
         "output_snapshot_schema",
     ]
@@ -121,9 +139,15 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_adapter.v0";' in " ".join(lib_rs.split())
     )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_message.v0";' in " ".join(lib_rs.split())
+    )
     assert "fn validate_coarse_id(" in lib_rs
+    assert "fn validate_control_plane_request_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
     assert "serde_json::from_str" in lib_rs
+    assert "serde_json::to_string" in lib_rs
     assert "serde_json::from_value" not in lib_rs
     assert "use std::fs;" in lib_rs
     assert "use std::path::{Path, PathBuf};" in lib_rs
@@ -296,6 +320,78 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "!file_metadata.file_type().is_file()" in lib_rs
 
 
+def test_rust_core_exposes_control_plane_message_envelope_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub struct RuntimeControlPlaneRequestId",
+        "pub struct RuntimeControlPlaneMessageRequest",
+        "pub schema_version: String",
+        "pub request_id: RuntimeControlPlaneRequestId",
+        "pub command: RuntimeControlPlaneCommand",
+        "pub struct RuntimeControlPlaneMessageResponse",
+        "pub outcome: RuntimeControlPlaneMessageOutcome",
+        "pub snapshot: Option<RuntimeHandoffSnapshot>",
+        "pub error_code: Option<RuntimeControlPlaneMessageErrorCode>",
+        "pub enum RuntimeControlPlaneMessageOutcome",
+        "Success",
+        "Failure",
+        "pub enum RuntimeControlPlaneMessageErrorCode",
+        "UnsupportedSchemaVersion",
+        "UnsupportedValue",
+        "UnsafeFlag",
+        "RawRuntimeControlPlaneMessageRequest",
+        "RawRuntimeControlPlaneMessageCommand",
+        "command_kind: String",
+        "input: Option<String>",
+        "path: Option<PathBuf>",
+        "policy: Option<RuntimeControlPlaneFilePolicy>",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_helpers = [
+        "impl RuntimeControlPlaneRequestId",
+        "pub fn new(value: impl Into<String>) -> Result<Self, RuntimeControlPlaneAdapterError>",
+        "pub fn as_str(&self) -> &str",
+        "impl RuntimeControlPlaneMessageRequest",
+        "pub fn new(",
+        "impl RuntimeControlPlaneMessageResponse",
+        "pub fn success(",
+        "pub fn failure(",
+        "impl RuntimeControlPlaneMessageOutcome",
+        "impl RuntimeControlPlaneMessageErrorCode",
+        "impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorCode",
+        "parse_control_plane_message_request_json",
+        "execute_control_plane_message_request",
+        "execute_control_plane_message_json",
+        "serialize_control_plane_message_response_json",
+        "parse_runtime_control_plane_message_command",
+        "validate_control_plane_request_id",
+    ]
+    for helper in expected_helpers:
+        assert helper in lib_rs
+
+    expected_values = [
+        '"runtime_control_plane_message.v0"',
+        '"success"',
+        '"failure"',
+        '"invalid_json"',
+        '"non_object_root"',
+        '"unsupported_schema_version"',
+        '"unsupported_value"',
+        '"unsafe_flag"',
+        '"parse_handoff_snapshot_json"',
+        '"parse_handoff_snapshot_file"',
+        '"command.command_kind"',
+        '"request_id"',
+    ]
+    for value in expected_values:
+        assert value in lib_rs
+
+    assert '#[serde(skip_serializing_if = "Option::is_none")]' in lib_rs
+
+
 def test_rust_core_static_handoff_fixture_composes_existing_contracts() -> None:
     lib_rs = _read("src/lib.rs")
 
@@ -335,16 +431,18 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     expected_values = [
         '"runtime_control_plane_adapter.v0"',
+        '"runtime_control_plane_message.v0"',
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"local_json_file_adapter"',
-        '"accepted_local_json_file"',
-        '"local_file_adapter_available"',
+        '"local_control_plane_message_envelope"',
+        '"accepted_local_message_envelope"',
+        '"local_message_envelope_available"',
         '"not_arbitrary_file_loader"',
         '"not_file_watcher"',
         '"not_ipc_or_socket_transport"',
         '"not_live_transport"',
+        '"not_message_transport"',
         '"not_qt_binding"',
         '"not_external_service"',
         '"not_deployment_approval"',
@@ -354,9 +452,17 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     for value in expected_values:
         assert value in lib_rs
 
-    assert "adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonFileAdapter" in lib_rs
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonFile" in lib_rs
-    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalFileAdapterAvailable" in lib_rs
+    assert (
+        "adapter_kind: RuntimeControlPlaneAdapterKind::"
+        "LocalControlPlaneMessageEnvelope" in " ".join(lib_rs.split())
+    )
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageEnvelope" in " ".join(
+        lib_rs.split()
+    )
+    assert (
+        "adapter_state: RuntimeControlPlaneAdapterState::"
+        "LocalMessageEnvelopeAvailable" in " ".join(lib_rs.split())
+    )
     assert (
         "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
         "RuntimeHandoffSnapshotV0" in " ".join(lib_rs.split())
@@ -381,6 +487,7 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     assert [
         schema.strip() for schema in accepted_schema_block.group(1).split(",") if schema.strip()
     ] == [
+        "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
@@ -518,9 +625,16 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
     assert "RuntimeControlPlaneCommand" in rust_source
+    assert "RuntimeControlPlaneMessageRequest" in rust_source
+    assert "RuntimeControlPlaneMessageResponse" in rust_source
+    assert "RuntimeControlPlaneMessageErrorCode" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
     assert "execute_local_command" in rust_source
+    assert "parse_control_plane_message_request_json" in rust_source
+    assert "execute_control_plane_message_json" in rust_source
+    assert "serialize_control_plane_message_response_json" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION" in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
 
@@ -559,11 +673,17 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
+        "runtime_control_plane_message.v0",
+        "RuntimeControlPlaneMessageRequest",
+        "RuntimeControlPlaneRequestId",
+        "RuntimeControlPlaneMessageResponse",
+        "RuntimeControlPlaneMessageOutcome",
+        "RuntimeControlPlaneMessageErrorCode",
         "static runtime_summary.v0 handoff",
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
-        "accepted local handoff schemas",
+        "accepted local message and handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
         "bounded local file adapter is now enabled",
         "typed local command dispatcher",
@@ -572,6 +692,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "ParseHandoffSnapshotJson",
         "ParseHandoffSnapshotFile",
         "parse_handoff_snapshot_file",
+        "strict local `runtime_control_plane_message.v0` request/response message envelope",
+        "caller-supplied `RuntimeControlPlaneRequestId`",
+        "rejects malformed JSON, unknown fields, unsupported message schema versions",
+        "unsupported command variants",
+        "mixed command fields",
+        "RuntimeControlPlaneAdapterContract::serialize_control_plane_message_response_json",
         "absolute `.json` path",
         "canonical allowed root",
         "256 KiB",
@@ -584,6 +710,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
         "typed local control-plane command dispatcher over JSON/file parsers",
+        "strict runtime_control_plane_message.v0 local request/response envelope",
         "local IPC/control-plane adapter",
         "does not implement a daemon",
         "not arbitrary file loading",
