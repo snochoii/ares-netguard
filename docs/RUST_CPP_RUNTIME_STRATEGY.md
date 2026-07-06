@@ -58,8 +58,19 @@ accepts only a caller-provided local JSON string, denies unknown fields, rejects
 unsupported schema versions and enum values, validates coarse runtime IDs,
 enforces local-only and non-deployment safety flags, preserves the exact
 Python-derived synthetic registry entry order and aggregate metadata, and
-returns a typed `RuntimeHandoffSnapshot`. File I/O, live transport, Qt binding,
-external services, and deployment remain disabled.
+returns a typed `RuntimeHandoffSnapshot`.
+
+The bounded local file adapter is now enabled through
+`RuntimeControlPlaneFilePolicy` and
+`RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file`. The file
+adapter accepts only an absolute `.json` path, canonicalizes it against one
+canonical allowed root, rejects symlinks, directories, non-regular files,
+missing files, non-JSON paths, oversized files, and invalid UTF-8, then
+delegates the file contents to the same strict JSON-string parser. The fixed
+file cap is 256 KiB. This is only a local `runtime_handoff_snapshot.v0`
+handoff path; it is not an arbitrary file loader and does not load generated
+reports, model artifacts, telemetry, databases, or runtime output trees. Live
+transport, Qt binding, external services, and deployment remain disabled.
 
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
@@ -72,9 +83,10 @@ registry provider, generated JSON file loader, or native inference execution
 path. The handoff snapshot is not a live
 control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
-JSON-string parsing only; it is not file loading, file watching, socket/IPC
-transport, Qt binding, external-service integration, storage, deployment
-behavior, capture behavior, or native inference execution.
+strict local JSON-string parsing plus bounded local file reading only; it is
+not arbitrary file loading, not file watching, not socket/IPC transport, not Qt
+binding, not external-service integration, not storage, not deployment
+behavior, not capture behavior, and not native inference execution.
 
 Expected integration path:
 
@@ -85,8 +97,8 @@ Rust source contract
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
-  -> typed JSON-string parser for local handoff snapshots
-  -> local file/IPC adapter with strict path policy
+  -> typed JSON-string parser and bounded local file adapter for handoff snapshots
+  -> local IPC/control-plane adapter
   -> local control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
