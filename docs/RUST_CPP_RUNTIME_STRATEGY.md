@@ -108,6 +108,29 @@ socket, file watcher, process spawning, storage provider, Qt binding, generated
 report loader, capture behavior, deployment behavior, external service, or
 native inference execution.
 
+The scaffold now adds a bounded local byte-frame adapter over that strict
+`runtime_control_plane_message.v0` envelope through
+`runtime_control_plane_frame.v0`, `RuntimeControlPlaneFramePolicy`, and
+`RuntimeControlPlaneFrameAdapterContract`. The adapter accepts only
+caller-provided `&[u8]` frames, caps frames at 256 KiB by default, requires
+UTF-8 JSON payloads, uses the existing `serde`/`serde_json` dependency surface
+without adding a new dependency, delegates parsed requests to the existing
+message envelope, and returns serialized UTF-8 JSON response bytes through
+`parse_control_plane_message_frame_bytes`,
+`execute_control_plane_message_frame_bytes`, and
+`serialize_control_plane_message_response_frame_bytes`. Empty, oversized,
+invalid UTF-8, malformed JSON, non-object roots, unknown fields, unsupported
+message schema versions, unsafe request identifiers, unsupported command
+variants, mixed command fields, unsafe nested handoff flags, and malformed
+nested handoff snapshots fail closed. Frame parsing failures without a valid
+request identifier return adapter errors; command execution failures after a
+valid request identifier return typed failure responses with
+`RuntimeControlPlaneMessageErrorCode`. This is a local byte-frame adapter only:
+it adds no OS IPC adapter, socket listener, daemon lifecycle, file watcher,
+process spawning, storage provider, Qt binding, generated report loader,
+capture behavior, deployment behavior, external service, or native inference
+execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
@@ -120,10 +143,11 @@ path. The handoff snapshot is not a live
 control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
-local command dispatcher and strict local request/response message envelope
-only; it is not arbitrary file loading, not file watching, not socket/IPC
-transport, not Qt binding, not external-service integration, not storage, not
-deployment behavior, not capture behavior, and not native inference execution.
+local command dispatcher, strict local request/response message envelope, and
+bounded local byte-frame adapter only; it is not arbitrary file loading, not
+file watching, not socket/IPC transport, not Qt binding, not external-service
+integration, not storage, not deployment behavior, not capture behavior, and
+not native inference execution.
 
 Expected integration path:
 
@@ -137,6 +161,7 @@ Rust source contract
   -> typed JSON-string parser and bounded local file adapter for handoff snapshots
   -> typed local control-plane command dispatcher over JSON/file parsers
   -> strict runtime_control_plane_message.v0 local request/response envelope
+  -> bounded runtime_control_plane_frame.v0 local byte-frame adapter
   -> local IPC/control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider

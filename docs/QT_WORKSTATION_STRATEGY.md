@@ -46,10 +46,13 @@ to it. Rust now also defines a strict local
 `runtime_control_plane_message.v0` request/response message envelope over that
 typed dispatcher, with a safe request identifier, a single local command, and
 typed success/failure responses. Qt does not parse the message envelope, call
-the dispatcher, open a transport, or bind to live runtime state. Qt still
-performs no file I/O and has no IPC, live runtime service, Qt data binding,
-generated report loading, external service use, deployment behavior, capture
-behavior, or native inference execution.
+the dispatcher, open a transport, or bind to live runtime state. Rust now also
+defines a bounded local `runtime_control_plane_frame.v0` byte-frame adapter
+over that message envelope, with caller-provided UTF-8 JSON bytes, a 256 KiB
+default frame cap, and serialized UTF-8 JSON response bytes. Qt does not parse
+frame bytes, call the frame adapter, perform file I/O, open IPC, bind to live
+runtime state, load generated reports, use external services, allow deployment,
+capture traffic, or execute native inference.
 
 Expected integration path:
 
@@ -63,6 +66,7 @@ QML shell scaffold
   -> Rust JSON-string parser and bounded local file adapter for local handoff snapshots
   -> typed local control-plane command dispatcher in the Rust runtime
   -> strict local runtime_control_plane_message.v0 envelope in the Rust runtime
+  -> bounded runtime_control_plane_frame.v0 byte-frame adapter in the Rust runtime
   -> future local IPC/control-plane adapter from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
