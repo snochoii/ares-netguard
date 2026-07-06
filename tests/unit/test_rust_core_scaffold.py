@@ -45,6 +45,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_CONTRACT_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION",
+        "RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION",
+        "RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
@@ -67,6 +69,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeSummary",
         "RuntimeSummaryProviderContract",
         "RuntimeSummaryProviderPolicy",
+        "RuntimeRegistryProviderContract",
+        "RuntimeRegistryProviderPolicy",
+        "RuntimeRegistryRecord",
+        "RuntimeRegistrySnapshot",
+        "RuntimeRegistryProvider",
         "ModelRegistryMetadata",
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
@@ -148,6 +155,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "parse_handoff_snapshot_json",
         "parse_handoff_snapshot_file",
         "build_runtime_summary_from_events",
+        "upsert_snapshot",
+        "default_provider",
         "parse_model_registry_metadata_json",
         "parse_model_registry_metadata_file",
         "execute_local_command",
@@ -175,6 +184,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         'pub const RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION: &str = "runtime_summary_provider.v0";'
         in lib_rs
     )
+    assert (
+        "pub const RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION: &str = "
+        '"runtime_registry_provider.v0";' in lib_rs
+    )
+    assert "pub const RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP: usize = 64;" in lib_rs
     assert (
         'pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";'
         in lib_rs
@@ -292,6 +306,107 @@ def test_rust_core_exposes_runtime_summary_provider_contract_shape() -> None:
         '"not_event_store"',
         '"not_file_loader"',
         '"not_process_spawner"',
+        '"not_qt_binding"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+    ]
+    for anchor in expected_anchors:
+        assert anchor in lib_rs
+
+
+def test_rust_core_exposes_runtime_registry_provider_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub accepted_snapshot_schema: &'static str",
+        "pub output_snapshot_schema: &'static str",
+        "pub max_records: usize",
+        "pub in_memory_only: bool",
+        "pub accepts_validated_handoff_snapshots_only: bool",
+        "pub strict_handoff_validation_enabled: bool",
+        "pub upsert_replaces_matching_workspace_session: bool",
+        "pub deterministic_snapshot_ordering: bool",
+        "pub persistent_storage_enabled: bool",
+        "pub database_or_indexing_enabled: bool",
+        "pub generated_report_loading_enabled: bool",
+        "pub generated_json_loading_enabled: bool",
+        "pub file_io_enabled: bool",
+        "pub live_transport_enabled: bool",
+        "pub public_network_transport_enabled: bool",
+        "pub socket_listener_enabled: bool",
+        "pub filesystem_socket_path_policy_enabled: bool",
+        "pub daemon_lifecycle_enabled: bool",
+        "pub process_spawning_enabled: bool",
+        "pub file_watching_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+        "pub workspace_id: WorkspaceId",
+        "pub session_id: SessionId",
+        "pub snapshot_schema_version: String",
+        "pub snapshot: RuntimeHandoffSnapshot",
+        "pub record_count: u32",
+        "pub max_record_count: u32",
+        "pub records: Vec<RuntimeRegistryRecord>",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_anchors = [
+        "impl RuntimeRegistryProviderContract",
+        "impl RuntimeRegistryProviderPolicy",
+        "impl Default for RuntimeRegistryProviderPolicy",
+        "impl RuntimeRegistryProvider",
+        "impl Default for RuntimeRegistryProvider",
+        "RuntimeRegistryProviderContract::synthetic_fixture",
+        "RuntimeRegistryProviderPolicy::bounded",
+        "pub fn default_provider() -> Self",
+        "pub fn upsert_snapshot",
+        "pub fn snapshot(&self) -> RuntimeRegistrySnapshot",
+        "pub fn len(&self) -> usize",
+        "pub fn is_empty(&self) -> bool",
+        "BTreeMap<(String, String), RuntimeRegistryRecord>",
+        "validate_runtime_handoff_snapshot(&snapshot)",
+        "runtime_registry_provider.max_records",
+        "runtime_registry_provider.record_cap",
+        "runtime_registry_provider.local_only",
+        "runtime_registry_provider.in_memory_only",
+        "runtime_registry_provider.accepts_validated_handoff_snapshots_only",
+        "runtime_registry_provider.strict_handoff_validation_enabled",
+        "runtime_registry_provider.persistent_storage_enabled",
+        "runtime_registry_provider.database_or_indexing_enabled",
+        "runtime_registry_provider.generated_report_loading_enabled",
+        "runtime_registry_provider.generated_json_loading_enabled",
+        "runtime_registry_provider.file_io_enabled",
+        "runtime_registry_provider.live_transport_enabled",
+        "runtime_registry_provider.public_network_transport_enabled",
+        "runtime_registry_provider.socket_listener_enabled",
+        "runtime_registry_provider.filesystem_socket_path_policy_enabled",
+        "runtime_registry_provider.daemon_lifecycle_enabled",
+        "runtime_registry_provider.process_spawning_enabled",
+        "runtime_registry_provider.file_watching_enabled",
+        "runtime_registry_provider.qt_binding_enabled",
+        "runtime_registry_provider.capture_enabled",
+        "runtime_registry_provider.external_services_used",
+        "runtime_registry_provider.deployment_allowed",
+        "runtime_registry_provider.native_inference_execution_enabled",
+        "RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS",
+        '"runtime_registry_provider.v0"',
+        '"not_persistent_storage"',
+        '"not_database_or_indexing_engine"',
+        '"not_generated_report_loader"',
+        '"not_generated_json_loader"',
+        '"not_control_plane_transport"',
+        '"not_public_network_transport"',
+        '"not_socket_listener"',
+        '"not_filesystem_socket_path_policy"',
+        '"not_daemon_lifecycle"',
+        '"not_process_spawner"',
+        '"not_file_watcher"',
         '"not_qt_binding"',
         '"not_capture_boundary"',
         '"not_external_service"',
@@ -936,6 +1051,11 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeControlPlaneFilePolicy" in rust_source
     assert "RuntimeSummaryProviderContract" in rust_source
     assert "RuntimeSummaryProviderPolicy" in rust_source
+    assert "RuntimeRegistryProviderContract" in rust_source
+    assert "RuntimeRegistryProviderPolicy" in rust_source
+    assert "RuntimeRegistryRecord" in rust_source
+    assert "RuntimeRegistrySnapshot" in rust_source
+    assert "RuntimeRegistryProvider" in rust_source
     assert "RuntimeControlPlaneFramePolicy" in rust_source
     assert "RuntimeControlPlaneIpcPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointPolicy" in rust_source
@@ -1011,6 +1131,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "parse_model_registry_metadata_file",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
+        "runtime_registry_provider.v0",
+        "RuntimeRegistryProviderContract",
+        "RuntimeRegistryProviderPolicy",
+        "RuntimeRegistryRecord",
+        "RuntimeRegistrySnapshot",
+        "RuntimeRegistryProvider",
         "runtime_control_plane_adapter.v0",
         "RuntimeControlPlaneAdapterContract",
         "RuntimeControlPlaneAdapterKind",
@@ -1085,6 +1211,13 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
             "non-JSON paths, oversized files, and invalid UTF-8"
         ),
         "validates sorted Python-derived synthetic registry entries and derived aggregate metadata",
+        "bounded in-memory `runtime_registry_provider.v0`",
+        "already validated `runtime_handoff_snapshot.v0` values",
+        "re-runs strict handoff validation",
+        "caps the default registry at 64 records",
+        "sorted by workspace/session key",
+        "Durable runtime registry/storage provider work",
+        "OS-local listener/path binding remain future milestones",
         "Live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
@@ -1094,8 +1227,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",
         "bounded runtime_control_plane_ipc.v0 connected-stream adapter",
         "bounded runtime_control_plane_endpoint.v0 endpoint policy",
+        "bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots",
+        "durable runtime registry/storage provider",
         "future OS-local listener/path binding implementation",
         "does not implement a daemon",
+        "not a database or indexing engine",
+        "not a generated JSON loader",
         "not arbitrary file loading",
         "not file watching",
         "no socket listener",

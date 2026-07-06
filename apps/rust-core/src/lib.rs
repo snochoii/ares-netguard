@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
 pub const RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION: &str = "runtime_summary_provider.v0";
+pub const RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION: &str = "runtime_registry_provider.v0";
+pub const RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP: usize = 64;
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
 pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str =
     "model_registry_metadata_adapter.v0";
@@ -350,6 +352,107 @@ pub struct RuntimeHandoffSnapshot {
     pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryProviderContract {
+    pub schema_version: &'static str,
+    pub accepted_snapshot_schema: &'static str,
+    pub output_snapshot_schema: &'static str,
+    pub max_records: usize,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub accepts_validated_handoff_snapshots_only: bool,
+    pub strict_handoff_validation_enabled: bool,
+    pub upsert_replaces_matching_workspace_session: bool,
+    pub deterministic_snapshot_ordering: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub file_io_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryProviderPolicy {
+    pub max_records: usize,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub accepts_validated_handoff_snapshots_only: bool,
+    pub strict_handoff_validation_enabled: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub file_io_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct RuntimeRegistryRecord {
+    pub workspace_id: WorkspaceId,
+    pub session_id: SessionId,
+    pub snapshot_schema_version: String,
+    pub snapshot: RuntimeHandoffSnapshot,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct RuntimeRegistrySnapshot {
+    pub schema_version: String,
+    pub accepted_snapshot_schema: String,
+    pub record_count: u32,
+    pub max_record_count: u32,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub file_io_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub records: Vec<RuntimeRegistryRecord>,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryProvider {
+    policy: RuntimeRegistryProviderPolicy,
+    records: BTreeMap<(String, String), RuntimeRegistryRecord>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1193,6 +1296,284 @@ impl RuntimeHandoffSnapshot {
             deployment_allowed: false,
             non_claims: static_str_vec(RUNTIME_HANDOFF_NON_CLAIMS),
         }
+    }
+}
+
+impl RuntimeRegistryProviderContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION,
+            accepted_snapshot_schema: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            output_snapshot_schema: RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION,
+            max_records: RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP,
+            local_only: true,
+            in_memory_only: true,
+            accepts_validated_handoff_snapshots_only: true,
+            strict_handoff_validation_enabled: true,
+            upsert_replaces_matching_workspace_session: true,
+            deterministic_snapshot_ordering: true,
+            persistent_storage_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            file_io_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS,
+        }
+    }
+}
+
+impl RuntimeRegistryProviderPolicy {
+    pub fn new() -> Self {
+        Self::bounded(RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP)
+    }
+
+    pub fn bounded(max_records: usize) -> Self {
+        Self {
+            max_records,
+            local_only: true,
+            in_memory_only: true,
+            accepts_validated_handoff_snapshots_only: true,
+            strict_handoff_validation_enabled: true,
+            persistent_storage_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            file_io_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        if self.max_records == 0 || self.max_records > RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_provider.max_records",
+            });
+        }
+        validate_required_flag(
+            "runtime_registry_provider.local_only",
+            self.local_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.in_memory_only",
+            self.in_memory_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.accepts_validated_handoff_snapshots_only",
+            self.accepts_validated_handoff_snapshots_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.strict_handoff_validation_enabled",
+            self.strict_handoff_validation_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.persistent_storage_enabled",
+            self.persistent_storage_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.database_or_indexing_enabled",
+            self.database_or_indexing_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.generated_report_loading_enabled",
+            self.generated_report_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.generated_json_loading_enabled",
+            self.generated_json_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.file_io_enabled",
+            self.file_io_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.live_transport_enabled",
+            self.live_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.public_network_transport_enabled",
+            self.public_network_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.socket_listener_enabled",
+            self.socket_listener_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.filesystem_socket_path_policy_enabled",
+            self.filesystem_socket_path_policy_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.daemon_lifecycle_enabled",
+            self.daemon_lifecycle_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.process_spawning_enabled",
+            self.process_spawning_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.file_watching_enabled",
+            self.file_watching_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_provider.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+}
+
+impl Default for RuntimeRegistryProviderPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RuntimeRegistryProvider {
+    pub fn new(
+        policy: RuntimeRegistryProviderPolicy,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        policy.validate()?;
+        Ok(Self {
+            policy,
+            records: BTreeMap::new(),
+        })
+    }
+
+    pub fn default_provider() -> Self {
+        Self::new(RuntimeRegistryProviderPolicy::new())
+            .expect("default runtime registry provider policy must be valid")
+    }
+
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    pub fn upsert_snapshot(
+        &mut self,
+        snapshot: RuntimeHandoffSnapshot,
+    ) -> Result<RuntimeRegistryRecord, RuntimeControlPlaneAdapterError> {
+        self.policy.validate()?;
+        validate_runtime_handoff_snapshot(&snapshot)?;
+
+        let workspace_id = snapshot.runtime_summary.workspace_id.clone();
+        let session_id = snapshot.runtime_summary.session_id.clone();
+        let key = (
+            workspace_id.as_str().to_owned(),
+            session_id.as_str().to_owned(),
+        );
+        if !self.records.contains_key(&key) && self.records.len() >= self.policy.max_records {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_provider.record_cap",
+            });
+        }
+
+        let record = RuntimeRegistryRecord {
+            workspace_id,
+            session_id,
+            snapshot_schema_version: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION.to_owned(),
+            snapshot,
+        };
+        self.records.insert(key, record.clone());
+        Ok(record)
+    }
+
+    pub fn snapshot(&self) -> RuntimeRegistrySnapshot {
+        RuntimeRegistrySnapshot {
+            schema_version: RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION.to_owned(),
+            accepted_snapshot_schema: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION.to_owned(),
+            record_count: self.records.len() as u32,
+            max_record_count: self.policy.max_records as u32,
+            local_only: true,
+            in_memory_only: true,
+            persistent_storage_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            file_io_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            records: self.records.values().cloned().collect(),
+            non_claims: static_str_vec(RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS),
+        }
+    }
+}
+
+impl Default for RuntimeRegistryProvider {
+    fn default() -> Self {
+        Self::default_provider()
     }
 }
 
@@ -2619,6 +3000,25 @@ const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
     "not_native_runtime_execution",
 ];
 
+const RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS: &[&str] = &[
+    "not_persistent_storage",
+    "not_database_or_indexing_engine",
+    "not_generated_report_loader",
+    "not_generated_json_loader",
+    "not_control_plane_transport",
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_filesystem_socket_path_policy",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
 const MODEL_REGISTRY_GRAPH_NOVELTY_SCHEMAS: &[&str] = &[
     "agentic_investigation_report.v0",
     "detection_candidate_report.v0",
@@ -3365,6 +3765,25 @@ mod tests {
         serde_json::from_str(&response_json).expect("IPC response frame must parse")
     }
 
+    fn registry_handoff_fixture(
+        workspace_id: &str,
+        session_id: &str,
+        total_job_count: u32,
+        last_event_label: &str,
+    ) -> RuntimeHandoffSnapshot {
+        let mut snapshot = RuntimeHandoffSnapshot::synthetic_fixture();
+        snapshot.runtime_summary.workspace_id =
+            WorkspaceId::new(workspace_id).expect("registry fixture workspace id must be valid");
+        snapshot.runtime_summary.session_id =
+            SessionId::new(session_id).expect("registry fixture session id must be valid");
+        snapshot.runtime_summary.total_job_count = total_job_count;
+        snapshot.runtime_summary.queued_job_count = 0;
+        snapshot.runtime_summary.running_job_count = 0;
+        snapshot.runtime_summary.failed_job_count = 0;
+        snapshot.runtime_summary.last_event_label = last_event_label.to_owned();
+        snapshot
+    }
+
     fn execute_ipc_frame_bytes(
         frame: &[u8],
     ) -> (Result<(), RuntimeControlPlaneAdapterError>, Vec<u8>) {
@@ -4038,6 +4457,368 @@ mod tests {
                 "not_deployment_approval",
                 "not_native_runtime_execution"
             ])
+        );
+    }
+
+    #[test]
+    fn exposes_runtime_registry_provider_contract_fixture() {
+        let contract = RuntimeRegistryProviderContract::synthetic_fixture();
+        let policy = RuntimeRegistryProviderPolicy::new();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_snapshot_schema,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.output_snapshot_schema,
+            RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_records,
+            RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP
+        );
+        assert!(contract.local_only);
+        assert!(contract.in_memory_only);
+        assert!(contract.accepts_validated_handoff_snapshots_only);
+        assert!(contract.strict_handoff_validation_enabled);
+        assert!(contract.upsert_replaces_matching_workspace_session);
+        assert!(contract.deterministic_snapshot_ordering);
+        assert!(!contract.persistent_storage_enabled);
+        assert!(!contract.database_or_indexing_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.generated_json_loading_enabled);
+        assert!(!contract.file_io_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.filesystem_socket_path_policy_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert!(contract.non_claims.contains(&"not_persistent_storage"));
+        assert!(contract
+            .non_claims
+            .contains(&"not_database_or_indexing_engine"));
+        assert!(contract.non_claims.contains(&"not_generated_report_loader"));
+        assert!(contract.non_claims.contains(&"not_qt_binding"));
+        assert!(contract
+            .non_claims
+            .contains(&"not_native_runtime_execution"));
+        assert_eq!(policy, RuntimeRegistryProviderPolicy::default());
+        assert_eq!(
+            policy.max_records,
+            RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP
+        );
+        policy.validate().unwrap();
+
+        assert_eq!(
+            RuntimeRegistryProviderPolicy::bounded(0)
+                .validate()
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_provider.max_records",
+            }
+        );
+        assert_eq!(
+            RuntimeRegistryProviderPolicy::bounded(
+                RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP + 1,
+            )
+            .validate()
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_provider.max_records",
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_registry_provider_stores_validated_handoff_snapshots_in_key_order() {
+        let mut provider = RuntimeRegistryProvider::default();
+
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-beta",
+                "session-beta",
+                2,
+                "beta snapshot ready",
+            ))
+            .unwrap();
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-alpha",
+                "session-alpha",
+                1,
+                "alpha snapshot ready",
+            ))
+            .unwrap();
+
+        let snapshot = provider.snapshot();
+        assert_eq!(
+            snapshot.schema_version,
+            RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            snapshot.accepted_snapshot_schema,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(snapshot.record_count, 2);
+        assert_eq!(
+            snapshot.max_record_count,
+            RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP as u32
+        );
+        assert!(snapshot.local_only);
+        assert!(snapshot.in_memory_only);
+        assert!(!snapshot.persistent_storage_enabled);
+        assert!(!snapshot.database_or_indexing_enabled);
+        assert!(!snapshot.generated_report_loading_enabled);
+        assert!(!snapshot.generated_json_loading_enabled);
+        assert!(!snapshot.file_io_enabled);
+        assert!(!snapshot.live_transport_enabled);
+        assert!(!snapshot.public_network_transport_enabled);
+        assert!(!snapshot.socket_listener_enabled);
+        assert!(!snapshot.filesystem_socket_path_policy_enabled);
+        assert!(!snapshot.daemon_lifecycle_enabled);
+        assert!(!snapshot.process_spawning_enabled);
+        assert!(!snapshot.file_watching_enabled);
+        assert!(!snapshot.qt_binding_enabled);
+        assert!(!snapshot.capture_enabled);
+        assert!(!snapshot.external_services_used);
+        assert!(!snapshot.deployment_allowed);
+        assert!(!snapshot.native_inference_execution_enabled);
+        assert_eq!(
+            snapshot.non_claims,
+            strings(&[
+                "not_persistent_storage",
+                "not_database_or_indexing_engine",
+                "not_generated_report_loader",
+                "not_generated_json_loader",
+                "not_control_plane_transport",
+                "not_public_network_transport",
+                "not_socket_listener",
+                "not_filesystem_socket_path_policy",
+                "not_daemon_lifecycle",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_native_runtime_execution"
+            ])
+        );
+        assert_eq!(snapshot.records.len(), 2);
+        assert_eq!(snapshot.records[0].workspace_id.as_str(), "workspace-alpha");
+        assert_eq!(snapshot.records[0].session_id.as_str(), "session-alpha");
+        assert_eq!(snapshot.records[1].workspace_id.as_str(), "workspace-beta");
+        assert_eq!(snapshot.records[1].session_id.as_str(), "session-beta");
+        assert_eq!(
+            snapshot.records[0].snapshot_schema_version,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            snapshot.records[0]
+                .snapshot
+                .runtime_summary
+                .last_event_label,
+            "alpha snapshot ready"
+        );
+    }
+
+    #[test]
+    fn runtime_registry_provider_upsert_replaces_existing_workspace_session() {
+        let mut provider = RuntimeRegistryProvider::default();
+
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-replace",
+                "session-replace",
+                1,
+                "first snapshot ready",
+            ))
+            .unwrap();
+        let replacement = provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-replace",
+                "session-replace",
+                3,
+                "replacement snapshot ready",
+            ))
+            .unwrap();
+
+        assert_eq!(provider.len(), 1);
+        assert!(!provider.is_empty());
+        assert_eq!(
+            replacement.snapshot.runtime_summary.last_event_label,
+            "replacement snapshot ready"
+        );
+
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.record_count, 1);
+        assert_eq!(
+            snapshot.records[0].workspace_id.as_str(),
+            "workspace-replace"
+        );
+        assert_eq!(snapshot.records[0].session_id.as_str(), "session-replace");
+        assert_eq!(
+            snapshot.records[0].snapshot.runtime_summary.total_job_count,
+            3
+        );
+    }
+
+    #[test]
+    fn runtime_registry_provider_rejects_record_cap_overflow() {
+        let mut provider =
+            RuntimeRegistryProvider::new(RuntimeRegistryProviderPolicy::bounded(1)).unwrap();
+
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-cap-alpha",
+                "session-cap-alpha",
+                1,
+                "alpha cap snapshot",
+            ))
+            .unwrap();
+        assert_eq!(
+            provider
+                .upsert_snapshot(registry_handoff_fixture(
+                    "workspace-cap-beta",
+                    "session-cap-beta",
+                    1,
+                    "beta cap snapshot",
+                ))
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_provider.record_cap",
+            }
+        );
+
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-cap-alpha",
+                "session-cap-alpha",
+                2,
+                "alpha cap replacement",
+            ))
+            .unwrap();
+        assert_eq!(provider.snapshot().record_count, 1);
+        assert_eq!(
+            provider.snapshot().records[0]
+                .snapshot
+                .runtime_summary
+                .last_event_label,
+            "alpha cap replacement"
+        );
+    }
+
+    #[test]
+    fn runtime_registry_provider_rejects_unsafe_policy_flags() {
+        let mut policy = RuntimeRegistryProviderPolicy::new();
+        policy.persistent_storage_enabled = true;
+
+        assert_eq!(
+            RuntimeRegistryProvider::new(policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_provider.persistent_storage_enabled",
+            }
+        );
+
+        let mut drifted_policy = RuntimeRegistryProviderPolicy::bounded(1);
+        drifted_policy.qt_binding_enabled = true;
+        let mut provider = RuntimeRegistryProvider {
+            policy: drifted_policy,
+            records: BTreeMap::new(),
+        };
+        assert_eq!(
+            provider
+                .upsert_snapshot(RuntimeHandoffSnapshot::synthetic_fixture())
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_provider.qt_binding_enabled",
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_registry_provider_rejects_malformed_nested_snapshots() {
+        let mut provider = RuntimeRegistryProvider::default();
+
+        let mut generated_json = RuntimeHandoffSnapshot::synthetic_fixture();
+        generated_json.generated_json_loaded = true;
+        assert_eq!(
+            provider.upsert_snapshot(generated_json).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "generated_json_loaded",
+            }
+        );
+
+        let mut non_local = RuntimeHandoffSnapshot::synthetic_fixture();
+        non_local.local_only = false;
+        assert_eq!(
+            provider.upsert_snapshot(non_local).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "local_only",
+            }
+        );
+
+        let mut external_service = RuntimeHandoffSnapshot::synthetic_fixture();
+        external_service.external_services_used = true;
+        assert_eq!(
+            provider.upsert_snapshot(external_service).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "external_services_used",
+            }
+        );
+
+        let mut deployment = RuntimeHandoffSnapshot::synthetic_fixture();
+        deployment.deployment_allowed = true;
+        assert_eq!(
+            provider.upsert_snapshot(deployment).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "deployment_allowed",
+            }
+        );
+
+        let mut bad_summary = RuntimeHandoffSnapshot::synthetic_fixture();
+        bad_summary.runtime_summary.total_job_count = 1;
+        bad_summary.runtime_summary.running_job_count = 2;
+        assert_eq!(
+            provider.upsert_snapshot(bad_summary).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary.job_counts",
+            }
+        );
+
+        let mut bad_metadata = RuntimeHandoffSnapshot::synthetic_fixture();
+        bad_metadata
+            .model_registry_metadata
+            .aggregate_summary
+            .model_count = 9;
+        assert_eq!(
+            provider.upsert_snapshot(bad_metadata).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.model_count",
+            }
+        );
+
+        let mut unsafe_metadata = RuntimeHandoffSnapshot::synthetic_fixture();
+        unsafe_metadata
+            .model_registry_metadata
+            .safety_flags
+            .external_services_used = true;
+        assert_eq!(
+            provider.upsert_snapshot(unsafe_metadata).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.safety_flags.external_services_used",
+            }
         );
     }
 
