@@ -27,6 +27,13 @@ execution, live capture, external service, or private telemetry claim. All v0 UI
 content is static and synthetic. The Runtime Boundary panel is a source-level
 handoff preview only; it is not a live runtime connection and does not make the
 Qt shell the owner of workspace, session, job, or native inference state.
+The Rust runtime now also defines a typed `runtime_summary_provider.v0` over
+caller-provided local `RuntimeEvent` slices and exposes
+`build_runtime_summary_from_events` for deriving `runtime_summary.v0` in Rust.
+Qt still displays its own static Runtime Boundary preview object; it does not
+call the provider, own the event stream, bind to live runtime state, read a
+storage provider, open a transport, capture traffic, allow deployment, use
+external services, or execute native inference.
 The Model Registry Snapshot panel is also a source-level handoff preview only;
 it is not a persistent registry, does not read generated reports, and does not
 own model promotion or deployment state.
@@ -84,6 +91,7 @@ Expected integration path:
 QML shell scaffold
   -> buildable Qt project in an environment with Qt 6 and CMake
   -> static runtime_summary.v0 handoff preview
+  -> runtime_summary_provider.v0 in the Rust runtime, not called by Qt
   -> static model_registry_metadata.v0 handoff preview
   -> typed model_registry_metadata_adapter.v0 in the Rust runtime, not called by Qt
   -> static runtime_handoff_snapshot.v0 envelope in the Rust runtime
