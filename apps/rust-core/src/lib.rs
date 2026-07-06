@@ -2124,6 +2124,7 @@ fn validate_safe_model_id(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_no_unsafe_label_parts(field, value)?;
     let mut bytes = value.bytes();
     let Some(first) = bytes.next() else {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
@@ -2143,6 +2144,7 @@ fn validate_safe_source_name(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_no_unsafe_label_parts(field, value)?;
     let bytes = value.as_bytes();
     if bytes.len() < 5
         || bytes.len() > 101
@@ -2154,6 +2156,25 @@ fn validate_safe_source_name(
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
     {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_no_unsafe_label_parts(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    let mut previous_part: Option<&str> = None;
+    for part in value.split(['-', '_']).filter(|part| !part.is_empty()) {
+        if MODEL_REGISTRY_UNSAFE_LABEL_PARTS.contains(&part)
+            || matches!(
+                (previous_part, part),
+                (Some("api"), "key") | (Some("private"), "key")
+            )
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+        }
+        previous_part = Some(part);
     }
     Ok(())
 }
@@ -2386,6 +2407,9 @@ const MODEL_REGISTRY_NON_CLAIMS: &[&str] = &[
     "not_rule_deployment",
     "not_native_runtime_execution",
 ];
+
+const MODEL_REGISTRY_UNSAFE_LABEL_PARTS: &[&str] =
+    &["password", "passwd", "credential", "secret", "apikey"];
 
 const MODEL_REGISTRY_METADATA_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_persistent_model_registry",
@@ -2926,6 +2950,14 @@ mod tests {
     fn three_model_registry_metadata_json() -> String {
         serde_json::to_string_pretty(&three_model_registry_metadata_fixture())
             .expect("three-model metadata fixture must serialize")
+    }
+
+    fn secret_model_registry_metadata_json() -> String {
+        let mut metadata = three_model_registry_metadata_fixture();
+        metadata.entries[0].model_id = "secret".to_owned();
+        metadata.aggregate_summary.models_with_score_rows[0] = "secret".to_owned();
+        serde_json::to_string_pretty(&metadata)
+            .expect("secret-like metadata fixture must serialize")
     }
 
     fn patched_metadata_json(target: &str, replacement: &str) -> String {
@@ -5493,9 +5525,25 @@ mod tests {
             }
         );
         assert_eq!(
+            parse_model_registry_metadata_json(&secret_model_registry_metadata_json()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.model_id",
+            }
+        );
+        assert_eq!(
             parse_model_registry_metadata_json(&patched_metadata_json(
                 r#""temporal_security_graph_report_v0_001""#,
                 r#""temporal_security_graph_report.json""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_names",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""temporal_security_graph_report_v0_001""#,
+                r#""password_001""#,
             ))
             .unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
