@@ -8,7 +8,10 @@ pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
 pub const RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION: &str = "runtime_summary_provider.v0";
 pub const RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION: &str = "runtime_registry_provider.v0";
+pub const RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION: &str =
+    "runtime_registry_storage_provider.v0";
 pub const RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP: usize = 64;
+pub const RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES: u64 = 1024 * 1024;
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
 pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str =
     "model_registry_metadata_adapter.v0";
@@ -72,6 +75,7 @@ pub enum RuntimeControlPlaneAdapterError {
         max_bytes: usize,
     },
     FileReadFailed,
+    FileWriteFailed,
     InvalidUtf8,
     IpcReadFailed,
     IpcWriteFailed,
@@ -412,7 +416,8 @@ pub struct RuntimeRegistryProviderPolicy {
     pub native_inference_execution_enabled: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeRegistryRecord {
     pub workspace_id: WorkspaceId,
     pub session_id: SessionId,
@@ -420,7 +425,8 @@ pub struct RuntimeRegistryRecord {
     pub snapshot: RuntimeHandoffSnapshot,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeRegistrySnapshot {
     pub schema_version: String,
     pub accepted_snapshot_schema: String,
@@ -453,6 +459,104 @@ pub struct RuntimeRegistrySnapshot {
 pub struct RuntimeRegistryProvider {
     policy: RuntimeRegistryProviderPolicy,
     records: BTreeMap<(String, String), RuntimeRegistryRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryStorageProviderContract {
+    pub schema_version: &'static str,
+    pub accepted_registry_snapshot_schema: &'static str,
+    pub storage_document_schema: &'static str,
+    pub max_file_bytes: u64,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub typed_registry_snapshots_only: bool,
+    pub strict_registry_validation_enabled: bool,
+    pub storage_document_json_enabled: bool,
+    pub file_io_enabled: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub arbitrary_file_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryStoragePolicy {
+    pub file_policy: RuntimeControlPlaneFilePolicy,
+    pub max_file_bytes: u64,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub typed_registry_snapshots_only: bool,
+    pub strict_registry_validation_enabled: bool,
+    pub storage_document_json_enabled: bool,
+    pub file_io_enabled: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub arbitrary_file_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeRegistryStorageDocument {
+    pub schema_version: String,
+    pub registry_snapshot_schema: String,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub typed_registry_snapshots_only: bool,
+    pub strict_registry_validation_enabled: bool,
+    pub storage_document_json_enabled: bool,
+    pub file_io_enabled: bool,
+    pub persistent_storage_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub arbitrary_file_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub registry_snapshot: RuntimeRegistrySnapshot,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeRegistryStorageProvider {
+    policy: RuntimeRegistryStoragePolicy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -648,6 +752,7 @@ pub enum RuntimeControlPlaneMessageErrorCode {
     OversizedFile,
     OversizedFrame,
     FileReadFailed,
+    FileWriteFailed,
     InvalidUtf8,
     IpcReadFailed,
     IpcWriteFailed,
@@ -955,6 +1060,7 @@ impl RuntimeControlPlaneMessageErrorCode {
             Self::OversizedFile => "oversized_file",
             Self::OversizedFrame => "oversized_frame",
             Self::FileReadFailed => "file_read_failed",
+            Self::FileWriteFailed => "file_write_failed",
             Self::InvalidUtf8 => "invalid_utf8",
             Self::IpcReadFailed => "ipc_read_failed",
             Self::IpcWriteFailed => "ipc_write_failed",
@@ -990,6 +1096,7 @@ impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorC
             RuntimeControlPlaneAdapterError::OversizedFile { .. } => Self::OversizedFile,
             RuntimeControlPlaneAdapterError::OversizedFrame { .. } => Self::OversizedFrame,
             RuntimeControlPlaneAdapterError::FileReadFailed => Self::FileReadFailed,
+            RuntimeControlPlaneAdapterError::FileWriteFailed => Self::FileWriteFailed,
             RuntimeControlPlaneAdapterError::InvalidUtf8 => Self::InvalidUtf8,
             RuntimeControlPlaneAdapterError::IpcReadFailed => Self::IpcReadFailed,
             RuntimeControlPlaneAdapterError::IpcWriteFailed => Self::IpcWriteFailed,
@@ -1577,6 +1684,296 @@ impl Default for RuntimeRegistryProvider {
     }
 }
 
+impl RuntimeRegistryStorageProviderContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION,
+            accepted_registry_snapshot_schema: RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION,
+            storage_document_schema: RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION,
+            max_file_bytes: RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES,
+            local_only: true,
+            caller_authorized_allowed_root_required: true,
+            typed_registry_snapshots_only: true,
+            strict_registry_validation_enabled: true,
+            storage_document_json_enabled: true,
+            file_io_enabled: true,
+            persistent_storage_enabled: true,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            arbitrary_file_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_REGISTRY_STORAGE_PROVIDER_NON_CLAIMS,
+        }
+    }
+
+    pub fn persist_snapshot_file(
+        path: impl AsRef<Path>,
+        snapshot: &RuntimeRegistrySnapshot,
+        policy: &RuntimeRegistryStoragePolicy,
+    ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+        persist_runtime_registry_snapshot_file(path, snapshot, policy)
+    }
+
+    pub fn load_snapshot_file(
+        path: impl AsRef<Path>,
+        policy: &RuntimeRegistryStoragePolicy,
+    ) -> Result<RuntimeRegistrySnapshot, RuntimeControlPlaneAdapterError> {
+        load_runtime_registry_snapshot_file(path, policy)
+    }
+
+    pub fn parse_storage_document_json(
+        input: &str,
+    ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+        parse_runtime_registry_storage_document_json(input)
+    }
+}
+
+impl RuntimeRegistryStoragePolicy {
+    pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
+        Self::from_file_policy(RuntimeControlPlaneFilePolicy::new(allowed_root))
+    }
+
+    pub fn from_file_policy(file_policy: RuntimeControlPlaneFilePolicy) -> Self {
+        Self {
+            file_policy,
+            max_file_bytes: RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES,
+            local_only: true,
+            caller_authorized_allowed_root_required: true,
+            typed_registry_snapshots_only: true,
+            strict_registry_validation_enabled: true,
+            storage_document_json_enabled: true,
+            file_io_enabled: true,
+            persistent_storage_enabled: true,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            arbitrary_file_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn max_bytes(&self) -> u64 {
+        self.max_file_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        if self.max_file_bytes == 0 || self.max_file_bytes > RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_storage_provider.max_file_bytes",
+            });
+        }
+        validate_required_flag(
+            "runtime_registry_storage_provider.local_only",
+            self.local_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.caller_authorized_allowed_root_required",
+            self.caller_authorized_allowed_root_required,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.typed_registry_snapshots_only",
+            self.typed_registry_snapshots_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.strict_registry_validation_enabled",
+            self.strict_registry_validation_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.storage_document_json_enabled",
+            self.storage_document_json_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.file_io_enabled",
+            self.file_io_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.persistent_storage_enabled",
+            self.persistent_storage_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.database_or_indexing_enabled",
+            self.database_or_indexing_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.generated_report_loading_enabled",
+            self.generated_report_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.generated_json_loading_enabled",
+            self.generated_json_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.arbitrary_file_loading_enabled",
+            self.arbitrary_file_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.live_transport_enabled",
+            self.live_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.public_network_transport_enabled",
+            self.public_network_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.socket_listener_enabled",
+            self.socket_listener_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.filesystem_socket_path_policy_enabled",
+            self.filesystem_socket_path_policy_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.daemon_lifecycle_enabled",
+            self.daemon_lifecycle_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.process_spawning_enabled",
+            self.process_spawning_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.file_watching_enabled",
+            self.file_watching_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_registry_storage_provider.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+}
+
+impl RuntimeRegistryStorageDocument {
+    pub fn from_snapshot(
+        snapshot: RuntimeRegistrySnapshot,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        validate_runtime_registry_snapshot(&snapshot)?;
+        let document = Self {
+            schema_version: RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION.to_owned(),
+            registry_snapshot_schema: RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION.to_owned(),
+            local_only: true,
+            caller_authorized_allowed_root_required: true,
+            typed_registry_snapshots_only: true,
+            strict_registry_validation_enabled: true,
+            storage_document_json_enabled: true,
+            file_io_enabled: true,
+            persistent_storage_enabled: true,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            arbitrary_file_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            registry_snapshot: snapshot,
+            non_claims: static_str_vec(RUNTIME_REGISTRY_STORAGE_PROVIDER_NON_CLAIMS),
+        };
+        validate_runtime_registry_storage_document(&document)?;
+        Ok(document)
+    }
+}
+
+impl RuntimeRegistryStorageProvider {
+    pub fn new(
+        policy: RuntimeRegistryStoragePolicy,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        policy.validate()?;
+        Ok(Self { policy })
+    }
+
+    pub fn persist_snapshot(
+        &self,
+        path: impl AsRef<Path>,
+        snapshot: &RuntimeRegistrySnapshot,
+    ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+        persist_runtime_registry_snapshot_file(path, snapshot, &self.policy)
+    }
+
+    pub fn load_document(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+        load_runtime_registry_storage_document_file(path, &self.policy)
+    }
+
+    pub fn load_snapshot(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<RuntimeRegistrySnapshot, RuntimeControlPlaneAdapterError> {
+        load_runtime_registry_snapshot_file(path, &self.policy)
+    }
+}
+
 impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
@@ -2017,6 +2414,67 @@ pub fn parse_model_registry_metadata_file(
     parse_model_registry_metadata_json(&input)
 }
 
+pub fn parse_runtime_registry_storage_document_json(
+    input: &str,
+) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+    match input.trim_start().as_bytes().first() {
+        Some(b'{') => {}
+        Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+        None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+    }
+
+    let document: RuntimeRegistryStorageDocument =
+        serde_json::from_str(input).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+    validate_runtime_registry_storage_document(&document)?;
+    Ok(document)
+}
+
+pub fn load_runtime_registry_storage_document_file(
+    path: impl AsRef<Path>,
+    policy: &RuntimeRegistryStoragePolicy,
+) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    let canonical_path = validate_runtime_registry_storage_json_read_path(path.as_ref(), policy)?;
+    let bytes =
+        fs::read(&canonical_path).map_err(|_| RuntimeControlPlaneAdapterError::FileReadFailed)?;
+    if bytes.len() as u64 > policy.max_bytes() {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+            max_bytes: policy.max_bytes(),
+        });
+    }
+    let input =
+        String::from_utf8(bytes).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    parse_runtime_registry_storage_document_json(&input)
+}
+
+pub fn load_runtime_registry_snapshot_file(
+    path: impl AsRef<Path>,
+    policy: &RuntimeRegistryStoragePolicy,
+) -> Result<RuntimeRegistrySnapshot, RuntimeControlPlaneAdapterError> {
+    let document = load_runtime_registry_storage_document_file(path, policy)?;
+    Ok(document.registry_snapshot)
+}
+
+pub fn persist_runtime_registry_snapshot_file(
+    path: impl AsRef<Path>,
+    snapshot: &RuntimeRegistrySnapshot,
+    policy: &RuntimeRegistryStoragePolicy,
+) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    let document = RuntimeRegistryStorageDocument::from_snapshot(snapshot.clone())?;
+    let canonical_path = validate_runtime_registry_storage_json_write_path(path.as_ref(), policy)?;
+    let bytes = serde_json::to_vec_pretty(&document)
+        .map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+    if bytes.len() as u64 > policy.max_bytes() {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+            max_bytes: policy.max_bytes(),
+        });
+    }
+    fs::write(&canonical_path, bytes)
+        .map_err(|_| RuntimeControlPlaneAdapterError::FileWriteFailed)?;
+    Ok(document)
+}
+
 impl RuntimeControlPlaneFilePolicy {
     pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
         Self {
@@ -2423,6 +2881,402 @@ fn validate_runtime_control_plane_json_file_path(
     }
 
     Ok(canonical_path)
+}
+
+fn validate_runtime_registry_storage_json_read_path(
+    path: &Path,
+    policy: &RuntimeRegistryStoragePolicy,
+) -> Result<PathBuf, RuntimeControlPlaneAdapterError> {
+    validate_runtime_registry_storage_json_path(path, policy, true)
+}
+
+fn validate_runtime_registry_storage_json_write_path(
+    path: &Path,
+    policy: &RuntimeRegistryStoragePolicy,
+) -> Result<PathBuf, RuntimeControlPlaneAdapterError> {
+    validate_runtime_registry_storage_json_path(path, policy, false)
+}
+
+fn validate_runtime_registry_storage_json_path(
+    path: &Path,
+    policy: &RuntimeRegistryStoragePolicy,
+    file_must_exist: bool,
+) -> Result<PathBuf, RuntimeControlPlaneAdapterError> {
+    if !path.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeFilePath);
+    }
+    if !policy.file_policy.allowed_root.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeAllowedRoot);
+    }
+    if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedFileExtension);
+    }
+
+    let allowed_root_metadata = fs::symlink_metadata(&policy.file_policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+    if allowed_root_metadata.file_type().is_symlink() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootSymlink);
+    }
+    if !allowed_root_metadata.is_dir() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootNotDirectory);
+    }
+    let canonical_allowed_root = fs::canonicalize(&policy.file_policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+
+    match fs::symlink_metadata(path) {
+        Ok(file_metadata) => {
+            if file_metadata.file_type().is_symlink() {
+                return Err(RuntimeControlPlaneAdapterError::SymlinkPath);
+            }
+            if file_metadata.is_dir() {
+                return Err(RuntimeControlPlaneAdapterError::DirectoryPath);
+            }
+            if !file_metadata.file_type().is_file() {
+                return Err(RuntimeControlPlaneAdapterError::NonRegularFile);
+            }
+            if file_metadata.len() > policy.max_bytes() {
+                return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+                    max_bytes: policy.max_bytes(),
+                });
+            }
+
+            let canonical_path =
+                fs::canonicalize(path).map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+            if !canonical_path.starts_with(&canonical_allowed_root) {
+                return Err(RuntimeControlPlaneAdapterError::OutsideAllowedRoot);
+            }
+            Ok(canonical_path)
+        }
+        Err(_) if file_must_exist => Err(RuntimeControlPlaneAdapterError::MissingFile),
+        Err(_) => {
+            let parent = path
+                .parent()
+                .ok_or(RuntimeControlPlaneAdapterError::MissingFile)?;
+            let parent_metadata = fs::symlink_metadata(parent)
+                .map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+            if parent_metadata.file_type().is_symlink() {
+                return Err(RuntimeControlPlaneAdapterError::SymlinkPath);
+            }
+            if !parent_metadata.is_dir() {
+                return Err(RuntimeControlPlaneAdapterError::MissingFile);
+            }
+            let canonical_parent = fs::canonicalize(parent)
+                .map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+            if !canonical_parent.starts_with(&canonical_allowed_root) {
+                return Err(RuntimeControlPlaneAdapterError::OutsideAllowedRoot);
+            }
+            let file_name = path
+                .file_name()
+                .ok_or(RuntimeControlPlaneAdapterError::MissingFile)?;
+            Ok(canonical_parent.join(file_name))
+        }
+    }
+}
+
+fn validate_runtime_registry_storage_document(
+    document: &RuntimeRegistryStorageDocument,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_registry_storage_provider.schema_version",
+        &document.schema_version,
+        RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_registry_storage_provider.registry_snapshot_schema",
+        &document.registry_snapshot_schema,
+        RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.local_only",
+        document.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.caller_authorized_allowed_root_required",
+        document.caller_authorized_allowed_root_required,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.typed_registry_snapshots_only",
+        document.typed_registry_snapshots_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.strict_registry_validation_enabled",
+        document.strict_registry_validation_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.storage_document_json_enabled",
+        document.storage_document_json_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.file_io_enabled",
+        document.file_io_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.persistent_storage_enabled",
+        document.persistent_storage_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.database_or_indexing_enabled",
+        document.database_or_indexing_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.generated_report_loading_enabled",
+        document.generated_report_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.generated_json_loading_enabled",
+        document.generated_json_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.arbitrary_file_loading_enabled",
+        document.arbitrary_file_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.live_transport_enabled",
+        document.live_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.public_network_transport_enabled",
+        document.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.socket_listener_enabled",
+        document.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.filesystem_socket_path_policy_enabled",
+        document.filesystem_socket_path_policy_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.daemon_lifecycle_enabled",
+        document.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.process_spawning_enabled",
+        document.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.file_watching_enabled",
+        document.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.qt_binding_enabled",
+        document.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.capture_enabled",
+        document.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.external_services_used",
+        document.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.deployment_allowed",
+        document.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_storage_provider.native_inference_execution_enabled",
+        document.native_inference_execution_enabled,
+        false,
+    )?;
+    validate_exact_strings(
+        "runtime_registry_storage_provider.non_claims",
+        &document.non_claims,
+        RUNTIME_REGISTRY_STORAGE_PROVIDER_NON_CLAIMS,
+    )?;
+    validate_runtime_registry_snapshot(&document.registry_snapshot)
+}
+
+fn validate_runtime_registry_snapshot(
+    snapshot: &RuntimeRegistrySnapshot,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_registry_snapshot.schema_version",
+        &snapshot.schema_version,
+        RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_registry_snapshot.accepted_snapshot_schema",
+        &snapshot.accepted_snapshot_schema,
+        RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    if snapshot.max_record_count == 0
+        || snapshot.max_record_count > RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP as u32
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_registry_snapshot.max_record_count",
+        });
+    }
+    if snapshot.record_count != snapshot.records.len() as u32
+        || snapshot.record_count > snapshot.max_record_count
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_registry_snapshot.record_count",
+        });
+    }
+    validate_required_flag(
+        "runtime_registry_snapshot.local_only",
+        snapshot.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.in_memory_only",
+        snapshot.in_memory_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.persistent_storage_enabled",
+        snapshot.persistent_storage_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.database_or_indexing_enabled",
+        snapshot.database_or_indexing_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.generated_report_loading_enabled",
+        snapshot.generated_report_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.generated_json_loading_enabled",
+        snapshot.generated_json_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.file_io_enabled",
+        snapshot.file_io_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.live_transport_enabled",
+        snapshot.live_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.public_network_transport_enabled",
+        snapshot.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.socket_listener_enabled",
+        snapshot.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.filesystem_socket_path_policy_enabled",
+        snapshot.filesystem_socket_path_policy_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.daemon_lifecycle_enabled",
+        snapshot.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.process_spawning_enabled",
+        snapshot.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.file_watching_enabled",
+        snapshot.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.qt_binding_enabled",
+        snapshot.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.capture_enabled",
+        snapshot.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.external_services_used",
+        snapshot.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.deployment_allowed",
+        snapshot.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_registry_snapshot.native_inference_execution_enabled",
+        snapshot.native_inference_execution_enabled,
+        false,
+    )?;
+    validate_exact_strings(
+        "runtime_registry_snapshot.non_claims",
+        &snapshot.non_claims,
+        RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS,
+    )?;
+
+    let mut previous_key: Option<(String, String)> = None;
+    for record in &snapshot.records {
+        validate_runtime_registry_record(record)?;
+        let key = (
+            record.workspace_id.as_str().to_owned(),
+            record.session_id.as_str().to_owned(),
+        );
+        if previous_key
+            .as_ref()
+            .is_some_and(|previous_key| previous_key >= &key)
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.records",
+            });
+        }
+        previous_key = Some(key);
+    }
+    Ok(())
+}
+
+fn validate_runtime_registry_record(
+    record: &RuntimeRegistryRecord,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_registry_snapshot.records.snapshot_schema_version",
+        &record.snapshot_schema_version,
+        RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    validate_runtime_handoff_snapshot(&record.snapshot)?;
+    if record.workspace_id != record.snapshot.runtime_summary.workspace_id {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_registry_snapshot.records.workspace_id",
+        });
+    }
+    if record.session_id != record.snapshot.runtime_summary.session_id {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_registry_snapshot.records.session_id",
+        });
+    }
+    Ok(())
 }
 
 fn validate_runtime_handoff_snapshot(
@@ -3005,6 +3859,25 @@ const RUNTIME_REGISTRY_PROVIDER_NON_CLAIMS: &[&str] = &[
     "not_database_or_indexing_engine",
     "not_generated_report_loader",
     "not_generated_json_loader",
+    "not_control_plane_transport",
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_filesystem_socket_path_policy",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_REGISTRY_STORAGE_PROVIDER_NON_CLAIMS: &[&str] = &[
+    "not_database_or_indexing_engine",
+    "not_generated_report_loader",
+    "not_generated_json_loader",
+    "not_arbitrary_file_loader",
     "not_control_plane_transport",
     "not_public_network_transport",
     "not_socket_listener",
@@ -3782,6 +4655,37 @@ mod tests {
         snapshot.runtime_summary.failed_job_count = 0;
         snapshot.runtime_summary.last_event_label = last_event_label.to_owned();
         snapshot
+    }
+
+    fn runtime_registry_snapshot_fixture() -> RuntimeRegistrySnapshot {
+        let mut provider = RuntimeRegistryProvider::default();
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-storage-beta",
+                "session-storage-beta",
+                2,
+                "beta storage snapshot ready",
+            ))
+            .unwrap();
+        provider
+            .upsert_snapshot(registry_handoff_fixture(
+                "workspace-storage-alpha",
+                "session-storage-alpha",
+                1,
+                "alpha storage snapshot ready",
+            ))
+            .unwrap();
+        provider.snapshot()
+    }
+
+    fn runtime_registry_storage_document_fixture() -> RuntimeRegistryStorageDocument {
+        RuntimeRegistryStorageDocument::from_snapshot(runtime_registry_snapshot_fixture())
+            .expect("storage document fixture must be valid")
+    }
+
+    fn runtime_registry_storage_document_json() -> String {
+        serde_json::to_string_pretty(&runtime_registry_storage_document_fixture())
+            .expect("storage document fixture must serialize")
     }
 
     fn execute_ipc_frame_bytes(
@@ -4820,6 +5724,496 @@ mod tests {
                 field: "model_registry_metadata.safety_flags.external_services_used",
             }
         );
+    }
+
+    #[test]
+    fn exposes_runtime_registry_storage_provider_contract_fixture() {
+        let contract = RuntimeRegistryStorageProviderContract::synthetic_fixture();
+        let root = temp_policy_root("registry-storage-policy");
+        let policy = RuntimeRegistryStoragePolicy::new(root.clone());
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_registry_snapshot_schema,
+            RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.storage_document_schema,
+            RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_file_bytes,
+            RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_authorized_allowed_root_required);
+        assert!(contract.typed_registry_snapshots_only);
+        assert!(contract.strict_registry_validation_enabled);
+        assert!(contract.storage_document_json_enabled);
+        assert!(contract.file_io_enabled);
+        assert!(contract.persistent_storage_enabled);
+        assert!(!contract.database_or_indexing_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.generated_json_loading_enabled);
+        assert!(!contract.arbitrary_file_loading_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.filesystem_socket_path_policy_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert!(contract
+            .non_claims
+            .contains(&"not_database_or_indexing_engine"));
+        assert!(contract.non_claims.contains(&"not_generated_report_loader"));
+        assert!(contract.non_claims.contains(&"not_arbitrary_file_loader"));
+        assert!(contract.non_claims.contains(&"not_socket_listener"));
+        assert!(contract
+            .non_claims
+            .contains(&"not_native_runtime_execution"));
+        assert_eq!(policy.max_bytes(), RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES);
+        policy.validate().unwrap();
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn runtime_registry_storage_policy_rejects_unsafe_flags() {
+        let root = temp_policy_root("registry-storage-unsafe-policy");
+        let mut policy = RuntimeRegistryStoragePolicy::new(root.clone());
+        policy.database_or_indexing_enabled = true;
+        assert_eq!(
+            policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_storage_provider.database_or_indexing_enabled",
+            }
+        );
+
+        let mut too_large = RuntimeRegistryStoragePolicy::new(root.clone());
+        too_large.max_file_bytes = RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES + 1;
+        assert_eq!(
+            too_large.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_storage_provider.max_file_bytes",
+            }
+        );
+
+        let mut drifted = RuntimeRegistryStoragePolicy::new(root.clone());
+        drifted.persistent_storage_enabled = false;
+        assert_eq!(
+            drifted.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_storage_provider.persistent_storage_enabled",
+            }
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn runtime_registry_storage_provider_persists_and_loads_typed_snapshot() {
+        let root = temp_policy_root("registry-storage-roundtrip");
+        let policy = RuntimeRegistryStoragePolicy::new(root.clone());
+        let provider = RuntimeRegistryStorageProvider::new(policy.clone()).unwrap();
+        let path = root.join("runtime_registry_storage.json");
+        let snapshot = runtime_registry_snapshot_fixture();
+
+        let document = provider.persist_snapshot(&path, &snapshot).unwrap();
+        let loaded_document = provider.load_document(&path).unwrap();
+        let loaded_snapshot =
+            RuntimeRegistryStorageProviderContract::load_snapshot_file(&path, &policy).unwrap();
+
+        assert_eq!(document, loaded_document);
+        assert_eq!(loaded_snapshot, snapshot);
+        assert_eq!(
+            loaded_document.schema_version,
+            RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION
+        );
+        assert!(loaded_document.persistent_storage_enabled);
+        assert!(!loaded_document.database_or_indexing_enabled);
+        assert_eq!(loaded_snapshot.record_count, 2);
+        assert_eq!(
+            loaded_snapshot.records[0].workspace_id.as_str(),
+            "workspace-storage-alpha"
+        );
+        assert_eq!(
+            loaded_snapshot.records[1].workspace_id.as_str(),
+            "workspace-storage-beta"
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn runtime_registry_storage_document_rejects_schema_and_flag_drift() {
+        let mut document = runtime_registry_storage_document_fixture();
+        document.schema_version = "runtime_registry_storage_provider.v1".to_owned();
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "runtime_registry_storage_provider.schema_version",
+                expected: RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION,
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.external_services_used = true;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_storage_provider.external_services_used",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.non_claims.pop();
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_storage_provider.non_claims",
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_registry_storage_rejects_malformed_json_and_unknown_fields() {
+        assert_eq!(
+            parse_runtime_registry_storage_document_json("{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            parse_runtime_registry_storage_document_json("[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let unknown_root_field = runtime_registry_storage_document_json().replacen(
+            r#"  "registry_snapshot_schema": "runtime_registry_provider.v0","#,
+            r#"  "registry_snapshot_schema": "runtime_registry_provider.v0",
+  "unexpected_field": true,"#,
+            1,
+        );
+        assert_eq!(
+            parse_runtime_registry_storage_document_json(&unknown_root_field).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let duplicate_flag = runtime_registry_storage_document_json().replacen(
+            r#"  "external_services_used": false,"#,
+            r#"  "external_services_used": true,
+  "external_services_used": false,"#,
+            1,
+        );
+        assert_eq!(
+            parse_runtime_registry_storage_document_json(&duplicate_flag).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+    }
+
+    #[test]
+    fn runtime_registry_storage_rejects_registry_snapshot_drift() {
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.record_count = 3;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.record_count",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.max_record_count = 0;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.max_record_count",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records.swap(0, 1);
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.records",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[1] = document.registry_snapshot.records[0].clone();
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.records",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.qt_binding_enabled = true;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_registry_snapshot.qt_binding_enabled",
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_registry_storage_rejects_record_and_nested_snapshot_drift() {
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[0].workspace_id =
+            WorkspaceId::new("workspace-storage-mismatch").unwrap();
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_registry_snapshot.records.workspace_id",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[0]
+            .snapshot
+            .generated_json_loaded = true;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "generated_json_loaded",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[0]
+            .snapshot
+            .runtime_summary
+            .total_job_count = 1;
+        document.registry_snapshot.records[0]
+            .snapshot
+            .runtime_summary
+            .running_job_count = 2;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary.job_counts",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[0]
+            .snapshot
+            .model_registry_metadata
+            .aggregate_summary
+            .model_count = 9;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.model_count",
+            }
+        );
+
+        let mut document = runtime_registry_storage_document_fixture();
+        document.registry_snapshot.records[0]
+            .snapshot
+            .model_registry_metadata
+            .safety_flags
+            .deployment_allowed = true;
+        assert_eq!(
+            validate_runtime_registry_storage_document(&document).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.safety_flags.deployment_allowed",
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_registry_storage_file_policy_rejects_unsafe_read_paths() {
+        let root = temp_policy_root("registry-storage-path-policy");
+        let outside_root = temp_policy_root("outside-registry-storage-path-policy");
+        let policy = RuntimeRegistryStoragePolicy::new(root.clone());
+        let valid_json = runtime_registry_storage_document_json();
+
+        assert_eq!(
+            load_runtime_registry_snapshot_file("runtime_registry_storage.json", &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let relative_root_policy = RuntimeRegistryStoragePolicy::new("relative-root");
+        let relative_root_path = write_test_file(
+            &root,
+            "relative_root_runtime_registry_storage.json",
+            &valid_json,
+        );
+        assert_eq!(
+            load_runtime_registry_snapshot_file(relative_root_path, &relative_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot
+        );
+
+        let missing_root_policy =
+            RuntimeRegistryStoragePolicy::new(root.join("missing-storage-root"));
+        let missing_root_path = root
+            .join("missing-storage-root")
+            .join("runtime_registry_storage.json");
+        assert_eq!(
+            load_runtime_registry_snapshot_file(missing_root_path, &missing_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot
+        );
+
+        assert_eq!(
+            load_runtime_registry_snapshot_file(root.join("missing_storage.json"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        let file_root = write_test_file(&root, "file_policy_root.json", &valid_json);
+        let file_root_policy = RuntimeRegistryStoragePolicy::new(file_root.clone());
+        assert_eq!(
+            load_runtime_registry_snapshot_file(file_root, &file_root_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory
+        );
+
+        let outside_path =
+            write_test_file(&outside_root, "runtime_registry_storage.json", &valid_json);
+        assert_eq!(
+            load_runtime_registry_snapshot_file(outside_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let text_path = write_test_file(&root, "runtime_registry_storage.txt", "{}");
+        assert_eq!(
+            load_runtime_registry_snapshot_file(text_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+
+        let directory_path = root.join("runtime_registry_storage_directory.json");
+        std::fs::create_dir_all(&directory_path).unwrap();
+        assert_eq!(
+            load_runtime_registry_snapshot_file(directory_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        let oversized_path = write_test_file(
+            &root,
+            "oversized_runtime_registry_storage.json",
+            vec![b' '; RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES as usize + 1],
+        );
+        assert_eq!(
+            load_runtime_registry_snapshot_file(oversized_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFile {
+                max_bytes: RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES,
+            }
+        );
+
+        let invalid_utf8_path =
+            write_test_file(&root, "invalid_utf8_runtime_registry_storage.json", [0xff]);
+        assert_eq!(
+            load_runtime_registry_snapshot_file(invalid_utf8_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        remove_temp_root(&root);
+        remove_temp_root(&outside_root);
+    }
+
+    #[test]
+    fn runtime_registry_storage_file_policy_validates_write_paths() {
+        let root = temp_policy_root("registry-storage-write-path-policy");
+        let outside_root = temp_policy_root("outside-registry-storage-write-path-policy");
+        let policy = RuntimeRegistryStoragePolicy::new(root.clone());
+        let snapshot = runtime_registry_snapshot_fixture();
+
+        assert_eq!(
+            persist_runtime_registry_snapshot_file(
+                "runtime_registry_storage.json",
+                &snapshot,
+                &policy
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let outside_path = outside_root.join("runtime_registry_storage.json");
+        assert_eq!(
+            persist_runtime_registry_snapshot_file(outside_path, &snapshot, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let text_path = root.join("runtime_registry_storage.txt");
+        assert_eq!(
+            persist_runtime_registry_snapshot_file(text_path, &snapshot, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+
+        let directory_path = root.join("runtime_registry_storage_directory.json");
+        std::fs::create_dir_all(&directory_path).unwrap();
+        assert_eq!(
+            persist_runtime_registry_snapshot_file(directory_path, &snapshot, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        let missing_parent_path = root
+            .join("missing-parent")
+            .join("runtime_registry_storage.json");
+        assert_eq!(
+            persist_runtime_registry_snapshot_file(missing_parent_path, &snapshot, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        remove_temp_root(&root);
+        remove_temp_root(&outside_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_registry_storage_file_policy_rejects_symlinks_and_non_regular_files() {
+        use std::os::unix::fs::symlink;
+
+        let root = temp_policy_root("registry-storage-symlink-policy");
+        let target_path = write_test_file(
+            &root,
+            "runtime_registry_storage_target.json",
+            runtime_registry_storage_document_json(),
+        );
+        let symlink_path = root.join("runtime_registry_storage_symlink.json");
+        symlink(&target_path, &symlink_path).unwrap();
+        let policy = RuntimeRegistryStoragePolicy::new(root.clone());
+        assert_eq!(
+            load_runtime_registry_snapshot_file(&symlink_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        let symlink_root = root.join("symlink-root");
+        symlink(&root, &symlink_root).unwrap();
+        let symlink_root_policy = RuntimeRegistryStoragePolicy::new(symlink_root.clone());
+        assert_eq!(
+            load_runtime_registry_snapshot_file(
+                symlink_root.join("runtime_registry_storage_target.json"),
+                &symlink_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootSymlink
+        );
+
+        if !effective_user_id_is_root() {
+            let fifo_path = root.join("runtime_registry_storage_fifo.json");
+            make_fifo(&fifo_path);
+            assert_eq!(
+                load_runtime_registry_snapshot_file(fifo_path, &policy).unwrap_err(),
+                RuntimeControlPlaneAdapterError::NonRegularFile
+            );
+        }
+
+        remove_temp_root(&root);
     }
 
     #[test]

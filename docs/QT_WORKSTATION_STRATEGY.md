@@ -93,6 +93,15 @@ storage, use a database or indexing engine, load generated reports, load
 generated JSON, open transport, start a listener, manage a filesystem socket
 path, spawn a process, use external services, allow deployment, capture
 traffic, or execute native inference.
+Rust now also defines a bounded
+`runtime_registry_storage_provider.v0` local JSON storage provider for typed
+`RuntimeRegistrySnapshot` documents under a caller-authorized absolute allowed
+root. Qt still does not call `RuntimeRegistryStorageProvider`, read
+`RuntimeRegistryStorageDocument`, read registry storage files, bind to live
+runtime state, use a database or indexing engine, load generated reports, load
+generated JSON, open transport, start a listener, manage a filesystem socket
+path, spawn a process, use external services, allow deployment, capture
+traffic, or execute native inference.
 
 Expected integration path:
 
@@ -112,6 +121,7 @@ QML shell scaffold
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy in the Rust runtime
   -> bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt
+  -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
   -> future OS-local listener/path binding implementation from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
