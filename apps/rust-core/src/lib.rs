@@ -1,4 +1,6 @@
 use serde::{Deserialize, Deserializer};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
@@ -7,6 +9,7 @@ pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
+pub const RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES: u64 = 256 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeIdError {
@@ -37,6 +40,22 @@ impl std::fmt::Display for RuntimeIdError {
 pub enum RuntimeControlPlaneAdapterError {
     InvalidJson,
     NonObjectRoot,
+    RelativeFilePath,
+    RelativeAllowedRoot,
+    MissingFile,
+    MissingAllowedRoot,
+    AllowedRootSymlink,
+    AllowedRootNotDirectory,
+    SymlinkPath,
+    DirectoryPath,
+    NonRegularFile,
+    UnsupportedFileExtension,
+    OutsideAllowedRoot,
+    OversizedFile {
+        max_bytes: u64,
+    },
+    FileReadFailed,
+    InvalidUtf8,
     UnsupportedSchemaVersion {
         field: &'static str,
         expected: &'static str,
@@ -120,6 +139,7 @@ pub enum RuntimeControlPlaneState {
 pub enum RuntimeControlPlaneAdapterKind {
     StaticContractFixture,
     LocalJsonStringParser,
+    LocalJsonFileAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -127,6 +147,7 @@ pub enum RuntimeControlPlaneAdapterKind {
 pub enum RuntimeControlPlaneInputMode {
     AcceptedSchemaDeclarationOnly,
     AcceptedLocalJsonString,
+    AcceptedLocalJsonFile,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -134,6 +155,7 @@ pub enum RuntimeControlPlaneInputMode {
 pub enum RuntimeControlPlaneAdapterState {
     Unavailable,
     JsonStringParserAvailable,
+    LocalFileAdapterAvailable,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -244,6 +266,11 @@ pub struct RuntimeControlPlaneAdapterContract {
     pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneFilePolicy {
+    pub allowed_root: PathBuf,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -393,6 +420,7 @@ impl RuntimeControlPlaneAdapterKind {
         match self {
             Self::StaticContractFixture => "static_contract_fixture",
             Self::LocalJsonStringParser => "local_json_string_parser",
+            Self::LocalJsonFileAdapter => "local_json_file_adapter",
         }
     }
 }
@@ -402,6 +430,7 @@ impl RuntimeControlPlaneInputMode {
         match self {
             Self::AcceptedSchemaDeclarationOnly => "accepted_schema_declaration_only",
             Self::AcceptedLocalJsonString => "accepted_local_json_string",
+            Self::AcceptedLocalJsonFile => "accepted_local_json_file",
         }
     }
 }
@@ -411,6 +440,7 @@ impl RuntimeControlPlaneAdapterState {
         match self {
             Self::Unavailable => "unavailable",
             Self::JsonStringParserAvailable => "json_string_parser_available",
+            Self::LocalFileAdapterAvailable => "local_file_adapter_available",
         }
     }
 }
@@ -497,9 +527,9 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonStringParser,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonString,
-            adapter_state: RuntimeControlPlaneAdapterState::JsonStringParserAvailable,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonFileAdapter,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonFile,
+            adapter_state: RuntimeControlPlaneAdapterState::LocalFileAdapterAvailable,
             output_snapshot_schema:
                 RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
@@ -507,7 +537,7 @@ impl RuntimeControlPlaneAdapterContract {
             dependency_free: false,
             static_synthetic_fixture: true,
             json_parsing_enabled: true,
-            file_io_enabled: false,
+            file_io_enabled: true,
             live_transport_enabled: false,
             qt_binding_enabled: false,
             external_services_used: false,
@@ -530,6 +560,86 @@ impl RuntimeControlPlaneAdapterContract {
         validate_runtime_handoff_snapshot(&snapshot)?;
         Ok(snapshot)
     }
+
+    pub fn parse_handoff_snapshot_file(
+        path: impl AsRef<Path>,
+        policy: &RuntimeControlPlaneFilePolicy,
+    ) -> Result<RuntimeHandoffSnapshot, RuntimeControlPlaneAdapterError> {
+        let canonical_path = validate_runtime_handoff_snapshot_file_path(path.as_ref(), policy)?;
+        let bytes = fs::read(&canonical_path)
+            .map_err(|_| RuntimeControlPlaneAdapterError::FileReadFailed)?;
+        if bytes.len() as u64 > RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES {
+            return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+                max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            });
+        }
+        let input =
+            String::from_utf8(bytes).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+        Self::parse_handoff_snapshot_json(&input)
+    }
+}
+
+impl RuntimeControlPlaneFilePolicy {
+    pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
+        Self {
+            allowed_root: allowed_root.into(),
+        }
+    }
+
+    pub fn max_bytes(&self) -> u64 {
+        RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES
+    }
+}
+
+fn validate_runtime_handoff_snapshot_file_path(
+    path: &Path,
+    policy: &RuntimeControlPlaneFilePolicy,
+) -> Result<PathBuf, RuntimeControlPlaneAdapterError> {
+    if !path.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeFilePath);
+    }
+    if !policy.allowed_root.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeAllowedRoot);
+    }
+    if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedFileExtension);
+    }
+
+    let allowed_root_metadata = fs::symlink_metadata(&policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+    if allowed_root_metadata.file_type().is_symlink() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootSymlink);
+    }
+    if !allowed_root_metadata.is_dir() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootNotDirectory);
+    }
+
+    let file_metadata =
+        fs::symlink_metadata(path).map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+    if file_metadata.file_type().is_symlink() {
+        return Err(RuntimeControlPlaneAdapterError::SymlinkPath);
+    }
+    if file_metadata.is_dir() {
+        return Err(RuntimeControlPlaneAdapterError::DirectoryPath);
+    }
+    if !file_metadata.file_type().is_file() {
+        return Err(RuntimeControlPlaneAdapterError::NonRegularFile);
+    }
+    if file_metadata.len() > RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+            max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+        });
+    }
+
+    let canonical_allowed_root = fs::canonicalize(&policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+    let canonical_path =
+        fs::canonicalize(path).map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+    if !canonical_path.starts_with(&canonical_allowed_root) {
+        return Err(RuntimeControlPlaneAdapterError::OutsideAllowedRoot);
+    }
+
+    Ok(canonical_path)
 }
 
 fn validate_runtime_handoff_snapshot(
@@ -938,7 +1048,9 @@ const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
 ];
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
-    "not_file_io",
+    "not_arbitrary_file_loader",
+    "not_file_watcher",
+    "not_ipc_or_socket_transport",
     "not_live_transport",
     "not_qt_binding",
     "not_external_service",
@@ -1217,6 +1329,17 @@ fn validate_coarse_id(value: &str, allowed_prefixes: &[&str]) -> Result<(), Runt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    use std::ffi::CString;
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+
+    #[cfg(unix)]
+    unsafe extern "C" {
+        fn geteuid() -> u32;
+        fn mkfifo(path: *const std::os::raw::c_char, mode: u32) -> i32;
+    }
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
@@ -1497,6 +1620,39 @@ mod tests {
         synthetic_handoff_json().replacen(target, replacement, 1)
     }
 
+    fn temp_policy_root(name: &str) -> PathBuf {
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock must produce a temp path suffix")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ares-rust-core-{name}-{suffix}"));
+        std::fs::create_dir_all(&root).expect("test temp root must be created");
+        root
+    }
+
+    fn write_test_file(root: &Path, file_name: &str, contents: impl AsRef<[u8]>) -> PathBuf {
+        let path = root.join(file_name);
+        std::fs::write(&path, contents).expect("test handoff file must be written");
+        path
+    }
+
+    fn remove_temp_root(root: &Path) {
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    fn make_fifo(path: &Path) {
+        let c_path =
+            CString::new(path.as_os_str().as_bytes()).expect("test path must be a C string");
+        let result = unsafe { mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(result, 0, "test fifo must be created");
+    }
+
+    #[cfg(unix)]
+    fn effective_user_id_is_root() -> bool {
+        unsafe { geteuid() == 0 }
+    }
+
     #[test]
     fn accepts_coarse_runtime_identifiers() {
         let workspace = WorkspaceId::new("workspace-alpha").unwrap();
@@ -1651,11 +1807,11 @@ mod tests {
             contract.schema_version,
             RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION
         );
-        assert_eq!(contract.adapter_kind.as_str(), "local_json_string_parser");
-        assert_eq!(contract.input_mode.as_str(), "accepted_local_json_string");
+        assert_eq!(contract.adapter_kind.as_str(), "local_json_file_adapter");
+        assert_eq!(contract.input_mode.as_str(), "accepted_local_json_file");
         assert_eq!(
             contract.adapter_state.as_str(),
-            "json_string_parser_available"
+            "local_file_adapter_available"
         );
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
@@ -1673,7 +1829,7 @@ mod tests {
         assert!(!contract.dependency_free);
         assert!(contract.static_synthetic_fixture);
         assert!(contract.json_parsing_enabled);
-        assert!(!contract.file_io_enabled);
+        assert!(contract.file_io_enabled);
         assert!(!contract.live_transport_enabled);
         assert!(!contract.qt_binding_enabled);
         assert!(!contract.external_services_used);
@@ -1681,7 +1837,9 @@ mod tests {
         assert_eq!(
             contract.non_claims,
             &[
-                "not_file_io",
+                "not_arbitrary_file_loader",
+                "not_file_watcher",
+                "not_ipc_or_socket_transport",
                 "not_live_transport",
                 "not_qt_binding",
                 "not_external_service",
@@ -1690,6 +1848,17 @@ mod tests {
                 "not_generated_report_loader"
             ]
         );
+    }
+
+    #[test]
+    fn exposes_bounded_runtime_control_plane_file_policy() {
+        let root = temp_policy_root("policy");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(policy.allowed_root, root);
+        assert_eq!(policy.max_bytes(), 256 * 1024);
+
+        remove_temp_root(&policy.allowed_root);
     }
 
     #[test]
@@ -1749,6 +1918,336 @@ mod tests {
         assert!(!snapshot.live_runtime_connection);
         assert!(!snapshot.external_services_used);
         assert!(!snapshot.deployment_allowed);
+    }
+
+    #[test]
+    fn parses_runtime_handoff_snapshot_file_under_allowed_root() {
+        let root = temp_policy_root("valid-file");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        let from_file =
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&path, &policy)
+                .unwrap();
+        let from_json = RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json(
+            synthetic_handoff_json(),
+        )
+        .unwrap();
+
+        assert_eq!(from_file, from_json);
+        assert_eq!(
+            from_file.runtime_summary.workspace_id.as_str(),
+            "fixture-workspace-alpha"
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn rejects_handoff_snapshot_file_policy_path_violations() {
+        let root = temp_policy_root("path-policy");
+        let outside_root = temp_policy_root("outside-policy");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                Path::new("runtime_handoff_snapshot.json"),
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let relative_root_policy = RuntimeControlPlaneFilePolicy::new("relative-root");
+        let relative_root_path = write_test_file(
+            &root,
+            "relative_root_runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &relative_root_path,
+                &relative_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot
+        );
+
+        let missing_root_policy =
+            RuntimeControlPlaneFilePolicy::new(root.join("missing-policy-root"));
+        let missing_root_path = root
+            .join("missing-policy-root")
+            .join("runtime_handoff_snapshot.json");
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &missing_root_path,
+                &missing_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot
+        );
+
+        let file_root = write_test_file(&root, "file_policy_root.json", synthetic_handoff_json());
+        let file_root_policy = RuntimeControlPlaneFilePolicy::new(file_root.clone());
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &file_root,
+                &file_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory
+        );
+
+        let outside_path = write_test_file(
+            &outside_root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &outside_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let directory_path = root.join("directory.json");
+        std::fs::create_dir_all(&directory_path).expect("test directory path must be created");
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &directory_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        let text_path = write_test_file(&root, "runtime_handoff_snapshot.txt", "{}");
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&text_path, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+
+        let missing_path = root.join("missing_handoff_snapshot.json");
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &missing_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        let oversized_path = write_test_file(
+            &root,
+            "oversized_runtime_handoff_snapshot.json",
+            vec![b' '; RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES as usize + 1],
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &oversized_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFile {
+                max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            }
+        );
+
+        remove_temp_root(&outside_root);
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_allowed_root() {
+        let root = temp_policy_root("allowed-root-symlink-policy");
+        let real_root = root.join("real-root");
+        std::fs::create_dir_all(&real_root).expect("test real root must be created");
+        let symlink_root = root.join("symlink-root");
+        std::os::unix::fs::symlink(&real_root, &symlink_root)
+            .expect("test allowed root symlink must be created");
+        let path = write_test_file(
+            &real_root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let policy = RuntimeControlPlaneFilePolicy::new(symlink_root);
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&path, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootSymlink
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_handoff_snapshot_file() {
+        let root = temp_policy_root("symlink-policy");
+        let target_path = write_test_file(
+            &root,
+            "target_runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let symlink_path = root.join("linked_runtime_handoff_snapshot.json");
+        std::os::unix::fs::symlink(&target_path, &symlink_path)
+            .expect("test symlink must be created");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &symlink_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_non_regular_handoff_snapshot_file() {
+        let root = temp_policy_root("non-regular-policy");
+        let fifo_path = root.join("runtime_handoff_snapshot.json");
+        make_fifo(&fifo_path);
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&fifo_path, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonRegularFile
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_file_read_failures_after_regular_file_policy_checks() {
+        if effective_user_id_is_root() {
+            return;
+        }
+
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = temp_policy_root("file-read-failure-policy");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let mut permissions = std::fs::metadata(&path)
+            .expect("test handoff file metadata must be readable")
+            .permissions();
+        permissions.set_mode(0o000);
+        std::fs::set_permissions(&path, permissions)
+            .expect("test handoff file permissions must be changed");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&path, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::FileReadFailed
+        );
+
+        let mut restored_permissions = std::fs::metadata(&path)
+            .expect("test handoff file metadata must still be readable")
+            .permissions();
+        restored_permissions.set_mode(0o600);
+        std::fs::set_permissions(&path, restored_permissions)
+            .expect("test handoff file permissions must be restored");
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn delegates_handoff_snapshot_file_contents_to_strict_json_parser() {
+        let root = temp_policy_root("strict-content");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        let malformed_path = write_test_file(&root, "malformed_runtime_handoff_snapshot.json", "{");
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &malformed_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let duplicate_unsafe_key = synthetic_handoff_json().replacen(
+            "  \"generated_json_loaded\": false,",
+            "  \"generated_json_loaded\": true,\n  \"generated_json_loaded\": false,",
+            1,
+        );
+        let duplicate_path = write_test_file(
+            &root,
+            "duplicate_runtime_handoff_snapshot.json",
+            duplicate_unsafe_key,
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &duplicate_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let unsafe_flag_path = write_test_file(
+            &root,
+            "unsafe_runtime_handoff_snapshot.json",
+            patched_json(
+                "  \"local_only\": true,\n  \"static_synthetic_fixture\": true",
+                "  \"local_only\": false,\n  \"static_synthetic_fixture\": true",
+            ),
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &unsafe_flag_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "local_only",
+            }
+        );
+
+        let drift_path = write_test_file(
+            &root,
+            "drift_runtime_handoff_snapshot.json",
+            patched_json(r#""model_count": 10"#, r#""model_count": 9"#),
+        );
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(&drift_path, &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.model_count",
+            }
+        );
+
+        let invalid_utf8_path =
+            write_test_file(&root, "invalid_utf8_runtime_handoff_snapshot.json", [0xff]);
+        assert_eq!(
+            RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_file(
+                &invalid_utf8_path,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        remove_temp_root(&root);
     }
 
     #[test]

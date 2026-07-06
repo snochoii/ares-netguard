@@ -49,6 +49,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES",
         "WorkspaceId",
         "SessionId",
         "JobId",
@@ -70,6 +71,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneInputMode",
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
+        "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneAdapterError",
         "RuntimeEvent",
         "NativeInferenceRuntimeState",
@@ -85,12 +87,16 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "StaticSyntheticFixture",
         "StaticContractFixture",
         "LocalJsonStringParser",
+        "LocalJsonFileAdapter",
         "AcceptedSchemaDeclarationOnly",
         "AcceptedLocalJsonString",
+        "AcceptedLocalJsonFile",
         "JsonStringParserAvailable",
+        "LocalFileAdapterAvailable",
         "RuntimeHandoffSnapshotV0",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
+        "parse_handoff_snapshot_file",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -113,6 +119,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert "RuntimeIdError::RawIdentifier" in lib_rs
     assert "serde_json::from_str" in lib_rs
     assert "serde_json::from_value" not in lib_rs
+    assert "use std::fs;" in lib_rs
+    assert "use std::path::{Path, PathBuf};" in lib_rs
     assert "#[serde(deny_unknown_fields)]" in lib_rs
 
 
@@ -245,11 +253,30 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "impl RuntimeControlPlaneOutputSnapshotSchema" in lib_rs
     assert "RuntimeControlPlaneAdapterError::InvalidJson" in lib_rs
     assert "RuntimeControlPlaneAdapterError::NonObjectRoot" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::RelativeFilePath" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::RelativeAllowedRoot" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::MissingFile" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::MissingAllowedRoot" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::AllowedRootSymlink" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::AllowedRootNotDirectory" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::SymlinkPath" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::DirectoryPath" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::NonRegularFile" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::UnsupportedFileExtension" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::OutsideAllowedRoot" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::OversizedFile" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::FileReadFailed" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::InvalidUtf8" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsafeFlag" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsupportedValue" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS" in lib_rs
+    assert "pub struct RuntimeControlPlaneFilePolicy" in lib_rs
+    assert "pub allowed_root: PathBuf" in lib_rs
+    assert "pub fn new(allowed_root: impl Into<PathBuf>) -> Self" in lib_rs
+    assert "pub fn max_bytes(&self) -> u64" in lib_rs
+    assert "!file_metadata.file_type().is_file()" in lib_rs
 
 
 def test_rust_core_static_handoff_fixture_composes_existing_contracts() -> None:
@@ -294,10 +321,12 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"local_json_string_parser"',
-        '"accepted_local_json_string"',
-        '"json_string_parser_available"',
-        '"not_file_io"',
+        '"local_json_file_adapter"',
+        '"accepted_local_json_file"',
+        '"local_file_adapter_available"',
+        '"not_arbitrary_file_loader"',
+        '"not_file_watcher"',
+        '"not_ipc_or_socket_transport"',
         '"not_live_transport"',
         '"not_qt_binding"',
         '"not_external_service"',
@@ -308,9 +337,9 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     for value in expected_values:
         assert value in lib_rs
 
-    assert "adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonStringParser" in lib_rs
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonString" in lib_rs
-    assert "adapter_state: RuntimeControlPlaneAdapterState::JsonStringParserAvailable" in lib_rs
+    assert "adapter_kind: RuntimeControlPlaneAdapterKind::LocalJsonFileAdapter" in lib_rs
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalJsonFile" in lib_rs
+    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalFileAdapterAvailable" in lib_rs
     assert (
         "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
         "RuntimeHandoffSnapshotV0" in " ".join(lib_rs.split())
@@ -320,7 +349,7 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     assert "dependency_free: false" in lib_rs
     assert "static_synthetic_fixture: true" in lib_rs
     assert "json_parsing_enabled: true" in lib_rs
-    assert "file_io_enabled: false" in lib_rs
+    assert "file_io_enabled: true" in lib_rs
     assert "live_transport_enabled: false" in lib_rs
     assert "qt_binding_enabled: false" in lib_rs
     assert "external_services_used: false" in lib_rs
@@ -432,13 +461,10 @@ def test_rust_core_source_stays_local_contract_only() -> None:
 
     forbidden_terms = [
         "live capture",
-        "socket",
         "tcpstream",
         "udp",
         "std::net",
         "std::io",
-        "std::path",
-        "std::fs",
         "file::open",
         "read_to_string",
         "from_reader",
@@ -471,6 +497,11 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "serde" in lowered
     assert "serde_json::from_str" in rust_source
     assert "serde_json::from_value" not in rust_source
+    assert "std::fs" in rust_source
+    assert "std::path::{Path, PathBuf}" in rust_source
+    assert "RuntimeControlPlaneFilePolicy" in rust_source
+    assert "parse_handoff_snapshot_file" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
 
@@ -507,20 +538,31 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeControlPlaneInputMode",
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
+        "RuntimeControlPlaneFilePolicy",
         "static runtime_summary.v0 handoff",
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
         "accepted local handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
+        "bounded local file adapter is now enabled",
+        "parse_handoff_snapshot_file",
+        "absolute `.json` path",
+        "canonical allowed root",
+        "256 KiB",
+        (
+            "rejects symlinks, directories, non-regular files, missing files, "
+            "non-JSON paths, oversized files, and invalid UTF-8"
+        ),
         "preserves the exact Python-derived synthetic registry entry order and aggregate metadata",
-        "File I/O, live transport, Qt binding, external services, and deployment remain disabled",
+        "Live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
-        "local file/IPC adapter",
+        "local IPC/control-plane adapter",
         "local control-plane adapter",
         "does not implement a daemon",
-        "not file loading",
+        "not arbitrary file loading",
+        "not file watching",
         "does not require Rust tooling for `make verify`",
         "make verify-rust-core",
         "Qt workstation data-flow integration",
