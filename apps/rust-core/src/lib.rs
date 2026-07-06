@@ -9,8 +9,10 @@ pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
+pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str = "runtime_control_plane_frame.v0";
 pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
 pub const RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES: u64 = 256 * 1024;
+pub const RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES: usize = 256 * 1024;
 pub const RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES: usize = 96;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,6 +57,9 @@ pub enum RuntimeControlPlaneAdapterError {
     OutsideAllowedRoot,
     OversizedFile {
         max_bytes: u64,
+    },
+    OversizedFrame {
+        max_bytes: usize,
     },
     FileReadFailed,
     InvalidUtf8,
@@ -143,6 +148,7 @@ pub enum RuntimeControlPlaneAdapterKind {
     LocalJsonStringParser,
     LocalJsonFileAdapter,
     LocalControlPlaneMessageEnvelope,
+    LocalControlPlaneFrameAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -152,6 +158,7 @@ pub enum RuntimeControlPlaneInputMode {
     AcceptedLocalJsonString,
     AcceptedLocalJsonFile,
     AcceptedLocalMessageEnvelope,
+    AcceptedLocalMessageFrame,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -161,6 +168,7 @@ pub enum RuntimeControlPlaneAdapterState {
     JsonStringParserAvailable,
     LocalFileAdapterAvailable,
     LocalMessageEnvelopeAvailable,
+    LocalMessageFrameAvailable,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -273,6 +281,33 @@ pub struct RuntimeControlPlaneAdapterContract {
     pub non_claims: &'static [&'static str],
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneFramePolicy {
+    pub max_frame_bytes: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneFrameAdapterContract {
+    pub schema_version: &'static str,
+    pub payload_schema_version: &'static str,
+    pub max_frame_bytes: usize,
+    pub local_only: bool,
+    pub caller_provided_bytes_only: bool,
+    pub utf8_json_payload_required: bool,
+    pub additional_dependencies_required: bool,
+    pub live_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeControlPlaneFilePolicy {
@@ -336,6 +371,7 @@ pub enum RuntimeControlPlaneMessageErrorCode {
     UnsupportedFileExtension,
     OutsideAllowedRoot,
     OversizedFile,
+    OversizedFrame,
     FileReadFailed,
     InvalidUtf8,
     UnsupportedSchemaVersion,
@@ -532,6 +568,7 @@ impl RuntimeControlPlaneAdapterKind {
             Self::LocalJsonStringParser => "local_json_string_parser",
             Self::LocalJsonFileAdapter => "local_json_file_adapter",
             Self::LocalControlPlaneMessageEnvelope => "local_control_plane_message_envelope",
+            Self::LocalControlPlaneFrameAdapter => "local_control_plane_frame_adapter",
         }
     }
 }
@@ -543,6 +580,7 @@ impl RuntimeControlPlaneInputMode {
             Self::AcceptedLocalJsonString => "accepted_local_json_string",
             Self::AcceptedLocalJsonFile => "accepted_local_json_file",
             Self::AcceptedLocalMessageEnvelope => "accepted_local_message_envelope",
+            Self::AcceptedLocalMessageFrame => "accepted_local_message_frame",
         }
     }
 }
@@ -554,6 +592,7 @@ impl RuntimeControlPlaneAdapterState {
             Self::JsonStringParserAvailable => "json_string_parser_available",
             Self::LocalFileAdapterAvailable => "local_file_adapter_available",
             Self::LocalMessageEnvelopeAvailable => "local_message_envelope_available",
+            Self::LocalMessageFrameAvailable => "local_message_frame_available",
         }
     }
 }
@@ -592,6 +631,7 @@ impl RuntimeControlPlaneMessageErrorCode {
             Self::UnsupportedFileExtension => "unsupported_file_extension",
             Self::OutsideAllowedRoot => "outside_allowed_root",
             Self::OversizedFile => "oversized_file",
+            Self::OversizedFrame => "oversized_frame",
             Self::FileReadFailed => "file_read_failed",
             Self::InvalidUtf8 => "invalid_utf8",
             Self::UnsupportedSchemaVersion => "unsupported_schema_version",
@@ -622,6 +662,7 @@ impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorC
             }
             RuntimeControlPlaneAdapterError::OutsideAllowedRoot => Self::OutsideAllowedRoot,
             RuntimeControlPlaneAdapterError::OversizedFile { .. } => Self::OversizedFile,
+            RuntimeControlPlaneAdapterError::OversizedFrame { .. } => Self::OversizedFrame,
             RuntimeControlPlaneAdapterError::FileReadFailed => Self::FileReadFailed,
             RuntimeControlPlaneAdapterError::InvalidUtf8 => Self::InvalidUtf8,
             RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion { .. } => {
@@ -707,9 +748,9 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneMessageEnvelope,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageEnvelope,
-            adapter_state: RuntimeControlPlaneAdapterState::LocalMessageEnvelopeAvailable,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneFrameAdapter,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageFrame,
+            adapter_state: RuntimeControlPlaneAdapterState::LocalMessageFrameAvailable,
             output_snapshot_schema:
                 RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
@@ -819,6 +860,116 @@ impl RuntimeControlPlaneAdapterContract {
     ) -> Result<String, RuntimeControlPlaneAdapterError> {
         serde_json::to_string(response).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)
     }
+}
+
+impl RuntimeControlPlaneFrameAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
+            payload_schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            max_frame_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+            local_only: true,
+            caller_provided_bytes_only: true,
+            utf8_json_payload_required: true,
+            additional_dependencies_required: false,
+            live_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_CONTROL_PLANE_FRAME_NON_CLAIMS,
+        }
+    }
+
+    pub fn parse_control_plane_message_frame_bytes(
+        frame: &[u8],
+        policy: &RuntimeControlPlaneFramePolicy,
+    ) -> Result<RuntimeControlPlaneMessageRequest, RuntimeControlPlaneAdapterError> {
+        let input = validate_control_plane_frame_bytes(frame, policy)?;
+        RuntimeControlPlaneAdapterContract::parse_control_plane_message_request_json(input)
+    }
+
+    pub fn execute_control_plane_message_frame_bytes(
+        frame: &[u8],
+        policy: &RuntimeControlPlaneFramePolicy,
+    ) -> Result<Vec<u8>, RuntimeControlPlaneAdapterError> {
+        let request = Self::parse_control_plane_message_frame_bytes(frame, policy)?;
+        let response =
+            RuntimeControlPlaneAdapterContract::execute_control_plane_message_request(request);
+        Self::serialize_control_plane_message_response_frame_bytes(&response, policy)
+    }
+
+    pub fn serialize_control_plane_message_response_frame_bytes(
+        response: &RuntimeControlPlaneMessageResponse,
+        policy: &RuntimeControlPlaneFramePolicy,
+    ) -> Result<Vec<u8>, RuntimeControlPlaneAdapterError> {
+        let response_json =
+            RuntimeControlPlaneAdapterContract::serialize_control_plane_message_response_json(
+                response,
+            )?;
+        let response_bytes = response_json.into_bytes();
+        if response_bytes.len() > policy.max_frame_bytes {
+            return Err(RuntimeControlPlaneAdapterError::OversizedFrame {
+                max_bytes: policy.max_frame_bytes,
+            });
+        }
+        Ok(response_bytes)
+    }
+}
+
+impl Default for RuntimeControlPlaneFramePolicy {
+    fn default() -> Self {
+        Self {
+            max_frame_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+        }
+    }
+}
+
+impl RuntimeControlPlaneFramePolicy {
+    pub fn new(max_frame_bytes: usize) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        if max_frame_bytes == 0 || max_frame_bytes > RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "frame.max_frame_bytes",
+            });
+        }
+        Ok(Self { max_frame_bytes })
+    }
+
+    pub fn max_bytes(&self) -> usize {
+        self.max_frame_bytes
+    }
+}
+
+pub fn parse_control_plane_message_frame_bytes(
+    frame: &[u8],
+) -> Result<RuntimeControlPlaneMessageRequest, RuntimeControlPlaneAdapterError> {
+    RuntimeControlPlaneFrameAdapterContract::parse_control_plane_message_frame_bytes(
+        frame,
+        &RuntimeControlPlaneFramePolicy::default(),
+    )
+}
+
+pub fn execute_control_plane_message_frame_bytes(
+    frame: &[u8],
+) -> Result<Vec<u8>, RuntimeControlPlaneAdapterError> {
+    RuntimeControlPlaneFrameAdapterContract::execute_control_plane_message_frame_bytes(
+        frame,
+        &RuntimeControlPlaneFramePolicy::default(),
+    )
+}
+
+pub fn serialize_control_plane_message_response_frame_bytes(
+    response: &RuntimeControlPlaneMessageResponse,
+) -> Result<Vec<u8>, RuntimeControlPlaneAdapterError> {
+    RuntimeControlPlaneFrameAdapterContract::serialize_control_plane_message_response_frame_bytes(
+        response,
+        &RuntimeControlPlaneFramePolicy::default(),
+    )
 }
 
 impl RuntimeControlPlaneFilePolicy {
@@ -945,6 +1096,21 @@ fn parse_runtime_control_plane_message_command(
             field: "command.command_kind",
         }),
     }
+}
+
+fn validate_control_plane_frame_bytes<'a>(
+    frame: &'a [u8],
+    policy: &RuntimeControlPlaneFramePolicy,
+) -> Result<&'a str, RuntimeControlPlaneAdapterError> {
+    if frame.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::InvalidJson);
+    }
+    if frame.len() > policy.max_frame_bytes {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFrame {
+            max_bytes: policy.max_frame_bytes,
+        });
+    }
+    std::str::from_utf8(frame).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)
 }
 
 fn validate_runtime_handoff_snapshot_file_path(
@@ -1424,6 +1590,7 @@ fn validate_control_plane_request_id(value: &str) -> Result<(), RuntimeControlPl
 }
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
+    RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
     RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
     RUNTIME_SUMMARY_SCHEMA_VERSION,
@@ -1444,6 +1611,20 @@ const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_deployment_approval",
     "not_runtime_service",
     "not_generated_report_loader",
+];
+
+const RUNTIME_CONTROL_PLANE_FRAME_NON_CLAIMS: &[&str] = &[
+    "not_network_transport",
+    "not_ipc_or_socket_transport",
+    "not_socket_listener",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_storage_provider",
+    "not_capture_boundary",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
 ];
 
 const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
@@ -2076,6 +2257,11 @@ mod tests {
         )
     }
 
+    fn response_from_frame_bytes(frame: Vec<u8>) -> RuntimeControlPlaneMessageResponse {
+        let response_json = String::from_utf8(frame).expect("response frame must be UTF-8 JSON");
+        serde_json::from_str(&response_json).expect("response frame must parse")
+    }
+
     fn remove_temp_root(root: &Path) {
         let _ = std::fs::remove_dir_all(root);
     }
@@ -2249,15 +2435,12 @@ mod tests {
         );
         assert_eq!(
             contract.adapter_kind.as_str(),
-            "local_control_plane_message_envelope"
+            "local_control_plane_frame_adapter"
         );
-        assert_eq!(
-            contract.input_mode.as_str(),
-            "accepted_local_message_envelope"
-        );
+        assert_eq!(contract.input_mode.as_str(), "accepted_local_message_frame");
         assert_eq!(
             contract.adapter_state.as_str(),
-            "local_message_envelope_available"
+            "local_message_frame_available"
         );
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
@@ -2266,6 +2449,7 @@ mod tests {
         assert_eq!(
             contract.accepted_input_schemas,
             &[
+                RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
                 RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
                 RUNTIME_SUMMARY_SCHEMA_VERSION,
@@ -2299,6 +2483,54 @@ mod tests {
     }
 
     #[test]
+    fn emits_static_runtime_control_plane_frame_adapter_contract_fixture() {
+        let contract = RuntimeControlPlaneFrameAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.payload_schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_frame_bytes,
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_provided_bytes_only);
+        assert!(contract.utf8_json_payload_required);
+        assert!(!contract.additional_dependencies_required);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_network_transport",
+                "not_ipc_or_socket_transport",
+                "not_socket_listener",
+                "not_daemon_lifecycle",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_storage_provider",
+                "not_capture_boundary",
+                "not_deployment_approval",
+                "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
     fn exposes_bounded_runtime_control_plane_file_policy() {
         let root = temp_policy_root("policy");
         let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
@@ -2307,6 +2539,30 @@ mod tests {
         assert_eq!(policy.max_bytes(), 256 * 1024);
 
         remove_temp_root(&policy.allowed_root);
+    }
+
+    #[test]
+    fn exposes_bounded_runtime_control_plane_frame_policy() {
+        let policy = RuntimeControlPlaneFramePolicy::default();
+        assert_eq!(policy.max_frame_bytes, 256 * 1024);
+        assert_eq!(policy.max_bytes(), RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES);
+
+        let smaller_policy = RuntimeControlPlaneFramePolicy::new(1024).unwrap();
+        assert_eq!(smaller_policy.max_bytes(), 1024);
+
+        assert_eq!(
+            RuntimeControlPlaneFramePolicy::new(0).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "frame.max_frame_bytes",
+            }
+        );
+        assert_eq!(
+            RuntimeControlPlaneFramePolicy::new(RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES + 1)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "frame.max_frame_bytes",
+            }
+        );
     }
 
     #[test]
@@ -2482,6 +2738,44 @@ mod tests {
     }
 
     #[test]
+    fn dispatches_runtime_control_plane_json_message_frame_bytes() {
+        let request_json = json_message_request("request-frame-json-001", synthetic_handoff_json());
+        let request = parse_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap();
+        assert_eq!(request.request_id.as_str(), "request-frame-json-001");
+        assert_eq!(
+            request.command.command_kind(),
+            "parse_handoff_snapshot_json"
+        );
+
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+        let from_message =
+            RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(&request_json)
+                .unwrap();
+
+        assert_eq!(from_frame, from_message);
+        assert_eq!(
+            from_frame.outcome,
+            RuntimeControlPlaneMessageOutcome::Success
+        );
+        assert_eq!(
+            from_frame
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .runtime_summary
+                .workspace_id
+                .as_str(),
+            "fixture-workspace-alpha"
+        );
+
+        let response_frame =
+            serialize_control_plane_message_response_frame_bytes(&from_frame).unwrap();
+        assert_eq!(response_from_frame_bytes(response_frame), from_frame);
+    }
+
+    #[test]
     fn parses_runtime_handoff_snapshot_file_under_allowed_root() {
         let root = temp_policy_root("valid-file");
         let path = write_test_file(
@@ -2505,6 +2799,43 @@ mod tests {
         assert_eq!(
             from_file.runtime_summary.workspace_id.as_str(),
             "fixture-workspace-alpha"
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn dispatches_runtime_control_plane_file_message_frame_bytes() {
+        let root = temp_policy_root("valid-file-frame");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let request_json = file_message_request("request-frame-file-001", &path, &root);
+
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+        let from_message =
+            RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(&request_json)
+                .unwrap();
+
+        assert_eq!(from_frame, from_message);
+        assert_eq!(from_frame.request_id.as_str(), "request-frame-file-001");
+        assert_eq!(
+            from_frame.outcome,
+            RuntimeControlPlaneMessageOutcome::Success
+        );
+        assert_eq!(
+            from_frame
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .model_registry_metadata
+                .entries[9]
+                .model_id,
+            "time_series_residual"
         );
 
         remove_temp_root(&root);
@@ -2729,6 +3060,120 @@ mod tests {
     }
 
     #[test]
+    fn message_frame_parsing_fails_closed_for_invalid_frame_bytes() {
+        let policy = RuntimeControlPlaneFramePolicy::default();
+
+        assert_eq!(
+            RuntimeControlPlaneFrameAdapterContract::parse_control_plane_message_frame_bytes(
+                b"", &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            RuntimeControlPlaneFrameAdapterContract::parse_control_plane_message_frame_bytes(
+                &[0xff],
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        let oversized = vec![b' '; RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES + 1];
+        assert_eq!(
+            RuntimeControlPlaneFrameAdapterContract::parse_control_plane_message_frame_bytes(
+                &oversized, &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFrame {
+                max_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+            }
+        );
+
+        let short_policy = RuntimeControlPlaneFramePolicy::new(8).unwrap();
+        assert_eq!(
+            RuntimeControlPlaneFrameAdapterContract::parse_control_plane_message_frame_bytes(
+                br#"{"schema_version":"runtime_control_plane_message.v0"}"#,
+                &short_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFrame { max_bytes: 8 }
+        );
+    }
+
+    #[test]
+    fn message_frame_parsing_preserves_message_envelope_rejections() {
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(b"{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(b"[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let unsupported_schema =
+            json_message_request("request-frame-002", synthetic_handoff_json()).replacen(
+                RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+                "runtime_control_plane_message.v1",
+                1,
+            );
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(unsupported_schema.as_bytes()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            }
+        );
+
+        let unknown_root_field =
+            json_message_request("request-frame-003", synthetic_handoff_json()).replacen(
+                r#"  "request_id": "request-frame-003","#,
+                r#"  "request_id": "request-frame-003",
+  "unexpected_field": true,"#,
+                1,
+            );
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(unknown_root_field.as_bytes()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let unsupported_command = json_message_request(
+            "request-frame-004",
+            synthetic_handoff_json(),
+        )
+        .replacen("parse_handoff_snapshot_json", "open_runtime_service", 1);
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(unsupported_command.as_bytes()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "command.command_kind",
+            }
+        );
+
+        let mixed_command = json_message_request("request-frame-005", synthetic_handoff_json())
+            .replacen(
+                r#"    "input": "#,
+                r#"    "path": "/tmp/runtime_handoff_snapshot.json",
+    "input": "#,
+                1,
+            );
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(mixed_command.as_bytes()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue { field: "command" }
+        );
+
+        assert_eq!(
+            parse_control_plane_message_frame_bytes(
+                json_message_request("secret-frame", synthetic_handoff_json()).as_bytes(),
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "request_id",
+            }
+        );
+    }
+
+    #[test]
     fn message_execution_returns_failure_responses_for_nested_handoff_rejections() {
         let malformed = RuntimeControlPlaneAdapterContract::execute_control_plane_message_json(
             &json_message_request("request-json-006", "{"),
@@ -2798,6 +3243,61 @@ mod tests {
         assert_eq!(
             registry_drift.error_code,
             Some(RuntimeControlPlaneMessageErrorCode::UnsupportedValue)
+        );
+    }
+
+    #[test]
+    fn message_frame_execution_returns_failure_response_frames_for_nested_rejections() {
+        let malformed = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(
+                json_message_request("request-frame-006", "{").as_bytes(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(malformed.request_id.as_str(), "request-frame-006");
+        assert_eq!(
+            malformed.outcome,
+            RuntimeControlPlaneMessageOutcome::Failure
+        );
+        assert_eq!(
+            malformed.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidJson)
+        );
+
+        let unsafe_flag = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(
+                json_message_request(
+                    "request-frame-007",
+                    &patched_json(
+                        "  \"generated_json_loaded\": false,\n  \"live_runtime_connection\": false",
+                        "  \"generated_json_loaded\": true,\n  \"live_runtime_connection\": false",
+                    ),
+                )
+                .as_bytes(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            unsafe_flag.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::UnsafeFlag)
+        );
+
+        let schema_drift = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(
+                json_message_request(
+                    "request-frame-008",
+                    &patched_json(
+                        r#""schema_version": "runtime_handoff_snapshot.v0""#,
+                        r#""schema_version": "runtime_handoff_snapshot.v1""#,
+                    ),
+                )
+                .as_bytes(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            schema_drift.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::UnsupportedSchemaVersion)
         );
     }
 

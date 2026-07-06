@@ -49,8 +49,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES",
+        "RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES",
         "RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES",
         "WorkspaceId",
         "SessionId",
@@ -73,6 +75,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneInputMode",
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
+        "RuntimeControlPlaneFramePolicy",
+        "RuntimeControlPlaneFrameAdapterContract",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
         "RuntimeControlPlaneRequestId",
@@ -97,19 +101,23 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "LocalJsonStringParser",
         "LocalJsonFileAdapter",
         "LocalControlPlaneMessageEnvelope",
+        "LocalControlPlaneFrameAdapter",
         "AcceptedSchemaDeclarationOnly",
         "AcceptedLocalJsonString",
         "AcceptedLocalJsonFile",
         "AcceptedLocalMessageEnvelope",
+        "AcceptedLocalMessageFrame",
         "JsonStringParserAvailable",
         "LocalFileAdapterAvailable",
         "LocalMessageEnvelopeAvailable",
+        "LocalMessageFrameAvailable",
         "RuntimeHandoffSnapshotV0",
         "ParseHandoffSnapshotJson",
         "ParseHandoffSnapshotFile",
         "Success",
         "Failure",
         "InvalidJson",
+        "OversizedFrame",
         "UnsafeFlag",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
@@ -119,6 +127,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "execute_control_plane_message_request",
         "execute_control_plane_message_json",
         "serialize_control_plane_message_response_json",
+        "parse_control_plane_message_frame_bytes",
+        "execute_control_plane_message_frame_bytes",
+        "serialize_control_plane_message_response_frame_bytes",
         "command_kind",
         "output_snapshot_schema",
     ]
@@ -138,6 +149,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_adapter.v0";' in " ".join(lib_rs.split())
+    )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_frame.v0";' in " ".join(lib_rs.split())
     )
     assert (
         "pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str ="
@@ -306,12 +321,38 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub allowed_root: PathBuf" in lib_rs
     assert "pub fn new(allowed_root: impl Into<PathBuf>) -> Self" in lib_rs
     assert "pub fn max_bytes(&self) -> u64" in lib_rs
+    assert "pub struct RuntimeControlPlaneFramePolicy" in lib_rs
+    assert "pub max_frame_bytes: usize" in lib_rs
+    assert "pub struct RuntimeControlPlaneFrameAdapterContract" in lib_rs
+    assert "pub payload_schema_version: &'static str" in lib_rs
+    assert "pub caller_provided_bytes_only: bool" in lib_rs
+    assert "pub utf8_json_payload_required: bool" in lib_rs
+    assert "pub additional_dependencies_required: bool" in lib_rs
+    assert "pub socket_listener_enabled: bool" in lib_rs
+    assert "pub daemon_lifecycle_enabled: bool" in lib_rs
+    assert "pub process_spawning_enabled: bool" in lib_rs
+    assert "pub file_watching_enabled: bool" in lib_rs
+    assert "pub storage_provider_enabled: bool" in lib_rs
+    assert "pub capture_enabled: bool" in lib_rs
+    assert "pub native_inference_execution_enabled: bool" in lib_rs
+    assert "impl RuntimeControlPlaneFrameAdapterContract" in lib_rs
+    assert "impl RuntimeControlPlaneFramePolicy" in lib_rs
+    assert "impl Default for RuntimeControlPlaneFramePolicy" in lib_rs
+    assert (
+        "pub fn new(max_frame_bytes: usize) -> "
+        "Result<Self, RuntimeControlPlaneAdapterError>" in lib_rs
+    )
+    assert "pub fn max_bytes(&self) -> usize" in lib_rs
+    assert "fn validate_control_plane_frame_bytes" in lib_rs
     assert "pub enum RuntimeControlPlaneCommand" in lib_rs
     assert "ParseHandoffSnapshotJson {" in lib_rs
     assert "input: String" in lib_rs
     assert "ParseHandoffSnapshotFile {" in lib_rs
     assert "policy: RuntimeControlPlaneFilePolicy" in lib_rs
     assert "pub fn execute_local_command(" in lib_rs
+    assert "pub fn parse_control_plane_message_frame_bytes(" in lib_rs
+    assert "pub fn execute_control_plane_message_frame_bytes(" in lib_rs
+    assert "pub fn serialize_control_plane_message_response_frame_bytes(" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
     assert "pub fn command_kind(&self) -> &'static str" in lib_rs
@@ -378,6 +419,7 @@ def test_rust_core_exposes_control_plane_message_envelope_shape() -> None:
         '"failure"',
         '"invalid_json"',
         '"non_object_root"',
+        '"oversized_frame"',
         '"unsupported_schema_version"',
         '"unsupported_value"',
         '"unsafe_flag"',
@@ -431,13 +473,14 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     expected_values = [
         '"runtime_control_plane_adapter.v0"',
+        '"runtime_control_plane_frame.v0"',
         '"runtime_control_plane_message.v0"',
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"local_control_plane_message_envelope"',
-        '"accepted_local_message_envelope"',
-        '"local_message_envelope_available"',
+        '"local_control_plane_frame_adapter"',
+        '"accepted_local_message_frame"',
+        '"local_message_frame_available"',
         '"not_arbitrary_file_loader"',
         '"not_file_watcher"',
         '"not_ipc_or_socket_transport"',
@@ -454,14 +497,13 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     assert (
         "adapter_kind: RuntimeControlPlaneAdapterKind::"
-        "LocalControlPlaneMessageEnvelope" in " ".join(lib_rs.split())
+        "LocalControlPlaneFrameAdapter" in " ".join(lib_rs.split())
     )
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageEnvelope" in " ".join(
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageFrame" in " ".join(
         lib_rs.split()
     )
-    assert (
-        "adapter_state: RuntimeControlPlaneAdapterState::"
-        "LocalMessageEnvelopeAvailable" in " ".join(lib_rs.split())
+    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalMessageFrameAvailable" in " ".join(
+        lib_rs.split()
     )
     assert (
         "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
@@ -487,6 +529,7 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     assert [
         schema.strip() for schema in accepted_schema_block.group(1).split(",") if schema.strip()
     ] == [
+        "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
@@ -624,16 +667,23 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "std::fs" in rust_source
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
+    assert "RuntimeControlPlaneFramePolicy" in rust_source
+    assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
     assert "RuntimeControlPlaneCommand" in rust_source
     assert "RuntimeControlPlaneMessageRequest" in rust_source
     assert "RuntimeControlPlaneMessageResponse" in rust_source
     assert "RuntimeControlPlaneMessageErrorCode" in rust_source
+    assert "parse_control_plane_message_frame_bytes" in rust_source
+    assert "execute_control_plane_message_frame_bytes" in rust_source
+    assert "serialize_control_plane_message_response_frame_bytes" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
     assert "execute_local_command" in rust_source
     assert "parse_control_plane_message_request_json" in rust_source
     assert "execute_control_plane_message_json" in rust_source
     assert "serialize_control_plane_message_response_json" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION" in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
@@ -671,6 +721,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeControlPlaneInputMode",
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
+        "runtime_control_plane_frame.v0",
+        "RuntimeControlPlaneFramePolicy",
+        "RuntimeControlPlaneFrameAdapterContract",
+        "parse_control_plane_message_frame_bytes",
+        "execute_control_plane_message_frame_bytes",
+        "serialize_control_plane_message_response_frame_bytes",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
         "runtime_control_plane_message.v0",
@@ -698,6 +754,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "unsupported command variants",
         "mixed command fields",
         "RuntimeControlPlaneAdapterContract::serialize_control_plane_message_response_json",
+        "bounded local byte-frame adapter",
+        "caps frames at 256 KiB by default",
+        "requires UTF-8 JSON payloads",
+        "caller-provided `&[u8]` frames",
+        "typed failure responses with `RuntimeControlPlaneMessageErrorCode`",
+        "Frame parsing failures without a valid request identifier return adapter errors",
         "absolute `.json` path",
         "canonical allowed root",
         "256 KiB",
@@ -711,6 +773,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "typed registry metadata adapter",
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
+        "bounded runtime_control_plane_frame.v0 local byte-frame adapter",
         "local IPC/control-plane adapter",
         "does not implement a daemon",
         "not arbitrary file loading",

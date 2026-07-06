@@ -273,9 +273,18 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "request/response message envelope",
         "safe request identifier",
         "typed success/failure responses",
+        "runtime_control_plane_frame.v0",
+        "bounded local `runtime_control_plane_frame.v0` byte-frame adapter",
+        "caller-provided UTF-8 JSON bytes",
+        "256 KiB default frame cap",
+        "serialized UTF-8 JSON response bytes",
+        "Qt does not parse frame bytes",
+        "call the frame adapter",
+        "bounded runtime_control_plane_frame.v0 byte-frame adapter in the Rust runtime",
         "future local IPC/control-plane adapter from the Rust runtime",
-        "Qt still performs no file I/O",
-        "has no IPC, live runtime service, Qt data binding",
+        "perform file I/O",
+        "open IPC",
+        "bind to live runtime state",
     ]
     for text in expected_text:
         assert text in normalized_strategy
@@ -296,6 +305,8 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "typed local control-plane command dispatcher",
         "runtime_control_plane_message.v0",
         "request/response message envelope",
+        "runtime_control_plane_frame.v0",
+        "byte-frame adapter",
         "future local IPC/control-plane adapter from the Rust runtime",
     ]
     for text in expected_text:
