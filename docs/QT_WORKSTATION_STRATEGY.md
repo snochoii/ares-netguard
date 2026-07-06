@@ -62,6 +62,14 @@ open IPC, call `read_control_plane_message_ipc_frame`, call
 listener, manage a filesystem socket path, spawn a process, load generated
 reports, use external services, allow deployment, capture traffic, or execute
 native inference.
+Rust now also defines a bounded `runtime_control_plane_endpoint.v0` endpoint
+policy over that connected-stream IPC layer, with a caller-provided connected
+stream endpoint kind, strict endpoint policy validation, and
+`execute_control_plane_endpoint_stream` delegation into the IPC adapter. Qt does
+not call `execute_control_plane_endpoint_stream`, choose endpoint paths, open
+IPC, start a listener, manage a filesystem socket path, spawn a process, bind to
+live runtime state, load generated reports, use external services, allow
+deployment, capture traffic, or execute native inference.
 
 Expected integration path:
 
@@ -77,7 +85,8 @@ QML shell scaffold
   -> strict local runtime_control_plane_message.v0 envelope in the Rust runtime
   -> bounded runtime_control_plane_frame.v0 byte-frame adapter in the Rust runtime
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime
-  -> future OS-local endpoint/listener policy from the Rust runtime
+  -> bounded runtime_control_plane_endpoint.v0 endpoint policy in the Rust runtime
+  -> future OS-local listener/path binding implementation from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging

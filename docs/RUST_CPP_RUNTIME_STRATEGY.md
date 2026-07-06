@@ -48,16 +48,17 @@ claiming adapter behavior.
 
 The scaffold now also owns a `runtime_control_plane_adapter.v0` contract through
 `RuntimeControlPlaneAdapterContract`. The adapter contract declares the accepted
-local IPC, frame, message, and handoff schemas, `runtime_control_plane_ipc.v0`,
+local endpoint, IPC, frame, message, and handoff schemas,
+`runtime_control_plane_endpoint.v0`, `runtime_control_plane_ipc.v0`,
 `runtime_control_plane_frame.v0`, `runtime_control_plane_message.v0`,
 `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
 `model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
 `RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
 `RuntimeControlPlaneOutputSnapshotSchema`. The top local adapter fixture now
-identifies the bounded connected-stream IPC adapter as available while listener,
-daemon, filesystem socket path policy, Qt binding, external service, and
-deployment behavior remain disabled. JSON-string parsing is now enabled through
-`serde` and `serde_json` using
+identifies the bounded endpoint policy over the connected-stream IPC adapter as
+available while listener, daemon, filesystem socket path policy, Qt binding,
+external service, and deployment behavior remain disabled. JSON-string parsing
+is now enabled through `serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
 unsupported schema versions and enum values, validates coarse runtime IDs,
@@ -159,6 +160,26 @@ spawning, no file watcher, no storage provider, no Qt binding, no capture
 behavior, no generated report loading, no deployment behavior, no external
 service, and no native inference execution.
 
+The scaffold now adds a bounded `runtime_control_plane_endpoint.v0` endpoint
+policy over the connected-stream IPC adapter through
+`RuntimeControlPlaneEndpointPolicy`,
+`RuntimeControlPlaneEndpointAdapterContract`, `RuntimeControlPlaneEndpointKind`,
+and `execute_control_plane_endpoint_stream`. The only accepted endpoint kind is
+`CallerProvidedConnectedStream`, which means the caller must supply already
+connected `Read` and `Write` streams. `validate_control_plane_endpoint_policy`
+rejects unsupported endpoint schema versions, invalid nested frame caps, and
+unsafe policy flags including public network transport, socket listener,
+filesystem socket path policy, daemon lifecycle, process spawning, file
+watching, Qt binding, storage provider, capture, external services, deployment,
+and native inference execution. After policy validation, execution delegates to
+`execute_control_plane_message_ipc_stream` and preserves the same strict
+request/response behavior as the IPC stream adapter. This policy is an endpoint
+gate only: it adds no socket binding, no listener loop, no filesystem socket
+path selection, no OS endpoint registration, no daemon lifecycle, no process
+spawning, no file watcher, no storage provider, no Qt binding, no capture
+behavior, no generated report loading, no deployment behavior, no external
+service, and no native inference execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
@@ -172,11 +193,12 @@ control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
 local command dispatcher, strict local request/response message envelope, and
-bounded local byte-frame adapter plus a bounded connected-stream IPC adapter
-only; it is not arbitrary file loading, not file watching, not a public network
-transport, not a socket listener, not a filesystem socket path policy, not Qt
-binding, not external-service integration, not storage, not deployment behavior,
-not capture behavior, and not native inference execution.
+bounded local byte-frame adapter plus a bounded connected-stream IPC adapter and
+bounded endpoint policy only; it is not arbitrary file loading, not file
+watching, not a public network transport, not a socket listener, not a
+filesystem socket path policy, not Qt binding, not external-service integration,
+not storage, not deployment behavior, not capture behavior, and not native
+inference execution.
 
 Expected integration path:
 
@@ -192,7 +214,8 @@ Rust source contract
   -> strict runtime_control_plane_message.v0 local request/response envelope
   -> bounded runtime_control_plane_frame.v0 local byte-frame adapter
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
-  -> local OS endpoint/listener policy
+  -> bounded runtime_control_plane_endpoint.v0 endpoint policy
+  -> future OS-local listener/path binding implementation
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
   -> runtime registry/storage provider
