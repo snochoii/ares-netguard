@@ -124,8 +124,32 @@ indexing engine, generated report loading, generated JSON loading, file I/O,
 live transport, public network transport, socket listener, filesystem socket
 path policy, daemon lifecycle, process spawning, file watching, Qt binding,
 capture behavior, deployment behavior, external service integration, or native
-inference execution. Durable runtime registry/storage provider work and
-OS-local listener/path binding remain future milestones.
+inference execution.
+
+The scaffold now also owns a bounded local
+`runtime_registry_storage_provider.v0` through
+`RuntimeRegistryStorageProviderContract`, `RuntimeRegistryStoragePolicy`,
+`RuntimeRegistryStorageDocument`, and `RuntimeRegistryStorageProvider`. The
+storage provider accepts only typed `RuntimeRegistrySnapshot` values, wraps
+them in a strict storage document, writes UTF-8 JSON under a caller-provided
+absolute allowed root, and reloads the same typed snapshot through
+`load_runtime_registry_snapshot_file`. Both write and read paths reject
+relative paths, relative allowed roots, missing roots, symlink roots, symlink
+files, directories, non-regular files, non-JSON paths, paths outside the
+allowed root, oversized files above 1 MiB, invalid UTF-8, malformed JSON,
+unknown fields, storage schema drift, unsafe storage flags, malformed registry
+counts, unsorted or duplicate records, record key mismatches, malformed nested
+runtime summaries, malformed nested model registry metadata, nested generated
+JSON flags, deployment flags, and external service flags. This is the first
+durable runtime registry boundary, but it remains a bounded local JSON storage
+file provider only: it is not a database or indexing engine, not a generated
+report loader, not arbitrary file loading, not a control-plane transport, not a
+public network transport, not a socket listener, not a filesystem socket path
+policy, not a daemon lifecycle, not process spawning, not file watching, not a
+Qt binding, not a capture boundary, not deployment behavior, not an external
+service, and not native inference execution. Indexed storage, migrations,
+storage compaction, OS-local listener/path binding, Qt live binding, process
+supervision, and native inference execution remain future milestones.
 
 The scaffold now adds a typed local command dispatcher over those existing
 parsers through `RuntimeControlPlaneCommand` and
@@ -229,8 +253,9 @@ spawning, no file watcher, no storage provider, no Qt binding, no capture
 behavior, no generated report loading, no deployment behavior, no external
 service, and no native inference execution.
 
-The v0 scaffold is intentionally a source-only contract with bounded parser
-behavior. It does not implement a daemon, storage engine, process supervisor,
+The v0 scaffold is intentionally a source-only contract with bounded parser and
+local JSON storage behavior. It does not implement a daemon, indexed storage
+engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
 service client, packaging flow, or UI data adapter. It does not read PCAPs,
 private telemetry, logs, model binaries, databases, runtime artifacts, or
@@ -260,7 +285,13 @@ inside a bounded in-memory map; it is not durable storage, not a database or
 indexing engine, not a generated report loader, not a generated JSON loader,
 not Qt data-flow integration, not a transport, not a listener, not a daemon,
 not a capture boundary, not deployment behavior, not an external service, and
-not native inference execution.
+not native inference execution. The runtime registry storage provider persists
+only typed `RuntimeRegistrySnapshot` storage documents under a caller-authorized
+local `.json` file; it is not a database or indexing engine, not arbitrary file
+loading, not a generated report loader, not a transport, not a listener, not a
+filesystem socket path policy, not a daemon, not a file watcher, not Qt
+data-flow integration, not a capture boundary, not deployment behavior, not an
+external service, and not native inference execution.
 
 Expected integration path:
 
@@ -280,7 +311,7 @@ Rust source contract
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
-  -> durable runtime registry/storage provider
+  -> bounded runtime_registry_storage_provider.v0 local JSON persistence
   -> future OS-local listener/path binding implementation
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
@@ -307,7 +338,7 @@ is available.
 
 - Do not rewrite working Python ML research pipelines into Rust/C++ for
   aesthetics.
-- Do not claim live capture, native inference execution, persistent storage, or
+- Do not claim live capture, native inference execution, indexed storage, or
   packaging before the corresponding safety and validation gates exist.
 - Do not let the Qt/QML UI own runtime lifecycle or job supervision state.
 - Do not commit generated runtime outputs, databases, model artifacts, PCAPs, or

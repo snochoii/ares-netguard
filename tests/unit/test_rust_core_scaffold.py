@@ -46,7 +46,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION",
         "RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION",
+        "RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION",
         "RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP",
+        "RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
@@ -74,6 +76,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeRegistryRecord",
         "RuntimeRegistrySnapshot",
         "RuntimeRegistryProvider",
+        "RuntimeRegistryStorageProviderContract",
+        "RuntimeRegistryStoragePolicy",
+        "RuntimeRegistryStorageDocument",
+        "RuntimeRegistryStorageProvider",
         "ModelRegistryMetadata",
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
@@ -156,6 +162,12 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "parse_handoff_snapshot_file",
         "build_runtime_summary_from_events",
         "upsert_snapshot",
+        "persist_snapshot_file",
+        "load_snapshot_file",
+        "parse_storage_document_json",
+        "persist_runtime_registry_snapshot_file",
+        "load_runtime_registry_snapshot_file",
+        "parse_runtime_registry_storage_document_json",
         "default_provider",
         "parse_model_registry_metadata_json",
         "parse_model_registry_metadata_file",
@@ -188,7 +200,12 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "pub const RUNTIME_REGISTRY_PROVIDER_SCHEMA_VERSION: &str = "
         '"runtime_registry_provider.v0";' in lib_rs
     )
+    assert (
+        "pub const RUNTIME_REGISTRY_STORAGE_PROVIDER_SCHEMA_VERSION: &str = "
+        '"runtime_registry_storage_provider.v0";' in " ".join(lib_rs.split())
+    )
     assert "pub const RUNTIME_REGISTRY_PROVIDER_DEFAULT_RECORD_CAP: usize = 64;" in lib_rs
+    assert "pub const RUNTIME_REGISTRY_STORAGE_FILE_MAX_BYTES: u64 = 1024 * 1024;" in lib_rs
     assert (
         'pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";'
         in lib_rs
@@ -417,6 +434,109 @@ def test_rust_core_exposes_runtime_registry_provider_contract_shape() -> None:
         assert anchor in lib_rs
 
 
+def test_rust_core_exposes_runtime_registry_storage_provider_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub accepted_registry_snapshot_schema: &'static str",
+        "pub storage_document_schema: &'static str",
+        "pub max_file_bytes: u64",
+        "pub caller_authorized_allowed_root_required: bool",
+        "pub typed_registry_snapshots_only: bool",
+        "pub strict_registry_validation_enabled: bool",
+        "pub storage_document_json_enabled: bool",
+        "pub persistent_storage_enabled: bool",
+        "pub database_or_indexing_enabled: bool",
+        "pub generated_report_loading_enabled: bool",
+        "pub generated_json_loading_enabled: bool",
+        "pub arbitrary_file_loading_enabled: bool",
+        "pub live_transport_enabled: bool",
+        "pub public_network_transport_enabled: bool",
+        "pub socket_listener_enabled: bool",
+        "pub filesystem_socket_path_policy_enabled: bool",
+        "pub daemon_lifecycle_enabled: bool",
+        "pub process_spawning_enabled: bool",
+        "pub file_watching_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+        "pub registry_snapshot_schema: String",
+        "pub registry_snapshot: RuntimeRegistrySnapshot",
+        "pub file_policy: RuntimeControlPlaneFilePolicy",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_anchors = [
+        "RuntimeRegistryStorageProviderContract::synthetic_fixture",
+        "impl RuntimeRegistryStorageProviderContract",
+        "impl RuntimeRegistryStoragePolicy",
+        "impl RuntimeRegistryStorageDocument",
+        "impl RuntimeRegistryStorageProvider",
+        "RUNTIME_REGISTRY_STORAGE_PROVIDER_NON_CLAIMS",
+        "RuntimeRegistryStorageDocument::from_snapshot",
+        "validate_runtime_registry_storage_json_read_path",
+        "validate_runtime_registry_storage_json_write_path",
+        "validate_runtime_registry_storage_json_path",
+        "validate_runtime_registry_storage_document",
+        "validate_runtime_registry_snapshot",
+        "validate_runtime_registry_record",
+        "serde_json::to_vec_pretty(&document)",
+        "persist_runtime_registry_snapshot_file",
+        "load_runtime_registry_storage_document_file",
+        "load_runtime_registry_snapshot_file",
+        "parse_runtime_registry_storage_document_json",
+        "runtime_registry_storage_provider.max_file_bytes",
+        "runtime_registry_storage_provider.local_only",
+        "runtime_registry_storage_provider.caller_authorized_allowed_root_required",
+        "runtime_registry_storage_provider.typed_registry_snapshots_only",
+        "runtime_registry_storage_provider.strict_registry_validation_enabled",
+        "runtime_registry_storage_provider.storage_document_json_enabled",
+        "runtime_registry_storage_provider.persistent_storage_enabled",
+        "runtime_registry_storage_provider.database_or_indexing_enabled",
+        "runtime_registry_storage_provider.generated_report_loading_enabled",
+        "runtime_registry_storage_provider.generated_json_loading_enabled",
+        "runtime_registry_storage_provider.arbitrary_file_loading_enabled",
+        "runtime_registry_storage_provider.public_network_transport_enabled",
+        "runtime_registry_storage_provider.socket_listener_enabled",
+        "runtime_registry_storage_provider.filesystem_socket_path_policy_enabled",
+        "runtime_registry_storage_provider.daemon_lifecycle_enabled",
+        "runtime_registry_storage_provider.process_spawning_enabled",
+        "runtime_registry_storage_provider.file_watching_enabled",
+        "runtime_registry_storage_provider.qt_binding_enabled",
+        "runtime_registry_storage_provider.capture_enabled",
+        "runtime_registry_storage_provider.external_services_used",
+        "runtime_registry_storage_provider.deployment_allowed",
+        "runtime_registry_storage_provider.native_inference_execution_enabled",
+        "runtime_registry_snapshot.record_count",
+        "runtime_registry_snapshot.max_record_count",
+        "runtime_registry_snapshot.records",
+        "runtime_registry_snapshot.records.workspace_id",
+        "runtime_registry_snapshot.records.session_id",
+        '"runtime_registry_storage_provider.v0"',
+        '"not_database_or_indexing_engine"',
+        '"not_generated_report_loader"',
+        '"not_generated_json_loader"',
+        '"not_arbitrary_file_loader"',
+        '"not_control_plane_transport"',
+        '"not_public_network_transport"',
+        '"not_socket_listener"',
+        '"not_filesystem_socket_path_policy"',
+        '"not_daemon_lifecycle"',
+        '"not_process_spawner"',
+        '"not_file_watcher"',
+        '"not_qt_binding"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+    ]
+    for anchor in expected_anchors:
+        assert anchor in lib_rs
+
+
 def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
     lib_rs = _read("src/lib.rs")
 
@@ -584,6 +704,7 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "RuntimeControlPlaneAdapterError::OutsideAllowedRoot" in lib_rs
     assert "RuntimeControlPlaneAdapterError::OversizedFile" in lib_rs
     assert "RuntimeControlPlaneAdapterError::FileReadFailed" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::FileWriteFailed" in lib_rs
     assert "RuntimeControlPlaneAdapterError::InvalidUtf8" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsafeFlag" in lib_rs
@@ -724,6 +845,7 @@ def test_rust_core_exposes_control_plane_message_envelope_shape() -> None:
         '"failure"',
         '"invalid_json"',
         '"non_object_root"',
+        '"file_write_failed"',
         '"oversized_frame"',
         '"ipc_read_failed"',
         '"ipc_write_failed"',
@@ -1056,6 +1178,10 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeRegistryRecord" in rust_source
     assert "RuntimeRegistrySnapshot" in rust_source
     assert "RuntimeRegistryProvider" in rust_source
+    assert "RuntimeRegistryStorageProviderContract" in rust_source
+    assert "RuntimeRegistryStoragePolicy" in rust_source
+    assert "RuntimeRegistryStorageDocument" in rust_source
+    assert "RuntimeRegistryStorageProvider" in rust_source
     assert "RuntimeControlPlaneFramePolicy" in rust_source
     assert "RuntimeControlPlaneIpcPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointPolicy" in rust_source
@@ -1137,6 +1263,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeRegistryRecord",
         "RuntimeRegistrySnapshot",
         "RuntimeRegistryProvider",
+        "runtime_registry_storage_provider.v0",
+        "RuntimeRegistryStorageProviderContract",
+        "RuntimeRegistryStoragePolicy",
+        "RuntimeRegistryStorageDocument",
+        "RuntimeRegistryStorageProvider",
+        "load_runtime_registry_snapshot_file",
         "runtime_control_plane_adapter.v0",
         "RuntimeControlPlaneAdapterContract",
         "RuntimeControlPlaneAdapterKind",
@@ -1216,9 +1348,15 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "re-runs strict handoff validation",
         "caps the default registry at 64 records",
         "sorted by workspace/session key",
-        "Durable runtime registry/storage provider work",
-        "OS-local listener/path binding remain future milestones",
-        "Live transport, Qt binding, external services, and deployment remain disabled",
+        "bounded local `runtime_registry_storage_provider.v0`",
+        "writes UTF-8 JSON under a caller-provided absolute allowed root",
+        "reloads the same typed snapshot through `load_runtime_registry_snapshot_file`",
+        "oversized files above 1 MiB",
+        "not a database or indexing engine",
+        "not a generated report loader",
+        "not arbitrary file loading",
+        "not a control-plane transport",
+        "Indexed storage, migrations, storage compaction, OS-local listener/path binding",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
         "typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files",
@@ -1228,7 +1366,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "bounded runtime_control_plane_ipc.v0 connected-stream adapter",
         "bounded runtime_control_plane_endpoint.v0 endpoint policy",
         "bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots",
-        "durable runtime registry/storage provider",
+        "bounded runtime_registry_storage_provider.v0 local JSON persistence",
         "future OS-local listener/path binding implementation",
         "does not implement a daemon",
         "not a database or indexing engine",
