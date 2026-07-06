@@ -281,10 +281,22 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "Qt does not parse frame bytes",
         "call the frame adapter",
         "bounded runtime_control_plane_frame.v0 byte-frame adapter in the Rust runtime",
-        "future local IPC/control-plane adapter from the Rust runtime",
+        "runtime_control_plane_ipc.v0",
+        "bounded `runtime_control_plane_ipc.v0` connected-stream adapter",
+        "caller-provided streams",
+        "4-byte big-endian length prefix",
+        "one-shot request/response execution path",
+        "read_control_plane_message_ipc_frame",
+        "write_control_plane_message_ipc_frame",
+        "execute_control_plane_message_ipc_stream",
+        "bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime",
+        "future OS-local endpoint/listener policy from the Rust runtime",
         "perform file I/O",
         "open IPC",
         "bind to live runtime state",
+        "start a listener",
+        "manage a filesystem socket path",
+        "spawn a process",
     ]
     for text in expected_text:
         assert text in normalized_strategy
@@ -307,7 +319,9 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "request/response message envelope",
         "runtime_control_plane_frame.v0",
         "byte-frame adapter",
-        "future local IPC/control-plane adapter from the Rust runtime",
+        "runtime_control_plane_ipc.v0",
+        "connected-stream adapter",
+        "future OS-local endpoint/listener policy from the Rust runtime",
     ]
     for text in expected_text:
         assert text in normalized_strategy

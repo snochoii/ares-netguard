@@ -48,12 +48,16 @@ claiming adapter behavior.
 
 The scaffold now also owns a `runtime_control_plane_adapter.v0` contract through
 `RuntimeControlPlaneAdapterContract`. The adapter contract declares the accepted
-local message and handoff schemas, `runtime_control_plane_message.v0`,
+local IPC, frame, message, and handoff schemas, `runtime_control_plane_ipc.v0`,
+`runtime_control_plane_frame.v0`, `runtime_control_plane_message.v0`,
 `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
 `model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
 `RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
-`RuntimeControlPlaneOutputSnapshotSchema`. JSON-string parsing is now enabled
-through `serde` and `serde_json` using
+`RuntimeControlPlaneOutputSnapshotSchema`. The top local adapter fixture now
+identifies the bounded connected-stream IPC adapter as available while listener,
+daemon, filesystem socket path policy, Qt binding, external service, and
+deployment behavior remain disabled. JSON-string parsing is now enabled through
+`serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
 unsupported schema versions and enum values, validates coarse runtime IDs,
@@ -131,6 +135,30 @@ process spawning, storage provider, Qt binding, generated report loader,
 capture behavior, deployment behavior, external service, or native inference
 execution.
 
+The scaffold now adds a bounded `runtime_control_plane_ipc.v0`
+connected-stream adapter over the validated `runtime_control_plane_frame.v0`
+boundary through `RuntimeControlPlaneIpcPolicy`,
+`RuntimeControlPlaneIpcAdapterContract`,
+`read_control_plane_message_ipc_frame`,
+`write_control_plane_message_ipc_frame`, and
+`execute_control_plane_message_ipc_stream`. The adapter reads exactly one
+4-byte big-endian length prefix, where
+`RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES` is 4, followed by one UTF-8 JSON
+message frame. It rejects zero-length frames as invalid JSON, rejects declared
+lengths above `RuntimeControlPlaneFramePolicy`, rejects incomplete length
+prefixes and incomplete payloads as `IncompleteIpcFrame`, maps stream read and
+write failures to typed IPC adapter errors, delegates payload validation and
+request execution to the existing frame adapter, and writes the response with
+the same length-prefix format. Frame parsing failures without a valid request
+identifier still return adapter errors with no fabricated response; command
+execution failures after a valid request identifier still return typed failure
+responses with `RuntimeControlPlaneMessageErrorCode`. This adapter is local,
+caller-provided stream I/O only: it adds no public network transport, no socket
+listener, no filesystem socket path policy, no daemon lifecycle, no process
+spawning, no file watcher, no storage provider, no Qt binding, no capture
+behavior, no generated report loading, no deployment behavior, no external
+service, and no native inference execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
@@ -144,10 +172,11 @@ control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
 local command dispatcher, strict local request/response message envelope, and
-bounded local byte-frame adapter only; it is not arbitrary file loading, not
-file watching, not socket/IPC transport, not Qt binding, not external-service
-integration, not storage, not deployment behavior, not capture behavior, and
-not native inference execution.
+bounded local byte-frame adapter plus a bounded connected-stream IPC adapter
+only; it is not arbitrary file loading, not file watching, not a public network
+transport, not a socket listener, not a filesystem socket path policy, not Qt
+binding, not external-service integration, not storage, not deployment behavior,
+not capture behavior, and not native inference execution.
 
 Expected integration path:
 
@@ -162,7 +191,8 @@ Rust source contract
   -> typed local control-plane command dispatcher over JSON/file parsers
   -> strict runtime_control_plane_message.v0 local request/response envelope
   -> bounded runtime_control_plane_frame.v0 local byte-frame adapter
-  -> local IPC/control-plane adapter
+  -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
+  -> local OS endpoint/listener policy
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
   -> runtime registry/storage provider
