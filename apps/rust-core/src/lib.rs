@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -6,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
+pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str =
+    "model_registry_metadata_adapter.v0";
 pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_metadata";
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
@@ -260,6 +263,40 @@ pub struct ModelRegistrySafetyFlags {
     pub live_capture_used: bool,
     pub external_services_used: bool,
     pub deployment_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelRegistryMetadataAdapterContract {
+    pub schema_version: &'static str,
+    pub accepted_metadata_schema: &'static str,
+    pub source_bundle_schema: &'static str,
+    pub max_file_bytes: u64,
+    pub local_only: bool,
+    pub synthetic_metadata_only: bool,
+    pub strict_json_parsing_enabled: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModelRegistryMetadataAdapterPolicy {
+    pub file_policy: RuntimeControlPlaneFilePolicy,
+    pub local_only: bool,
+    pub synthetic_metadata_only: bool,
+    pub storage_provider_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -850,6 +887,115 @@ impl ModelRegistryMetadata {
     }
 }
 
+impl ModelRegistryMetadataAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION,
+            accepted_metadata_schema: MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+            source_bundle_schema: MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION,
+            max_file_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            local_only: true,
+            synthetic_metadata_only: true,
+            strict_json_parsing_enabled: true,
+            file_io_enabled: true,
+            storage_provider_enabled: false,
+            generated_report_loading_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: MODEL_REGISTRY_METADATA_ADAPTER_NON_CLAIMS,
+        }
+    }
+
+    pub fn parse_model_registry_metadata_json(
+        input: &str,
+    ) -> Result<ModelRegistryMetadata, RuntimeControlPlaneAdapterError> {
+        parse_model_registry_metadata_json(input)
+    }
+
+    pub fn parse_model_registry_metadata_file(
+        path: impl AsRef<Path>,
+        policy: &ModelRegistryMetadataAdapterPolicy,
+    ) -> Result<ModelRegistryMetadata, RuntimeControlPlaneAdapterError> {
+        parse_model_registry_metadata_file(path, policy)
+    }
+}
+
+impl ModelRegistryMetadataAdapterPolicy {
+    pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
+        Self::from_file_policy(RuntimeControlPlaneFilePolicy::new(allowed_root))
+    }
+
+    pub fn from_file_policy(file_policy: RuntimeControlPlaneFilePolicy) -> Self {
+        Self {
+            file_policy,
+            local_only: true,
+            synthetic_metadata_only: true,
+            storage_provider_enabled: false,
+            generated_report_loading_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn max_bytes(&self) -> u64 {
+        self.file_policy.max_bytes()
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_required_flag(
+            "model_registry_metadata_adapter.local_only",
+            self.local_only,
+            true,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.synthetic_metadata_only",
+            self.synthetic_metadata_only,
+            true,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.storage_provider_enabled",
+            self.storage_provider_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.generated_report_loading_enabled",
+            self.generated_report_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "model_registry_metadata_adapter.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+}
+
 impl RuntimeHandoffSnapshot {
     pub fn synthetic_fixture() -> Self {
         Self {
@@ -912,7 +1058,7 @@ impl RuntimeControlPlaneAdapterContract {
         path: impl AsRef<Path>,
         policy: &RuntimeControlPlaneFilePolicy,
     ) -> Result<RuntimeHandoffSnapshot, RuntimeControlPlaneAdapterError> {
-        let canonical_path = validate_runtime_handoff_snapshot_file_path(path.as_ref(), policy)?;
+        let canonical_path = validate_runtime_control_plane_json_file_path(path.as_ref(), policy)?;
         let bytes = fs::read(&canonical_path)
             .map_err(|_| RuntimeControlPlaneAdapterError::FileReadFailed)?;
         if bytes.len() as u64 > RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES {
@@ -1271,6 +1417,45 @@ pub fn execute_control_plane_endpoint_stream<R: Read, W: Write>(
     execute_control_plane_message_ipc_stream(reader, writer, &policy.ipc_policy)
 }
 
+pub fn parse_model_registry_metadata_json(
+    input: &str,
+) -> Result<ModelRegistryMetadata, RuntimeControlPlaneAdapterError> {
+    match input.trim_start().as_bytes().first() {
+        Some(b'{') => {}
+        Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+        None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+    }
+
+    let metadata: ModelRegistryMetadata =
+        serde_json::from_str(input).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+    validate_schema_version(
+        "schema_version",
+        &metadata.schema_version,
+        MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+    )?;
+    validate_model_registry_metadata(&metadata)?;
+    Ok(metadata)
+}
+
+pub fn parse_model_registry_metadata_file(
+    path: impl AsRef<Path>,
+    policy: &ModelRegistryMetadataAdapterPolicy,
+) -> Result<ModelRegistryMetadata, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    let canonical_path =
+        validate_runtime_control_plane_json_file_path(path.as_ref(), &policy.file_policy)?;
+    let bytes =
+        fs::read(&canonical_path).map_err(|_| RuntimeControlPlaneAdapterError::FileReadFailed)?;
+    if bytes.len() as u64 > RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+            max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+        });
+    }
+    let input =
+        String::from_utf8(bytes).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    parse_model_registry_metadata_json(&input)
+}
+
 impl RuntimeControlPlaneFilePolicy {
     pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
         Self {
@@ -1511,7 +1696,7 @@ fn read_exact_control_plane_ipc<R: Read>(
     Ok(())
 }
 
-fn validate_runtime_handoff_snapshot_file_path(
+fn validate_runtime_control_plane_json_file_path(
     path: &Path,
     policy: &RuntimeControlPlaneFilePolicy,
 ) -> Result<PathBuf, RuntimeControlPlaneAdapterError> {
@@ -1660,26 +1845,12 @@ fn validate_model_registry_metadata(
         metadata.aggregate_summary.deployment_allowed,
         false,
     )?;
-    validate_exact_strings(
-        "model_registry_metadata.aggregate_summary.schemas_present",
-        &metadata.aggregate_summary.schemas_present,
-        MODEL_REGISTRY_AGGREGATE_SCHEMAS,
-    )?;
-    validate_exact_strings(
-        "model_registry_metadata.aggregate_summary.models_with_score_rows",
-        &metadata.aggregate_summary.models_with_score_rows,
-        MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS,
-    )?;
-    if metadata.aggregate_summary.model_count != metadata.entries.len() as u32 {
-        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
-            field: "model_registry_metadata.aggregate_summary.model_count",
-        });
-    }
     validate_model_registry_entry_order(&metadata.entries)?;
     validate_model_registry_safety_flags(&metadata.safety_flags)?;
     for entry in &metadata.entries {
         validate_model_registry_entry(entry)?;
     }
+    validate_model_registry_aggregate_summary(metadata)?;
 
     Ok(())
 }
@@ -1687,15 +1858,18 @@ fn validate_model_registry_metadata(
 fn validate_model_registry_entry_order(
     entries: &[ModelRegistryEntry],
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
-    if entries.len() != MODEL_REGISTRY_MODEL_IDS.len()
-        || !entries
-            .iter()
-            .zip(MODEL_REGISTRY_MODEL_IDS.iter())
-            .all(|(entry, expected_model_id)| entry.model_id == *expected_model_id)
-    {
-        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
-            field: "model_registry_metadata.entries",
-        });
+    let mut seen_model_ids = BTreeSet::new();
+    let mut previous_model_id: Option<&str> = None;
+    for entry in entries {
+        validate_safe_model_id("model_registry_metadata.entries.model_id", &entry.model_id)?;
+        if previous_model_id.is_some_and(|previous| previous >= entry.model_id.as_str())
+            || !seen_model_ids.insert(entry.model_id.as_str())
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries",
+            });
+        }
+        previous_model_id = Some(entry.model_id.as_str());
     }
     Ok(())
 }
@@ -1769,23 +1943,29 @@ fn validate_model_registry_safety_flags(
 fn validate_model_registry_entry(
     entry: &ModelRegistryEntry,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
-    validate_safe_label("model_registry_metadata.entries.model_id", &entry.model_id)?;
-    let expected = expected_model_registry_entry(&entry.model_id)?;
-    validate_exact_strings(
+    validate_safe_model_id("model_registry_metadata.entries.model_id", &entry.model_id)?;
+    validate_sorted_unique_strings(
         "model_registry_metadata.entries.observed_source_schemas",
         &entry.observed_source_schemas,
-        expected.observed_source_schemas,
     )?;
-    validate_exact_strings(
+    if entry.observed_source_schemas.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.entries.observed_source_schemas",
+        });
+    }
+    for source_schema in &entry.observed_source_schemas {
+        validate_supported_model_registry_source_schema(
+            "model_registry_metadata.entries.observed_source_schemas",
+            source_schema,
+        )?;
+    }
+    validate_sorted_unique_strings(
         "model_registry_metadata.entries.observed_source_names",
         &entry.observed_source_names,
-        expected.observed_source_names,
     )?;
-    if entry.source_count != expected.source_count
-        || entry.has_score_rows != expected.has_score_rows
-    {
+    if entry.observed_source_names.is_empty() {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
-            field: "model_registry_metadata.entries.model_shape",
+            field: "model_registry_metadata.entries.observed_source_names",
         });
     }
     validate_required_flag(
@@ -1798,15 +1978,13 @@ fn validate_model_registry_entry(
         entry.deployment_allowed,
         false,
     )?;
-    if entry.source_count != entry.observed_source_schemas.len() as u32
-        || entry.source_count != entry.observed_source_names.len() as u32
-    {
+    if entry.source_count != entry.observed_source_names.len() as u32 {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
             field: "model_registry_metadata.entries.source_count",
         });
     }
     for source_name in &entry.observed_source_names {
-        validate_safe_label(
+        validate_safe_source_name(
             "model_registry_metadata.entries.observed_source_names",
             source_name,
         )?;
@@ -1814,63 +1992,63 @@ fn validate_model_registry_entry(
     Ok(())
 }
 
-struct ExpectedModelRegistryEntry {
-    observed_source_schemas: &'static [&'static str],
-    observed_source_names: &'static [&'static str],
-    source_count: u32,
-    has_score_rows: bool,
-}
-
-fn expected_model_registry_entry(
-    model_id: &str,
-) -> Result<ExpectedModelRegistryEntry, RuntimeControlPlaneAdapterError> {
-    match model_id {
-        "graph_novelty" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_GRAPH_NOVELTY_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_GRAPH_NOVELTY_SOURCE_NAMES,
-            source_count: 4,
-            has_score_rows: true,
-        }),
-        "isolation_forest" | "pyod_ecod" | "river_hst" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_AGENTIC_DETECTION_DISAGREEMENT_SOURCE_NAMES,
-            source_count: 3,
-            has_score_rows: true,
-        }),
-        "model_disagreement" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_INVESTIGATION_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_INVESTIGATION_SOURCE_NAMES,
-            source_count: 2,
-            has_score_rows: false,
-        }),
-        "pyod_copod" | "suricata_alert" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_AGENTIC_DISAGREEMENT_SOURCE_NAMES,
-            source_count: 2,
-            has_score_rows: true,
-        }),
-        "self_supervised_representation" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_REPRESENTATION_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_REPRESENTATION_SOURCE_NAMES,
-            source_count: 2,
-            has_score_rows: false,
-        }),
-        "stdlib_linear_native" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_NATIVE_SCORE_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_NATIVE_SCORE_SOURCE_NAMES,
-            source_count: 1,
-            has_score_rows: true,
-        }),
-        "time_series_residual" => Ok(ExpectedModelRegistryEntry {
-            observed_source_schemas: MODEL_REGISTRY_TIME_SERIES_SCHEMAS,
-            observed_source_names: MODEL_REGISTRY_TIME_SERIES_SOURCE_NAMES,
-            source_count: 4,
-            has_score_rows: true,
-        }),
-        _ => Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
-            field: "model_registry_metadata.entries.model_id",
-        }),
+fn validate_model_registry_aggregate_summary(
+    metadata: &ModelRegistryMetadata,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if metadata.aggregate_summary.model_count != metadata.entries.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.aggregate_summary.model_count",
+        });
     }
+
+    validate_sorted_unique_strings(
+        "model_registry_metadata.aggregate_summary.schemas_present",
+        &metadata.aggregate_summary.schemas_present,
+    )?;
+    for source_schema in &metadata.aggregate_summary.schemas_present {
+        validate_supported_model_registry_source_schema(
+            "model_registry_metadata.aggregate_summary.schemas_present",
+            source_schema,
+        )?;
+    }
+    validate_sorted_unique_strings(
+        "model_registry_metadata.aggregate_summary.models_with_score_rows",
+        &metadata.aggregate_summary.models_with_score_rows,
+    )?;
+    for model_id in &metadata.aggregate_summary.models_with_score_rows {
+        validate_safe_model_id(
+            "model_registry_metadata.aggregate_summary.models_with_score_rows",
+            model_id,
+        )?;
+    }
+
+    let derived_schemas = metadata
+        .entries
+        .iter()
+        .flat_map(|entry| entry.observed_source_schemas.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let derived_models_with_score_rows = metadata
+        .entries
+        .iter()
+        .filter(|entry| entry.has_score_rows)
+        .map(|entry| entry.model_id.clone())
+        .collect::<Vec<_>>();
+
+    if metadata.aggregate_summary.schemas_present != derived_schemas {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.aggregate_summary.schemas_present",
+        });
+    }
+    if metadata.aggregate_summary.models_with_score_rows != derived_models_with_score_rows {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "model_registry_metadata.aggregate_summary.models_with_score_rows",
+        });
+    }
+
+    Ok(())
 }
 
 fn validate_schema_version(
@@ -1911,6 +2089,16 @@ fn validate_exact_strings(
     Ok(())
 }
 
+fn validate_sorted_unique_strings(
+    field: &'static str,
+    values: &[String],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if values.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
 fn validate_required_flag(
     field: &'static str,
     actual: bool,
@@ -1922,19 +2110,70 @@ fn validate_required_flag(
     Ok(())
 }
 
-fn validate_safe_label(
+fn validate_safe_model_id(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
-    if value.is_empty()
-        || value.len() > 96
-        || value.contains('.')
-        || value.contains(':')
-        || value.contains('@')
-        || !value.bytes().all(|byte| {
+    validate_no_unsafe_label_parts(field, value)?;
+    let mut bytes = value.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    };
+    if value.len() > 81
+        || !first.is_ascii_lowercase()
+        || !bytes.all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
         })
     {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_safe_source_name(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_no_unsafe_label_parts(field, value)?;
+    let bytes = value.as_bytes();
+    if bytes.len() < 5
+        || bytes.len() > 101
+        || !bytes[0].is_ascii_lowercase()
+        || bytes[bytes.len() - 4] != b'_'
+        || !bytes[bytes.len() - 3..].iter().all(u8::is_ascii_digit)
+        || !bytes[1..bytes.len() - 4]
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_no_unsafe_label_parts(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    let mut previous_part: Option<&str> = None;
+    for part in value.split(['-', '_']).filter(|part| !part.is_empty()) {
+        if MODEL_REGISTRY_UNSAFE_LABEL_PARTS.contains(&part)
+            || matches!(
+                (previous_part, part),
+                (Some("api"), "key") | (Some("private"), "key")
+            )
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+        }
+        previous_part = Some(part);
+    }
+    Ok(())
+}
+
+fn validate_supported_model_registry_source_schema(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if !MODEL_REGISTRY_AGGREGATE_SCHEMAS.contains(&value) {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
     }
     Ok(())
@@ -2149,18 +2388,6 @@ const MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS: &[&str] = &[
     "suricata_alert",
     "time_series_residual",
 ];
-const MODEL_REGISTRY_MODEL_IDS: &[&str] = &[
-    "graph_novelty",
-    "isolation_forest",
-    "model_disagreement",
-    "pyod_copod",
-    "pyod_ecod",
-    "river_hst",
-    "self_supervised_representation",
-    "stdlib_linear_native",
-    "suricata_alert",
-    "time_series_residual",
-];
 const MODEL_REGISTRY_NON_CLAIMS: &[&str] = &[
     "not_persistent_model_registry",
     "not_model_promotion_gate",
@@ -2168,6 +2395,21 @@ const MODEL_REGISTRY_NON_CLAIMS: &[&str] = &[
     "not_live_capture",
     "not_external_enrichment",
     "not_rule_deployment",
+    "not_native_runtime_execution",
+];
+
+const MODEL_REGISTRY_UNSAFE_LABEL_PARTS: &[&str] =
+    &["password", "passwd", "credential", "secret", "apikey"];
+
+const MODEL_REGISTRY_METADATA_ADAPTER_NON_CLAIMS: &[&str] = &[
+    "not_persistent_model_registry",
+    "not_storage_provider",
+    "not_model_promotion_gate",
+    "not_deployment_approval",
+    "not_generated_report_loader",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
     "not_native_runtime_execution",
 ];
 
@@ -2622,6 +2864,96 @@ mod tests {
         synthetic_handoff_json().replacen(target, replacement, 1)
     }
 
+    fn synthetic_model_registry_metadata_json() -> String {
+        serde_json::to_string_pretty(&ModelRegistryMetadata::synthetic_fixture())
+            .expect("synthetic metadata fixture must serialize")
+    }
+
+    fn three_model_registry_metadata_fixture() -> ModelRegistryMetadata {
+        ModelRegistryMetadata {
+            schema_version: MODEL_REGISTRY_METADATA_SCHEMA_VERSION.to_owned(),
+            metadata_scope: MODEL_REGISTRY_METADATA_SCOPE.to_owned(),
+            source_bundle_schema: MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION.to_owned(),
+            entries: vec![
+                ModelRegistryEntry {
+                    model_id: "isolation_forest".to_owned(),
+                    registry_state: ModelRegistryState::ObservedSyntheticOnly,
+                    promotion_state: ModelPromotionState::NotPromoted,
+                    observed_source_schemas: strings(&["model_disagreement_report.v0"]),
+                    observed_source_names: strings(&["model_disagreement_report_v0_001"]),
+                    source_count: 1,
+                    has_score_rows: true,
+                    human_review_required: true,
+                    deployment_allowed: false,
+                },
+                ModelRegistryEntry {
+                    model_id: "pyod_ecod".to_owned(),
+                    registry_state: ModelRegistryState::ObservedSyntheticOnly,
+                    promotion_state: ModelPromotionState::NotPromoted,
+                    observed_source_schemas: strings(&["model_disagreement_report.v0"]),
+                    observed_source_names: strings(&["model_disagreement_report_v0_001"]),
+                    source_count: 1,
+                    has_score_rows: true,
+                    human_review_required: true,
+                    deployment_allowed: false,
+                },
+                ModelRegistryEntry {
+                    model_id: "stdlib_linear_native".to_owned(),
+                    registry_state: ModelRegistryState::ObservedSyntheticOnly,
+                    promotion_state: ModelPromotionState::NotPromoted,
+                    observed_source_schemas: strings(&["model_score_rows.v0"]),
+                    observed_source_names: strings(&["model_score_rows_v0_001"]),
+                    source_count: 1,
+                    has_score_rows: true,
+                    human_review_required: true,
+                    deployment_allowed: false,
+                },
+            ],
+            aggregate_summary: ModelRegistryAggregateSummary {
+                model_count: 3,
+                schemas_present: strings(&["model_disagreement_report.v0", "model_score_rows.v0"]),
+                models_with_score_rows: strings(&[
+                    "isolation_forest",
+                    "pyod_ecod",
+                    "stdlib_linear_native",
+                ]),
+                deployment_allowed: false,
+            },
+            safety_flags: ModelRegistrySafetyFlags {
+                local_only: true,
+                strict_json_loaded: true,
+                derived_from_evaluation_bundle_only: true,
+                input_paths_copied: false,
+                source_filenames_copied: false,
+                raw_identifiers_copied: false,
+                generated_artifact_references_copied: false,
+                secrets_detected: false,
+                report_payload_copied: false,
+                live_capture_used: false,
+                external_services_used: false,
+                deployment_allowed: false,
+            },
+            non_claims: static_str_vec(MODEL_REGISTRY_NON_CLAIMS),
+        }
+    }
+
+    fn three_model_registry_metadata_json() -> String {
+        serde_json::to_string_pretty(&three_model_registry_metadata_fixture())
+            .expect("three-model metadata fixture must serialize")
+    }
+
+    fn secret_model_registry_metadata_json() -> String {
+        let mut metadata = three_model_registry_metadata_fixture();
+        metadata.entries[0].model_id = "secret".to_owned();
+        metadata.aggregate_summary.models_with_score_rows[0] = "secret".to_owned();
+        serde_json::to_string_pretty(&metadata)
+            .expect("secret-like metadata fixture must serialize")
+    }
+
+    fn patched_metadata_json(target: &str, replacement: &str) -> String {
+        synthetic_model_registry_metadata_json().replacen(target, replacement, 1)
+    }
+
     fn temp_policy_root(name: &str) -> PathBuf {
         let suffix = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -2892,6 +3224,180 @@ mod tests {
                 "not_native_runtime_execution"
             ])
         );
+    }
+
+    #[test]
+    fn emits_static_model_registry_metadata_adapter_contract_fixture() {
+        let contract = ModelRegistryMetadataAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_metadata_schema,
+            MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.source_bundle_schema,
+            MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_file_bytes,
+            RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.synthetic_metadata_only);
+        assert!(contract.strict_json_parsing_enabled);
+        assert!(contract.file_io_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_persistent_model_registry",
+                "not_storage_provider",
+                "not_model_promotion_gate",
+                "not_deployment_approval",
+                "not_generated_report_loader",
+                "not_qt_binding",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
+    fn exposes_model_registry_metadata_adapter_policy() {
+        let root = temp_policy_root("metadata-adapter-policy");
+        let policy = ModelRegistryMetadataAdapterPolicy::new(root.clone());
+
+        assert_eq!(policy.file_policy.allowed_root, root);
+        assert_eq!(policy.max_bytes(), RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES);
+        assert!(policy.local_only);
+        assert!(policy.synthetic_metadata_only);
+        assert!(!policy.storage_provider_enabled);
+        assert!(!policy.generated_report_loading_enabled);
+        assert!(!policy.qt_binding_enabled);
+        assert!(!policy.capture_enabled);
+        assert!(!policy.external_services_used);
+        assert!(!policy.deployment_allowed);
+        assert!(!policy.native_inference_execution_enabled);
+        policy.validate().unwrap();
+
+        let mut drifted_policy = policy.clone();
+        drifted_policy.storage_provider_enabled = true;
+        assert_eq!(
+            drifted_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata_adapter.storage_provider_enabled",
+            }
+        );
+
+        remove_temp_root(&policy.file_policy.allowed_root);
+    }
+
+    #[test]
+    fn parses_model_registry_metadata_json_string() {
+        let json = synthetic_model_registry_metadata_json();
+        let metadata = parse_model_registry_metadata_json(&json).unwrap();
+        let from_contract =
+            ModelRegistryMetadataAdapterContract::parse_model_registry_metadata_json(&json)
+                .unwrap();
+
+        assert_eq!(metadata, ModelRegistryMetadata::synthetic_fixture());
+        assert_eq!(from_contract, metadata);
+        assert_eq!(
+            metadata.schema_version,
+            MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+        );
+        assert_eq!(metadata.metadata_scope, MODEL_REGISTRY_METADATA_SCOPE);
+        assert_eq!(metadata.entries.len(), 10);
+        assert_eq!(metadata.entries[0].model_id, "graph_novelty");
+        assert_eq!(
+            metadata.aggregate_summary.models_with_score_rows,
+            strings(&[
+                "graph_novelty",
+                "isolation_forest",
+                "pyod_copod",
+                "pyod_ecod",
+                "river_hst",
+                "stdlib_linear_native",
+                "suricata_alert",
+                "time_series_residual"
+            ])
+        );
+        assert!(!metadata.aggregate_summary.deployment_allowed);
+        assert!(!metadata.safety_flags.external_services_used);
+        assert!(!metadata.safety_flags.deployment_allowed);
+    }
+
+    #[test]
+    fn parses_python_valid_three_model_registry_metadata_json_string() {
+        let json = three_model_registry_metadata_json();
+        let metadata = parse_model_registry_metadata_json(&json).unwrap();
+
+        assert_eq!(metadata, three_model_registry_metadata_fixture());
+        assert_eq!(metadata.aggregate_summary.model_count, 3);
+        assert_eq!(
+            metadata.aggregate_summary.schemas_present,
+            strings(&["model_disagreement_report.v0", "model_score_rows.v0"])
+        );
+        assert_eq!(
+            metadata.aggregate_summary.models_with_score_rows,
+            strings(&["isolation_forest", "pyod_ecod", "stdlib_linear_native"])
+        );
+    }
+
+    #[test]
+    fn parses_model_registry_metadata_file_under_allowed_root() {
+        let root = temp_policy_root("valid-metadata-file");
+        let path = write_test_file(
+            &root,
+            "model_registry_metadata.json",
+            synthetic_model_registry_metadata_json(),
+        );
+        let policy = ModelRegistryMetadataAdapterPolicy::new(root.clone());
+
+        let from_file = parse_model_registry_metadata_file(&path, &policy).unwrap();
+        let from_contract =
+            ModelRegistryMetadataAdapterContract::parse_model_registry_metadata_file(
+                &path, &policy,
+            )
+            .unwrap();
+        let from_json =
+            parse_model_registry_metadata_json(&synthetic_model_registry_metadata_json()).unwrap();
+
+        assert_eq!(from_file, from_json);
+        assert_eq!(from_contract, from_file);
+        assert_eq!(from_file.entries[9].model_id, "time_series_residual");
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn parses_python_valid_three_model_registry_metadata_file_under_allowed_root() {
+        let root = temp_policy_root("valid-three-model-metadata-file");
+        let path = write_test_file(
+            &root,
+            "three_model_registry_metadata.json",
+            three_model_registry_metadata_json(),
+        );
+        let policy = ModelRegistryMetadataAdapterPolicy::new(root.clone());
+
+        let from_file = parse_model_registry_metadata_file(&path, &policy).unwrap();
+
+        assert_eq!(from_file, three_model_registry_metadata_fixture());
+        assert_eq!(from_file.entries[0].model_id, "isolation_forest");
+        assert_eq!(from_file.entries[2].model_id, "stdlib_linear_native");
+
+        remove_temp_root(&root);
     }
 
     #[test]
@@ -4604,6 +5110,110 @@ mod tests {
         remove_temp_root(&root);
     }
 
+    #[test]
+    fn rejects_model_registry_metadata_file_policy_path_violations() {
+        let root = temp_policy_root("metadata-path-policy");
+        let outside_root = temp_policy_root("outside-metadata-policy");
+        let policy = ModelRegistryMetadataAdapterPolicy::new(root.clone());
+
+        assert_eq!(
+            parse_model_registry_metadata_file(Path::new("model_registry_metadata.json"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let relative_root_policy = ModelRegistryMetadataAdapterPolicy::new("relative-root");
+        let relative_root_path = write_test_file(
+            &root,
+            "relative_root_model_registry_metadata.json",
+            synthetic_model_registry_metadata_json(),
+        );
+        assert_eq!(
+            parse_model_registry_metadata_file(&relative_root_path, &relative_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot
+        );
+
+        let missing_root_policy =
+            ModelRegistryMetadataAdapterPolicy::new(root.join("missing-policy-root"));
+        let missing_root_path = root
+            .join("missing-policy-root")
+            .join("model_registry_metadata.json");
+        assert_eq!(
+            parse_model_registry_metadata_file(&missing_root_path, &missing_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot
+        );
+
+        let file_root = write_test_file(
+            &root,
+            "file_policy_root.json",
+            synthetic_model_registry_metadata_json(),
+        );
+        let file_root_policy = ModelRegistryMetadataAdapterPolicy::new(file_root.clone());
+        assert_eq!(
+            parse_model_registry_metadata_file(&file_root, &file_root_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory
+        );
+
+        let outside_path = write_test_file(
+            &outside_root,
+            "model_registry_metadata.json",
+            synthetic_model_registry_metadata_json(),
+        );
+        assert_eq!(
+            parse_model_registry_metadata_file(&outside_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let directory_path = root.join("directory.json");
+        std::fs::create_dir_all(&directory_path).expect("test directory path must be created");
+        assert_eq!(
+            parse_model_registry_metadata_file(&directory_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        let text_path = write_test_file(&root, "model_registry_metadata.txt", "{}");
+        assert_eq!(
+            parse_model_registry_metadata_file(&text_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+
+        let missing_path = root.join("missing_model_registry_metadata.json");
+        assert_eq!(
+            parse_model_registry_metadata_file(&missing_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        let oversized_path = write_test_file(
+            &root,
+            "oversized_model_registry_metadata.json",
+            vec![b' '; RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES as usize + 1],
+        );
+        assert_eq!(
+            parse_model_registry_metadata_file(&oversized_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFile {
+                max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            }
+        );
+
+        let malformed_path = write_test_file(&root, "malformed_model_registry_metadata.json", "{");
+        assert_eq!(
+            parse_model_registry_metadata_file(&malformed_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let invalid_utf8_path =
+            write_test_file(&root, "invalid_utf8_model_registry_metadata.json", [0xff]);
+        assert_eq!(
+            parse_model_registry_metadata_file(&invalid_utf8_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        remove_temp_root(&outside_root);
+        remove_temp_root(&root);
+    }
+
     #[cfg(unix)]
     #[test]
     fn rejects_symlink_allowed_root() {
@@ -4657,6 +5267,28 @@ mod tests {
         );
         assert_eq!(
             execute_file_command(symlink_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_model_registry_metadata_file() {
+        let root = temp_policy_root("metadata-symlink-policy");
+        let target_path = write_test_file(
+            &root,
+            "target_model_registry_metadata.json",
+            synthetic_model_registry_metadata_json(),
+        );
+        let symlink_path = root.join("linked_model_registry_metadata.json");
+        std::os::unix::fs::symlink(&target_path, &symlink_path)
+            .expect("test symlink must be created");
+        let policy = ModelRegistryMetadataAdapterPolicy::new(root.clone());
+
+        assert_eq!(
+            parse_model_registry_metadata_file(&symlink_path, &policy).unwrap_err(),
             RuntimeControlPlaneAdapterError::SymlinkPath
         );
 
@@ -4804,6 +5436,196 @@ mod tests {
         );
 
         remove_temp_root(&root);
+    }
+
+    #[test]
+    fn rejects_malformed_or_drifted_model_registry_metadata_json_strings() {
+        assert_eq!(
+            parse_model_registry_metadata_json("{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json("[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let with_unknown_field = synthetic_model_registry_metadata_json().replacen(
+            "{\n",
+            "{\n  \"unexpected_field\": true,\n",
+            1,
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&with_unknown_field).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""schema_version": "model_registry_metadata.v0""#,
+                r#""schema_version": "model_registry_metadata.v1""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""metadata_scope": "local_synthetic_model_registry_metadata""#,
+                r#""metadata_scope": "private_registry_metadata""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.metadata_scope",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""source_bundle_schema": "model_evaluation_bundle.v0""#,
+                r#""source_bundle_schema": "model_evaluation_bundle.v1""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.source_bundle_schema",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unsorted_or_unsafe_model_registry_metadata_entries() {
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""model_id": "graph_novelty""#,
+                r#""model_id": "isolation_forest""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""model_id": "graph_novelty""#,
+                r#""model_id": "graph.novelty""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.model_id",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&secret_model_registry_metadata_json()).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.model_id",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""temporal_security_graph_report_v0_001""#,
+                r#""temporal_security_graph_report.json""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_names",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""detection_candidate_report_v0_001",
+        "model_disagreement_report_v0_001""#,
+                r#""detection_candidate_report_v0_001",
+        "detection_candidate_report_v0_001""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_names",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""temporal_security_graph_report_v0_001""#,
+                r#""password_001""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_names",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""model_disagreement_report.v0""#,
+                r#""private_report.v0""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.entries.observed_source_schemas",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                r#""model_count": 10"#,
+                r#""model_count": 9"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "model_registry_metadata.aggregate_summary.model_count",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_model_registry_metadata_unsafe_flags() {
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                "      \"human_review_required\": true,\n      \"deployment_allowed\": false",
+                "      \"human_review_required\": true,\n      \"deployment_allowed\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.entries.deployment_allowed",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                "    \"deployment_allowed\": false\n  },",
+                "    \"deployment_allowed\": true\n  },",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.aggregate_summary.deployment_allowed",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                "    \"live_capture_used\": false,\n    \"external_services_used\": false",
+                "    \"live_capture_used\": true,\n    \"external_services_used\": false",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.safety_flags.live_capture_used",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                "    \"live_capture_used\": false,\n    \"external_services_used\": false",
+                "    \"live_capture_used\": false,\n    \"external_services_used\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.safety_flags.external_services_used",
+            }
+        );
+        assert_eq!(
+            parse_model_registry_metadata_json(&patched_metadata_json(
+                "    \"external_services_used\": false,\n    \"deployment_allowed\": false",
+                "    \"external_services_used\": false,\n    \"deployment_allowed\": true",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "model_registry_metadata.safety_flags.deployment_allowed",
+            }
+        );
     }
 
     #[test]

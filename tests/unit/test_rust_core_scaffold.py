@@ -45,6 +45,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_CONTRACT_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
+        "MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
@@ -67,6 +68,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
         "ModelRegistrySafetyFlags",
+        "ModelRegistryMetadataAdapterContract",
+        "ModelRegistryMetadataAdapterPolicy",
         "ModelRegistryState",
         "ModelPromotionState",
         "RuntimeHandoffSnapshot",
@@ -141,6 +144,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
         "parse_handoff_snapshot_file",
+        "parse_model_registry_metadata_json",
+        "parse_model_registry_metadata_file",
         "execute_local_command",
         "parse_control_plane_message_request_json",
         "execute_control_plane_message_request",
@@ -165,6 +170,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         'pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";'
         in lib_rs
+    )
+    assert (
+        "pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str ="
+        ' "model_registry_metadata_adapter.v0";' in " ".join(lib_rs.split())
     )
     assert (
         "pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "
@@ -268,6 +277,55 @@ def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
     assert "impl ModelRegistryState" in lib_rs
     assert "impl ModelPromotionState" in lib_rs
     assert "fn model_registry_metadata_entries()" in lib_rs
+
+
+def test_rust_core_exposes_model_registry_metadata_adapter_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub accepted_metadata_schema: &'static str",
+        "pub source_bundle_schema: &'static str",
+        "pub max_file_bytes: u64",
+        "pub local_only: bool",
+        "pub synthetic_metadata_only: bool",
+        "pub strict_json_parsing_enabled: bool",
+        "pub file_io_enabled: bool",
+        "pub storage_provider_enabled: bool",
+        "pub generated_report_loading_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+        "pub non_claims: &'static [&'static str]",
+        "pub file_policy: RuntimeControlPlaneFilePolicy",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_anchors = [
+        "impl ModelRegistryMetadataAdapterContract",
+        "impl ModelRegistryMetadataAdapterPolicy",
+        "MODEL_REGISTRY_METADATA_ADAPTER_NON_CLAIMS",
+        "pub fn parse_model_registry_metadata_json",
+        "pub fn parse_model_registry_metadata_file",
+        "validate_runtime_control_plane_json_file_path",
+        "validate_model_registry_metadata(&metadata)",
+        "model_registry_metadata_adapter.storage_provider_enabled",
+        "model_registry_metadata_adapter.generated_report_loading_enabled",
+        "model_registry_metadata_adapter.qt_binding_enabled",
+        "model_registry_metadata_adapter.deployment_allowed",
+        "model_registry_metadata_adapter.native_inference_execution_enabled",
+        '"not_persistent_model_registry"',
+        '"not_storage_provider"',
+        '"not_generated_report_loader"',
+        '"not_qt_binding"',
+        '"not_deployment_approval"',
+        '"not_external_service"',
+        '"not_native_runtime_execution"',
+    ]
+    for anchor in expected_anchors:
+        assert anchor in lib_rs
 
 
 def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
@@ -739,7 +797,10 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
     assert "live_capture_used: false" in lib_rs
     assert "external_services_used: false" in lib_rs
 
-    entry_model_ids = re.findall(r'model_id: "([^"]+)"', lib_rs)
+    static_entries_block = lib_rs.split("fn model_registry_metadata_entries()", 1)[1].split(
+        "#[cfg(test)]", 1
+    )[0]
+    entry_model_ids = re.findall(r'model_id: "([^"]+)"', static_entries_block)
     assert entry_model_ids == [
         "graph_novelty",
         "isolation_forest",
@@ -809,6 +870,8 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeControlPlaneFramePolicy" in rust_source
     assert "RuntimeControlPlaneIpcPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointPolicy" in rust_source
+    assert "ModelRegistryMetadataAdapterContract" in rust_source
+    assert "ModelRegistryMetadataAdapterPolicy" in rust_source
     assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
     assert "RuntimeControlPlaneIpcAdapterContract" in rust_source
     assert "RuntimeControlPlaneEndpointAdapterContract" in rust_source
@@ -825,6 +888,8 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "execute_control_plane_endpoint_stream" in rust_source
     assert "validate_control_plane_endpoint_policy" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
+    assert "parse_model_registry_metadata_json" in rust_source
+    assert "parse_model_registry_metadata_file" in rust_source
     assert "execute_local_command" in rust_source
     assert "parse_control_plane_message_request_json" in rust_source
     assert "execute_control_plane_message_json" in rust_source
@@ -864,6 +929,11 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
         "ModelRegistrySafetyFlags",
+        "model_registry_metadata_adapter.v0",
+        "ModelRegistryMetadataAdapterContract",
+        "ModelRegistryMetadataAdapterPolicy",
+        "parse_model_registry_metadata_json",
+        "parse_model_registry_metadata_file",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
         "runtime_control_plane_adapter.v0",
@@ -906,6 +976,8 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "accepted local endpoint, IPC, frame, message, and handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
         "bounded local file adapter is now enabled",
+        "explicitly supplied synthetic metadata JSON",
+        "storage, indexing, generated report loading, model promotion",
         "typed local command dispatcher",
         "RuntimeControlPlaneCommand",
         "execute_local_command",
@@ -931,10 +1003,11 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
             "rejects symlinks, directories, non-regular files, missing files, "
             "non-JSON paths, oversized files, and invalid UTF-8"
         ),
-        "preserves the exact Python-derived synthetic registry entry order and aggregate metadata",
+        "validates sorted Python-derived synthetic registry entries and derived aggregate metadata",
         "Live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
+        "typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files",
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",

@@ -62,8 +62,8 @@ is now enabled through `serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
 unsupported schema versions and enum values, validates coarse runtime IDs,
-enforces local-only and non-deployment safety flags, preserves the exact
-Python-derived synthetic registry entry order and aggregate metadata, and
+enforces local-only and non-deployment safety flags, validates sorted
+Python-derived synthetic registry entries and derived aggregate metadata, and
 returns a typed `RuntimeHandoffSnapshot`.
 
 The bounded local file adapter is now enabled through
@@ -77,6 +77,25 @@ file cap is 256 KiB. This is only a local `runtime_handoff_snapshot.v0`
 handoff path; it is not an arbitrary file loader and does not load generated
 reports, model artifacts, telemetry, databases, or runtime output trees. Live
 transport, Qt binding, external services, and deployment remain disabled.
+
+The scaffold now also adds a typed `model_registry_metadata_adapter.v0`
+contract through `ModelRegistryMetadataAdapterContract` and
+`ModelRegistryMetadataAdapterPolicy`. The adapter accepts a caller-provided
+`model_registry_metadata.v0` JSON string through
+`parse_model_registry_metadata_json` or a bounded local `.json` file through
+`parse_model_registry_metadata_file` under the same explicit
+`RuntimeControlPlaneFilePolicy` root checks used by the handoff file adapter.
+Both paths deserialize into `ModelRegistryMetadata` with
+`serde`/`serde_json`, deny unknown fields, validate the exact metadata schema,
+scope, source bundle schema, sorted synthetic model entries, aggregate summary,
+safe model/source labels, non-claims, and local-only safety flags, and reject
+metadata that claims deployment, capture, or external services. The adapter
+contract and policy keep storage, generated report loading, Qt binding,
+external services, deployment, capture, and native inference execution disabled.
+This is a typed metadata handoff adapter only; it is not a persistent model
+registry, storage provider, promotion workflow, generated report loader, Qt
+binding, external service, deployment approval path, capture boundary, or
+native inference executor.
 
 The scaffold now adds a typed local command dispatcher over those existing
 parsers through `RuntimeControlPlaneCommand` and
@@ -187,8 +206,12 @@ service client, packaging flow, or UI data adapter. It does not read PCAPs,
 private telemetry, logs, model binaries, databases, runtime artifacts, or
 generated report files. The registry metadata preview is not a persistent model
 registry, promotion gate, deployment approval workflow, database-backed
-registry provider, generated JSON file loader, or native inference execution
-path. The handoff snapshot is not a live
+registry provider, generated JSON file loader, Qt binding, external service,
+capture boundary, or native inference execution path. The typed registry
+metadata adapter validates only explicitly supplied synthetic metadata JSON; it
+does not add storage, indexing, generated report loading, model promotion,
+deployment approval, Qt data-flow integration, external services, capture, or
+native inference execution. The handoff snapshot is not a live
 control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
@@ -207,6 +230,7 @@ Rust source contract
   -> buildable Cargo project in an environment with Rust tooling
   -> static runtime_summary.v0 handoff displayed by the Qt shell
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
+  -> typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
   -> typed JSON-string parser and bounded local file adapter for handoff snapshots
@@ -216,7 +240,6 @@ Rust source contract
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
   -> future OS-local listener/path binding implementation
-  -> typed registry metadata adapter
   -> real Rust runtime summary provider
   -> runtime registry/storage provider
   -> Qt workstation data-flow integration
