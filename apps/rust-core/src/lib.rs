@@ -20,10 +20,13 @@ pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str = "runtime_control_plane_endpoint.v0";
+pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION: &str =
+    "runtime_control_plane_endpoint_path.v0";
 pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str = "runtime_control_plane_frame.v0";
 pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str = "runtime_control_plane_ipc.v0";
 pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
 pub const RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES: u64 = 256 * 1024;
+pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES: usize = 107;
 pub const RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES: usize = 256 * 1024;
 pub const RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES: usize = 4;
 pub const RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES: usize = 96;
@@ -70,6 +73,9 @@ pub enum RuntimeControlPlaneAdapterError {
     OutsideAllowedRoot,
     OversizedFile {
         max_bytes: u64,
+    },
+    OversizedPath {
+        max_bytes: usize,
     },
     OversizedFrame {
         max_bytes: usize,
@@ -687,6 +693,96 @@ pub struct RuntimeControlPlaneEndpointAdapterContract {
     pub non_claims: &'static [&'static str],
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointPathContract {
+    pub schema_version: &'static str,
+    pub endpoint_schema_version: &'static str,
+    pub max_path_bytes: usize,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub absolute_allowed_root_required: bool,
+    pub absolute_endpoint_path_required: bool,
+    pub allowed_root_must_exist: bool,
+    pub allowed_root_symlink_rejected: bool,
+    pub target_parent_must_exist: bool,
+    pub target_parent_symlink_rejected: bool,
+    pub target_must_not_exist: bool,
+    pub socket_extension_required: bool,
+    pub endpoint_filename_safety_enabled: bool,
+    pub path_selection_only: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub filesystem_metadata_validation_enabled: bool,
+    pub filesystem_mutation_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeControlPlaneEndpointPathPolicy {
+    pub allowed_root: PathBuf,
+    pub max_path_bytes: usize,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub path_selection_only: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub filesystem_mutation_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeControlPlaneEndpointPathSelection {
+    pub schema_version: String,
+    pub endpoint_schema_version: String,
+    pub endpoint_path: String,
+    pub allowed_root: String,
+    pub endpoint_filename: String,
+    pub max_path_bytes: usize,
+    pub local_only: bool,
+    pub caller_authorized_allowed_root_required: bool,
+    pub absolute_endpoint_path: bool,
+    pub under_allowed_root: bool,
+    pub target_parent_exists: bool,
+    pub target_did_not_exist: bool,
+    pub socket_extension: String,
+    pub path_selection_only: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub filesystem_mutation_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeControlPlaneFilePolicy {
@@ -750,6 +846,7 @@ pub enum RuntimeControlPlaneMessageErrorCode {
     UnsupportedFileExtension,
     OutsideAllowedRoot,
     OversizedFile,
+    OversizedPath,
     OversizedFrame,
     FileReadFailed,
     FileWriteFailed,
@@ -1058,6 +1155,7 @@ impl RuntimeControlPlaneMessageErrorCode {
             Self::UnsupportedFileExtension => "unsupported_file_extension",
             Self::OutsideAllowedRoot => "outside_allowed_root",
             Self::OversizedFile => "oversized_file",
+            Self::OversizedPath => "oversized_path",
             Self::OversizedFrame => "oversized_frame",
             Self::FileReadFailed => "file_read_failed",
             Self::FileWriteFailed => "file_write_failed",
@@ -1094,6 +1192,7 @@ impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorC
             }
             RuntimeControlPlaneAdapterError::OutsideAllowedRoot => Self::OutsideAllowedRoot,
             RuntimeControlPlaneAdapterError::OversizedFile { .. } => Self::OversizedFile,
+            RuntimeControlPlaneAdapterError::OversizedPath { .. } => Self::OversizedPath,
             RuntimeControlPlaneAdapterError::OversizedFrame { .. } => Self::OversizedFrame,
             RuntimeControlPlaneAdapterError::FileReadFailed => Self::FileReadFailed,
             RuntimeControlPlaneAdapterError::FileWriteFailed => Self::FileWriteFailed,
@@ -2213,6 +2312,43 @@ impl RuntimeControlPlaneEndpointAdapterContract {
     }
 }
 
+impl RuntimeControlPlaneEndpointPathContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION,
+            endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+            max_path_bytes: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES,
+            local_only: true,
+            caller_authorized_allowed_root_required: true,
+            absolute_allowed_root_required: true,
+            absolute_endpoint_path_required: true,
+            allowed_root_must_exist: true,
+            allowed_root_symlink_rejected: true,
+            target_parent_must_exist: true,
+            target_parent_symlink_rejected: true,
+            target_must_not_exist: true,
+            socket_extension_required: true,
+            endpoint_filename_safety_enabled: true,
+            path_selection_only: true,
+            filesystem_socket_path_policy_enabled: true,
+            filesystem_metadata_validation_enabled: true,
+            filesystem_mutation_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS,
+        }
+    }
+}
+
 impl Default for RuntimeControlPlaneFramePolicy {
     fn default() -> Self {
         Self {
@@ -2281,6 +2417,131 @@ impl RuntimeControlPlaneEndpointPolicy {
 
     pub fn max_frame_bytes(&self) -> usize {
         self.ipc_policy.max_frame_bytes()
+    }
+}
+
+impl RuntimeControlPlaneEndpointPathPolicy {
+    pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
+        Self {
+            allowed_root: allowed_root.into(),
+            max_path_bytes: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES,
+            local_only: true,
+            caller_authorized_allowed_root_required: true,
+            path_selection_only: true,
+            filesystem_socket_path_policy_enabled: true,
+            filesystem_mutation_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn bounded(
+        allowed_root: impl Into<PathBuf>,
+        max_path_bytes: usize,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        if max_path_bytes == 0 || max_path_bytes > RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.max_path_bytes",
+            });
+        }
+        let mut policy = Self::new(allowed_root);
+        policy.max_path_bytes = max_path_bytes;
+        Ok(policy)
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        if self.max_path_bytes == 0
+            || self.max_path_bytes > RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.max_path_bytes",
+            });
+        }
+        validate_required_flag("endpoint_path.local_only", self.local_only, true)?;
+        validate_required_flag(
+            "endpoint_path.caller_authorized_allowed_root_required",
+            self.caller_authorized_allowed_root_required,
+            true,
+        )?;
+        validate_required_flag(
+            "endpoint_path.path_selection_only",
+            self.path_selection_only,
+            true,
+        )?;
+        validate_required_flag(
+            "endpoint_path.filesystem_socket_path_policy_enabled",
+            self.filesystem_socket_path_policy_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "endpoint_path.filesystem_mutation_enabled",
+            self.filesystem_mutation_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.public_network_transport_enabled",
+            self.public_network_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.socket_listener_enabled",
+            self.socket_listener_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.daemon_lifecycle_enabled",
+            self.daemon_lifecycle_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.process_spawning_enabled",
+            self.process_spawning_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.file_watching_enabled",
+            self.file_watching_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.storage_provider_enabled",
+            self.storage_provider_enabled,
+            false,
+        )?;
+        validate_required_flag("endpoint_path.capture_enabled", self.capture_enabled, false)?;
+        validate_required_flag(
+            "endpoint_path.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "endpoint_path.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+
+    pub fn max_bytes(&self) -> usize {
+        self.max_path_bytes
     }
 }
 
@@ -2373,6 +2634,129 @@ pub fn execute_control_plane_endpoint_stream<R: Read, W: Write>(
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
     policy.validate()?;
     execute_control_plane_message_ipc_stream(reader, writer, &policy.ipc_policy)
+}
+
+pub fn validate_control_plane_endpoint_path(
+    path: impl AsRef<Path>,
+    policy: &RuntimeControlPlaneEndpointPathPolicy,
+) -> Result<RuntimeControlPlaneEndpointPathSelection, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeFilePath);
+    }
+    if !policy.allowed_root.is_absolute() {
+        return Err(RuntimeControlPlaneAdapterError::RelativeAllowedRoot);
+    }
+    let path_text = path
+        .to_str()
+        .ok_or(RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    let allowed_root_text = policy
+        .allowed_root
+        .to_str()
+        .ok_or(RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    if path_text.len() > policy.max_path_bytes {
+        return Err(RuntimeControlPlaneAdapterError::OversizedPath {
+            max_bytes: policy.max_path_bytes,
+        });
+    }
+    if path.extension().and_then(|extension| extension.to_str()) != Some("sock") {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedFileExtension);
+    }
+
+    let allowed_root_metadata = fs::symlink_metadata(&policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+    if allowed_root_metadata.file_type().is_symlink() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootSymlink);
+    }
+    if !allowed_root_metadata.is_dir() {
+        return Err(RuntimeControlPlaneAdapterError::AllowedRootNotDirectory);
+    }
+    let canonical_allowed_root = fs::canonicalize(&policy.allowed_root)
+        .map_err(|_| RuntimeControlPlaneAdapterError::MissingAllowedRoot)?;
+
+    let parent = path
+        .parent()
+        .ok_or(RuntimeControlPlaneAdapterError::MissingFile)?;
+    let parent_metadata =
+        fs::symlink_metadata(parent).map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+    if parent_metadata.file_type().is_symlink() {
+        return Err(RuntimeControlPlaneAdapterError::SymlinkPath);
+    }
+    if !parent_metadata.is_dir() {
+        return Err(RuntimeControlPlaneAdapterError::MissingFile);
+    }
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|_| RuntimeControlPlaneAdapterError::MissingFile)?;
+    if !canonical_parent.starts_with(&canonical_allowed_root) {
+        return Err(RuntimeControlPlaneAdapterError::OutsideAllowedRoot);
+    }
+
+    if let Ok(target_metadata) = fs::symlink_metadata(path) {
+        if target_metadata.file_type().is_symlink() {
+            return Err(RuntimeControlPlaneAdapterError::SymlinkPath);
+        }
+        if target_metadata.is_dir() {
+            return Err(RuntimeControlPlaneAdapterError::DirectoryPath);
+        }
+        if target_metadata.file_type().is_file() {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.target_exists",
+            });
+        }
+        return Err(RuntimeControlPlaneAdapterError::NonRegularFile);
+    }
+
+    let endpoint_filename = path
+        .file_name()
+        .and_then(|file_name| file_name.to_str())
+        .ok_or(RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    validate_safe_endpoint_filename(endpoint_filename)?;
+
+    let selected_path = canonical_parent.join(endpoint_filename);
+    let selected_path_text = selected_path
+        .to_str()
+        .ok_or(RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    if selected_path_text.len() > policy.max_path_bytes {
+        return Err(RuntimeControlPlaneAdapterError::OversizedPath {
+            max_bytes: policy.max_path_bytes,
+        });
+    }
+    let selected_allowed_root_text = canonical_allowed_root
+        .to_str()
+        .unwrap_or(allowed_root_text)
+        .to_owned();
+
+    Ok(RuntimeControlPlaneEndpointPathSelection {
+        schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION.to_owned(),
+        endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION.to_owned(),
+        endpoint_path: selected_path_text.to_owned(),
+        allowed_root: selected_allowed_root_text,
+        endpoint_filename: endpoint_filename.to_owned(),
+        max_path_bytes: policy.max_path_bytes,
+        local_only: true,
+        caller_authorized_allowed_root_required: true,
+        absolute_endpoint_path: true,
+        under_allowed_root: true,
+        target_parent_exists: true,
+        target_did_not_exist: true,
+        socket_extension: "sock".to_owned(),
+        path_selection_only: true,
+        filesystem_socket_path_policy_enabled: true,
+        filesystem_mutation_enabled: false,
+        public_network_transport_enabled: false,
+        socket_listener_enabled: false,
+        daemon_lifecycle_enabled: false,
+        process_spawning_enabled: false,
+        file_watching_enabled: false,
+        qt_binding_enabled: false,
+        storage_provider_enabled: false,
+        capture_enabled: false,
+        external_services_used: false,
+        deployment_allowed: false,
+        native_inference_execution_enabled: false,
+        non_claims: static_str_vec(RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS),
+    })
 }
 
 pub fn parse_model_registry_metadata_json(
@@ -3758,8 +4142,39 @@ fn validate_control_plane_request_id(value: &str) -> Result<(), RuntimeControlPl
     Ok(())
 }
 
+fn validate_safe_endpoint_filename(value: &str) -> Result<(), RuntimeControlPlaneAdapterError> {
+    let Some(stem) = value.strip_suffix(".sock") else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedFileExtension);
+    };
+    if stem.is_empty() || stem.len() > RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "endpoint_path.endpoint_filename",
+        });
+    }
+    let mut bytes = stem.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "endpoint_path.endpoint_filename",
+        });
+    };
+    if !first.is_ascii_lowercase()
+        || !bytes.all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+        })
+        || stem
+            .split(['-', '_'])
+            .any(|part| RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_BLOCKED_PARTS.contains(&part))
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "endpoint_path.endpoint_filename",
+        });
+    }
+    Ok(())
+}
+
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
     RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+    RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
@@ -3770,6 +4185,16 @@ const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
 
 const RUNTIME_CONTROL_PLANE_REQUEST_ID_BLOCKED_PARTS: &[&str] =
     &["private", "secret", "credential"];
+
+const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_BLOCKED_PARTS: &[&str] = &[
+    "private",
+    "secret",
+    "credential",
+    "password",
+    "passwd",
+    "token",
+    "apikey",
+];
 
 const RUNTIME_SUMMARY_PROVIDER_NON_CLAIMS: &[&str] = &[
     "not_runtime_service",
@@ -3841,6 +4266,23 @@ const RUNTIME_CONTROL_PLANE_ENDPOINT_NON_CLAIMS: &[&str] = &[
     "not_external_service",
     "not_deployment_approval",
     "not_native_runtime_execution",
+];
+
+const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS: &[&str] = &[
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_socket_binding",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_storage_provider",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+    "not_filesystem_mutation",
+    "not_runtime_service",
 ];
 
 const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
@@ -4156,9 +4598,9 @@ mod tests {
     use super::*;
 
     #[cfg(unix)]
-    use std::ffi::CString;
+    use std::ffi::{CString, OsString};
     #[cfg(unix)]
-    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
     #[cfg(unix)]
     use std::os::unix::net::UnixStream;
 
@@ -6244,6 +6686,7 @@ mod tests {
             contract.accepted_input_schemas,
             &[
                 RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+                RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
@@ -6402,6 +6845,69 @@ mod tests {
     }
 
     #[test]
+    fn emits_static_runtime_control_plane_endpoint_path_contract_fixture() {
+        let contract = RuntimeControlPlaneEndpointPathContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.endpoint_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_path_bytes,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_authorized_allowed_root_required);
+        assert!(contract.absolute_allowed_root_required);
+        assert!(contract.absolute_endpoint_path_required);
+        assert!(contract.allowed_root_must_exist);
+        assert!(contract.allowed_root_symlink_rejected);
+        assert!(contract.target_parent_must_exist);
+        assert!(contract.target_parent_symlink_rejected);
+        assert!(contract.target_must_not_exist);
+        assert!(contract.socket_extension_required);
+        assert!(contract.endpoint_filename_safety_enabled);
+        assert!(contract.path_selection_only);
+        assert!(contract.filesystem_socket_path_policy_enabled);
+        assert!(contract.filesystem_metadata_validation_enabled);
+        assert!(!contract.filesystem_mutation_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_public_network_transport",
+                "not_socket_listener",
+                "not_socket_binding",
+                "not_daemon_lifecycle",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_storage_provider",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_native_runtime_execution",
+                "not_filesystem_mutation",
+                "not_runtime_service"
+            ]
+        );
+    }
+
+    #[test]
     fn emits_static_runtime_control_plane_frame_adapter_contract_fixture() {
         let contract = RuntimeControlPlaneFrameAdapterContract::synthetic_fixture();
 
@@ -6534,6 +7040,327 @@ mod tests {
         let endpoint_policy =
             RuntimeControlPlaneEndpointPolicy::caller_provided_connected_stream(ipc_policy);
         assert_eq!(endpoint_policy.max_frame_bytes(), 1024);
+    }
+
+    #[test]
+    fn exposes_bounded_runtime_control_plane_endpoint_path_policy() {
+        let root = temp_policy_root("endpoint-path-policy");
+        let policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+
+        assert_eq!(policy.allowed_root, root);
+        assert_eq!(
+            policy.max_bytes(),
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        );
+        assert!(policy.local_only);
+        assert!(policy.caller_authorized_allowed_root_required);
+        assert!(policy.path_selection_only);
+        assert!(policy.filesystem_socket_path_policy_enabled);
+        assert!(!policy.filesystem_mutation_enabled);
+        assert!(!policy.public_network_transport_enabled);
+        assert!(!policy.socket_listener_enabled);
+        assert!(!policy.daemon_lifecycle_enabled);
+        assert!(!policy.process_spawning_enabled);
+        assert!(!policy.file_watching_enabled);
+        assert!(!policy.qt_binding_enabled);
+        assert!(!policy.storage_provider_enabled);
+        assert!(!policy.capture_enabled);
+        assert!(!policy.external_services_used);
+        assert!(!policy.deployment_allowed);
+        assert!(!policy.native_inference_execution_enabled);
+        policy.validate().unwrap();
+
+        let bounded = RuntimeControlPlaneEndpointPathPolicy::bounded(
+            policy.allowed_root.clone(),
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES - 1,
+        )
+        .unwrap();
+        assert_eq!(
+            bounded.max_bytes(),
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES - 1
+        );
+
+        assert_eq!(
+            RuntimeControlPlaneEndpointPathPolicy::bounded(root.clone(), 0).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.max_path_bytes",
+            }
+        );
+        assert_eq!(
+            RuntimeControlPlaneEndpointPathPolicy::bounded(
+                root.clone(),
+                RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES + 1,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.max_path_bytes",
+            }
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn validates_safe_runtime_control_plane_endpoint_path_selection() {
+        let root = temp_policy_root("endpoint-path-valid");
+        let nested = root.join("ipc");
+        std::fs::create_dir(&nested).unwrap();
+        let path = nested.join("runtime-control.sock");
+        let policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+
+        let selection = validate_control_plane_endpoint_path(&path, &policy).unwrap();
+
+        assert_eq!(
+            selection.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION
+        );
+        assert_eq!(
+            selection.endpoint_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+        );
+        assert_eq!(selection.endpoint_path, path.to_str().unwrap());
+        assert_eq!(selection.allowed_root, root.to_str().unwrap());
+        assert_eq!(selection.endpoint_filename, "runtime-control.sock");
+        assert_eq!(
+            selection.max_path_bytes,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        );
+        assert!(selection.local_only);
+        assert!(selection.caller_authorized_allowed_root_required);
+        assert!(selection.absolute_endpoint_path);
+        assert!(selection.under_allowed_root);
+        assert!(selection.target_parent_exists);
+        assert!(selection.target_did_not_exist);
+        assert_eq!(selection.socket_extension, "sock");
+        assert!(selection.path_selection_only);
+        assert!(selection.filesystem_socket_path_policy_enabled);
+        assert!(!selection.filesystem_mutation_enabled);
+        assert!(!selection.public_network_transport_enabled);
+        assert!(!selection.socket_listener_enabled);
+        assert!(!selection.daemon_lifecycle_enabled);
+        assert!(!selection.process_spawning_enabled);
+        assert!(!selection.file_watching_enabled);
+        assert!(!selection.qt_binding_enabled);
+        assert!(!selection.storage_provider_enabled);
+        assert!(!selection.capture_enabled);
+        assert!(!selection.external_services_used);
+        assert!(!selection.deployment_allowed);
+        assert!(!selection.native_inference_execution_enabled);
+        assert_eq!(
+            selection.non_claims,
+            strings(RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS)
+        );
+        assert!(!path.exists());
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn endpoint_path_policy_rejects_unsafe_flags() {
+        let root = temp_policy_root("endpoint-path-unsafe-flags");
+        let path = root.join("runtime-control.sock");
+
+        let mut network_policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+        network_policy.public_network_transport_enabled = true;
+        assert_eq!(
+            validate_control_plane_endpoint_path(&path, &network_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_path.public_network_transport_enabled",
+            }
+        );
+
+        let mut listener_policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+        listener_policy.socket_listener_enabled = true;
+        assert_eq!(
+            validate_control_plane_endpoint_path(&path, &listener_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_path.socket_listener_enabled",
+            }
+        );
+
+        let mut mutation_policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+        mutation_policy.filesystem_mutation_enabled = true;
+        assert_eq!(
+            validate_control_plane_endpoint_path(&path, &mutation_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_path.filesystem_mutation_enabled",
+            }
+        );
+
+        let mut oversized_policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+        oversized_policy.max_path_bytes = RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES + 1;
+        assert_eq!(
+            validate_control_plane_endpoint_path(&path, &oversized_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.max_path_bytes",
+            }
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn endpoint_path_validation_rejects_unsafe_paths() {
+        let root = temp_policy_root("endpoint-path-unsafe");
+        let policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+
+        assert_eq!(
+            validate_control_plane_endpoint_path(Path::new("relative.sock"), &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let relative_root_policy = RuntimeControlPlaneEndpointPathPolicy::new("relative-root");
+        assert_eq!(
+            validate_control_plane_endpoint_path(root.join("runtime.sock"), &relative_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot
+        );
+
+        let missing_root = root.join("missing-root");
+        let missing_root_policy = RuntimeControlPlaneEndpointPathPolicy::new(missing_root.clone());
+        assert_eq!(
+            validate_control_plane_endpoint_path(
+                missing_root.join("runtime.sock"),
+                &missing_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot
+        );
+
+        let file_root = write_test_file(&root, "file-root", b"not a directory");
+        let file_root_policy = RuntimeControlPlaneEndpointPathPolicy::new(file_root.clone());
+        assert_eq!(
+            validate_control_plane_endpoint_path(file_root.join("runtime.sock"), &file_root_policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory
+        );
+
+        assert_eq!(
+            validate_control_plane_endpoint_path(root.join("missing/runtime.sock"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        let outside = temp_policy_root("endpoint-path-outside");
+        assert_eq!(
+            validate_control_plane_endpoint_path(outside.join("runtime.sock"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+        let outside_existing = write_test_file(&outside, "outside-exists.sock", b"outside");
+        assert_eq!(
+            validate_control_plane_endpoint_path(outside_existing, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let existing_file = write_test_file(&root, "runtime.sock", b"existing");
+        assert_eq!(
+            validate_control_plane_endpoint_path(&existing_file, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.target_exists",
+            }
+        );
+
+        let existing_dir = root.join("directory.sock");
+        std::fs::create_dir(&existing_dir).unwrap();
+        assert_eq!(
+            validate_control_plane_endpoint_path(&existing_dir, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        assert_eq!(
+            validate_control_plane_endpoint_path(root.join("runtime.txt"), &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+        assert_eq!(
+            validate_control_plane_endpoint_path(root.join("secret.sock"), &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.endpoint_filename",
+            }
+        );
+        assert_eq!(
+            validate_control_plane_endpoint_path(root.join("private-key.sock"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "endpoint_path.endpoint_filename",
+            }
+        );
+
+        let long_path = root.join(format!("{}.sock", "a".repeat(128)));
+        assert_eq!(
+            validate_control_plane_endpoint_path(long_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedPath {
+                max_bytes: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES,
+            }
+        );
+
+        remove_temp_root(&outside);
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn endpoint_path_validation_rejects_symlinks_non_regular_and_non_utf8_paths() {
+        let root = temp_policy_root("endpoint-path-unix");
+        let policy = RuntimeControlPlaneEndpointPathPolicy::new(root.clone());
+
+        let real_root = root.join("real-root");
+        std::fs::create_dir(&real_root).unwrap();
+        let symlink_root = root.join("symlink-root");
+        std::os::unix::fs::symlink(&real_root, &symlink_root).unwrap();
+        let symlink_root_policy = RuntimeControlPlaneEndpointPathPolicy::new(symlink_root.clone());
+        assert_eq!(
+            validate_control_plane_endpoint_path(
+                symlink_root.join("runtime.sock"),
+                &symlink_root_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootSymlink
+        );
+
+        let real_parent = root.join("real-parent");
+        std::fs::create_dir(&real_parent).unwrap();
+        let symlink_parent = root.join("symlink-parent");
+        std::os::unix::fs::symlink(&real_parent, &symlink_parent).unwrap();
+        assert_eq!(
+            validate_control_plane_endpoint_path(symlink_parent.join("runtime.sock"), &policy)
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        let target = write_test_file(&root, "target.sock", b"existing");
+        let symlink_target = root.join("linked.sock");
+        std::os::unix::fs::symlink(&target, &symlink_target).unwrap();
+        assert_eq!(
+            validate_control_plane_endpoint_path(&symlink_target, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        let fifo_path = root.join("fifo.sock");
+        make_fifo(&fifo_path);
+        assert_eq!(
+            validate_control_plane_endpoint_path(&fifo_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonRegularFile
+        );
+
+        let non_utf8_path = PathBuf::from(OsString::from_vec(b"/tmp/\xff.sock".to_vec()));
+        assert_eq!(
+            validate_control_plane_endpoint_path(non_utf8_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        let non_utf8_root = PathBuf::from(OsString::from_vec(b"/tmp/\xff-root".to_vec()));
+        let non_utf8_root_policy = RuntimeControlPlaneEndpointPathPolicy::new(non_utf8_root);
+        assert_eq!(
+            validate_control_plane_endpoint_path(
+                root.join("runtime-two.sock"),
+                &non_utf8_root_policy
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        remove_temp_root(&root);
     }
 
     #[test]
