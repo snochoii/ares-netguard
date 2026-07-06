@@ -27,6 +27,19 @@ last event label, and native inference availability state. The checked-in
 fixture values are local and synthetic so the Qt shell can display the contract
 shape without owning runtime lifecycle or job state.
 
+The scaffold now also owns a typed `runtime_summary_provider.v0` contract
+through `RuntimeSummaryProviderContract` and
+`RuntimeSummaryProviderPolicy`. The provider accepts only caller-provided local
+`RuntimeEvent` slices plus explicit workspace/session identifiers and a caller
+selected native inference state, then deterministically derives the existing
+`runtime_summary.v0` shape through `build_runtime_summary_from_events`. It
+rejects empty event streams, mismatched workspace/session events, duplicate job
+queue events, job state changes for unknown jobs, and unsafe policy flags. This
+is the first real Rust runtime summary provider, but it remains source-only and
+in-memory: it does not add an event store, persistent storage, file loading,
+process spawning, Qt binding, capture behavior, deployment behavior, external
+service integration, live runtime transport, or native inference execution.
+
 The scaffold now also owns a static `model_registry_metadata.v0` handoff
 contract through `ModelRegistryMetadata`, `ModelRegistryEntry`,
 `ModelRegistryAggregateSummary`, and `ModelRegistrySafetyFlags`. This mirrors
@@ -221,7 +234,10 @@ bounded endpoint policy only; it is not arbitrary file loading, not file
 watching, not a public network transport, not a socket listener, not a
 filesystem socket path policy, not Qt binding, not external-service integration,
 not storage, not deployment behavior, not capture behavior, and not native
-inference execution.
+inference execution. The runtime summary provider derives a summary only from
+explicit caller-provided events; it is not an event store, storage provider,
+runtime service, Qt data binding, live transport, process supervisor, capture
+boundary, deployment workflow, external service, or native inference executor.
 
 Expected integration path:
 
@@ -229,6 +245,7 @@ Expected integration path:
 Rust source contract
   -> buildable Cargo project in an environment with Rust tooling
   -> static runtime_summary.v0 handoff displayed by the Qt shell
+  -> runtime_summary_provider.v0 over caller-provided local RuntimeEvent slices
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
@@ -240,7 +257,6 @@ Rust source contract
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
   -> future OS-local listener/path binding implementation
-  -> real Rust runtime summary provider
   -> runtime registry/storage provider
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models

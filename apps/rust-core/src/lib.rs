@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
 pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";
+pub const RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION: &str = "runtime_summary_provider.v0";
 pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";
 pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str =
     "model_registry_metadata_adapter.v0";
@@ -211,6 +212,40 @@ pub struct RuntimeSummary {
     pub failed_job_count: u32,
     pub last_event_label: String,
     pub native_inference_state: NativeInferenceRuntimeState,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeSummaryProviderContract {
+    pub schema_version: &'static str,
+    pub output_summary_schema: &'static str,
+    pub local_only: bool,
+    pub caller_provided_events_only: bool,
+    pub event_replay_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub live_runtime_connection_enabled: bool,
+    pub file_io_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeSummaryProviderPolicy {
+    pub local_only: bool,
+    pub caller_provided_events_only: bool,
+    pub storage_provider_enabled: bool,
+    pub live_runtime_connection_enabled: bool,
+    pub file_io_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -538,6 +573,12 @@ struct RawRuntimeControlPlaneMessageCommand {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+struct RuntimeSummaryJobState {
+    job_id: JobId,
+    state: JobState,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeEvent {
     WorkspaceOpened {
         workspace_id: WorkspaceId,
@@ -649,6 +690,29 @@ impl RuntimeControlPlaneRequestId {
 impl RuntimeEvent {
     pub fn contract_summary() -> &'static str {
         "ARES local runtime boundary contract v0"
+    }
+}
+
+impl JobKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CompareModelScores => "compare_model_scores",
+            Self::RefreshEvidenceIndex => "refresh_evidence_index",
+            Self::RunNativeInferenceCandidate => "run_native_inference_candidate",
+            Self::RenderWorkstationSnapshot => "render_workstation_snapshot",
+        }
+    }
+}
+
+impl JobState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
     }
 }
 
@@ -852,6 +916,122 @@ impl RuntimeSummary {
             last_event_label: "synthetic workstation snapshot rendered".to_owned(),
             native_inference_state: NativeInferenceRuntimeState::Disabled,
         }
+    }
+}
+
+impl RuntimeSummaryProviderContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION,
+            output_summary_schema: RUNTIME_SUMMARY_SCHEMA_VERSION,
+            local_only: true,
+            caller_provided_events_only: true,
+            event_replay_enabled: true,
+            storage_provider_enabled: false,
+            live_runtime_connection_enabled: false,
+            file_io_enabled: false,
+            process_spawning_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_SUMMARY_PROVIDER_NON_CLAIMS,
+        }
+    }
+
+    pub fn build_runtime_summary_from_events(
+        workspace_id: WorkspaceId,
+        session_id: SessionId,
+        events: &[RuntimeEvent],
+        native_inference_state: NativeInferenceRuntimeState,
+        policy: &RuntimeSummaryProviderPolicy,
+    ) -> Result<RuntimeSummary, RuntimeControlPlaneAdapterError> {
+        build_runtime_summary_from_events(
+            workspace_id,
+            session_id,
+            events,
+            native_inference_state,
+            policy,
+        )
+    }
+}
+
+impl RuntimeSummaryProviderPolicy {
+    pub fn new() -> Self {
+        Self {
+            local_only: true,
+            caller_provided_events_only: true,
+            storage_provider_enabled: false,
+            live_runtime_connection_enabled: false,
+            file_io_enabled: false,
+            process_spawning_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_required_flag("runtime_summary_provider.local_only", self.local_only, true)?;
+        validate_required_flag(
+            "runtime_summary_provider.caller_provided_events_only",
+            self.caller_provided_events_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.storage_provider_enabled",
+            self.storage_provider_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.live_runtime_connection_enabled",
+            self.live_runtime_connection_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.file_io_enabled",
+            self.file_io_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.process_spawning_enabled",
+            self.process_spawning_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_summary_provider.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+}
+
+impl Default for RuntimeSummaryProviderPolicy {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1535,6 +1715,123 @@ impl RuntimeControlPlaneMessageResponse {
             snapshot: None,
             error_code: Some(error_code),
         }
+    }
+}
+
+pub fn build_runtime_summary_from_events(
+    workspace_id: WorkspaceId,
+    session_id: SessionId,
+    events: &[RuntimeEvent],
+    native_inference_state: NativeInferenceRuntimeState,
+    policy: &RuntimeSummaryProviderPolicy,
+) -> Result<RuntimeSummary, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    if events.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_summary_provider.events",
+        });
+    }
+
+    let mut jobs: Vec<RuntimeSummaryJobState> = Vec::new();
+    let mut last_event_label = String::new();
+    for event in events {
+        match event {
+            RuntimeEvent::WorkspaceOpened {
+                workspace_id: event_workspace_id,
+            } => {
+                if event_workspace_id != &workspace_id {
+                    return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.workspace_id",
+                    });
+                }
+            }
+            RuntimeEvent::SessionStarted {
+                workspace_id: event_workspace_id,
+                session_id: event_session_id,
+            } => {
+                if event_workspace_id != &workspace_id {
+                    return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.workspace_id",
+                    });
+                }
+                if event_session_id != &session_id {
+                    return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.session_id",
+                    });
+                }
+            }
+            RuntimeEvent::JobQueued {
+                session_id: event_session_id,
+                job_id,
+                kind: _,
+            } => {
+                if event_session_id != &session_id {
+                    return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.session_id",
+                    });
+                }
+                if jobs
+                    .iter()
+                    .any(|job| job.job_id.as_str() == job_id.as_str())
+                {
+                    return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.duplicate_job_id",
+                    });
+                }
+                jobs.push(RuntimeSummaryJobState {
+                    job_id: job_id.clone(),
+                    state: JobState::Queued,
+                });
+            }
+            RuntimeEvent::JobStateChanged { job_id, state } => {
+                let job = jobs
+                    .iter_mut()
+                    .find(|known_job| known_job.job_id.as_str() == job_id.as_str())
+                    .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                        field: "runtime_summary_provider.unknown_job_id",
+                    })?;
+                job.state = *state;
+            }
+        }
+        last_event_label = runtime_event_label(event).to_owned();
+    }
+
+    let summary = RuntimeSummary {
+        schema_version: RUNTIME_SUMMARY_SCHEMA_VERSION.to_owned(),
+        workspace_id,
+        session_id,
+        total_job_count: jobs.len() as u32,
+        queued_job_count: count_runtime_jobs_by_state(&jobs, JobState::Queued),
+        running_job_count: count_runtime_jobs_by_state(&jobs, JobState::Running),
+        failed_job_count: count_runtime_jobs_by_state(&jobs, JobState::Failed),
+        last_event_label,
+        native_inference_state,
+    };
+    validate_runtime_summary(&summary)?;
+    Ok(summary)
+}
+
+fn count_runtime_jobs_by_state(jobs: &[RuntimeSummaryJobState], state: JobState) -> u32 {
+    jobs.iter().filter(|job| job.state == state).count() as u32
+}
+
+fn runtime_event_label(event: &RuntimeEvent) -> &'static str {
+    match event {
+        RuntimeEvent::WorkspaceOpened { .. } => "workspace opened",
+        RuntimeEvent::SessionStarted { .. } => "session started",
+        RuntimeEvent::JobQueued { kind, .. } => match kind {
+            JobKind::CompareModelScores => "compare model scores job queued",
+            JobKind::RefreshEvidenceIndex => "refresh evidence index job queued",
+            JobKind::RunNativeInferenceCandidate => "native inference candidate job queued",
+            JobKind::RenderWorkstationSnapshot => "workstation snapshot job queued",
+        },
+        RuntimeEvent::JobStateChanged { state, .. } => match state {
+            JobState::Queued => "job queued",
+            JobState::Running => "job running",
+            JobState::Succeeded => "job succeeded",
+            JobState::Failed => "job failed",
+            JobState::Cancelled => "job cancelled",
+        },
     }
 }
 
@@ -2238,6 +2535,19 @@ const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
 
 const RUNTIME_CONTROL_PLANE_REQUEST_ID_BLOCKED_PARTS: &[&str] =
     &["private", "secret", "credential"];
+
+const RUNTIME_SUMMARY_PROVIDER_NON_CLAIMS: &[&str] = &[
+    "not_runtime_service",
+    "not_persistent_storage",
+    "not_event_store",
+    "not_file_loader",
+    "not_process_spawner",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_arbitrary_file_loader",
@@ -3166,6 +3476,297 @@ mod tests {
             "synthetic workstation snapshot rendered"
         );
         assert_eq!(summary.native_inference_state.as_str(), "disabled");
+    }
+
+    #[test]
+    fn exposes_runtime_summary_provider_contract_fixture() {
+        let contract = RuntimeSummaryProviderContract::synthetic_fixture();
+        let policy = RuntimeSummaryProviderPolicy::new();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.output_summary_schema,
+            RUNTIME_SUMMARY_SCHEMA_VERSION
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_provided_events_only);
+        assert!(contract.event_replay_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.live_runtime_connection_enabled);
+        assert!(!contract.file_io_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert!(contract.non_claims.contains(&"not_persistent_storage"));
+        assert!(contract.non_claims.contains(&"not_event_store"));
+        assert!(contract
+            .non_claims
+            .contains(&"not_native_runtime_execution"));
+        assert_eq!(policy, RuntimeSummaryProviderPolicy::default());
+        assert!(policy.validate().is_ok());
+    }
+
+    #[test]
+    fn builds_runtime_summary_from_caller_provided_events() {
+        let workspace_id =
+            WorkspaceId::new("workspace-runtime-provider").expect("workspace id must be valid");
+        let session_id =
+            SessionId::new("session-runtime-provider").expect("session id must be valid");
+        let job_running = JobId::new("job-runtime-running").expect("job id must be valid");
+        let job_failed = JobId::new("job-runtime-failed").expect("job id must be valid");
+        let job_queued = JobId::new("job-runtime-queued").expect("job id must be valid");
+        let job_succeeded = JobId::new("job-runtime-succeeded").expect("job id must be valid");
+        let job_cancelled = JobId::new("job-runtime-cancelled").expect("job id must be valid");
+        let events = vec![
+            RuntimeEvent::WorkspaceOpened {
+                workspace_id: workspace_id.clone(),
+            },
+            RuntimeEvent::SessionStarted {
+                workspace_id: workspace_id.clone(),
+                session_id: session_id.clone(),
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id: job_running.clone(),
+                kind: JobKind::CompareModelScores,
+            },
+            RuntimeEvent::JobStateChanged {
+                job_id: job_running,
+                state: JobState::Running,
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id: job_failed.clone(),
+                kind: JobKind::RefreshEvidenceIndex,
+            },
+            RuntimeEvent::JobStateChanged {
+                job_id: job_failed,
+                state: JobState::Failed,
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id: job_queued,
+                kind: JobKind::RenderWorkstationSnapshot,
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id: job_succeeded.clone(),
+                kind: JobKind::RunNativeInferenceCandidate,
+            },
+            RuntimeEvent::JobStateChanged {
+                job_id: job_succeeded,
+                state: JobState::Succeeded,
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id: job_cancelled.clone(),
+                kind: JobKind::RenderWorkstationSnapshot,
+            },
+            RuntimeEvent::JobStateChanged {
+                job_id: job_cancelled,
+                state: JobState::Cancelled,
+            },
+        ];
+
+        let summary = build_runtime_summary_from_events(
+            workspace_id.clone(),
+            session_id.clone(),
+            &events,
+            NativeInferenceRuntimeState::Available,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .expect("caller-provided events must build a runtime summary");
+
+        assert_eq!(summary.schema_version, RUNTIME_SUMMARY_SCHEMA_VERSION);
+        assert_eq!(summary.workspace_id, workspace_id);
+        assert_eq!(summary.session_id, session_id);
+        assert_eq!(summary.total_job_count, 5);
+        assert_eq!(summary.queued_job_count, 1);
+        assert_eq!(summary.running_job_count, 1);
+        assert_eq!(summary.failed_job_count, 1);
+        assert_eq!(summary.last_event_label, "job cancelled");
+        assert_eq!(summary.native_inference_state.as_str(), "available");
+    }
+
+    #[test]
+    fn provider_contract_builds_runtime_summary_from_events() {
+        let workspace_id =
+            WorkspaceId::new("workspace-contract-provider").expect("workspace id must be valid");
+        let session_id =
+            SessionId::new("session-contract-provider").expect("session id must be valid");
+        let job_id = JobId::new("job-contract-provider").expect("job id must be valid");
+        let events = vec![
+            RuntimeEvent::WorkspaceOpened {
+                workspace_id: workspace_id.clone(),
+            },
+            RuntimeEvent::SessionStarted {
+                workspace_id: workspace_id.clone(),
+                session_id: session_id.clone(),
+            },
+            RuntimeEvent::JobQueued {
+                session_id: session_id.clone(),
+                job_id,
+                kind: JobKind::RenderWorkstationSnapshot,
+            },
+        ];
+
+        let summary = RuntimeSummaryProviderContract::build_runtime_summary_from_events(
+            workspace_id,
+            session_id,
+            &events,
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .expect("contract wrapper must delegate to provider");
+
+        assert_eq!(summary.total_job_count, 1);
+        assert_eq!(summary.queued_job_count, 1);
+        assert_eq!(summary.running_job_count, 0);
+        assert_eq!(summary.failed_job_count, 0);
+        assert_eq!(summary.last_event_label, "workstation snapshot job queued");
+    }
+
+    #[test]
+    fn rejects_empty_runtime_summary_provider_events() {
+        let err = build_runtime_summary_from_events(
+            WorkspaceId::new("workspace-empty-provider").unwrap(),
+            SessionId::new("session-empty-provider").unwrap(),
+            &[],
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary_provider.events"
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_mismatched_runtime_summary_provider_workspace_or_session() {
+        let workspace_id = WorkspaceId::new("workspace-provider-alpha").unwrap();
+        let session_id = SessionId::new("session-provider-alpha").unwrap();
+        let wrong_workspace = WorkspaceId::new("workspace-provider-beta").unwrap();
+        let wrong_session = SessionId::new("session-provider-beta").unwrap();
+
+        let workspace_err = build_runtime_summary_from_events(
+            workspace_id.clone(),
+            session_id.clone(),
+            &[RuntimeEvent::WorkspaceOpened {
+                workspace_id: wrong_workspace,
+            }],
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            workspace_err,
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary_provider.workspace_id"
+            }
+        );
+
+        let session_err = build_runtime_summary_from_events(
+            workspace_id.clone(),
+            session_id,
+            &[RuntimeEvent::SessionStarted {
+                workspace_id,
+                session_id: wrong_session,
+            }],
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            session_err,
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary_provider.session_id"
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_or_duplicate_runtime_summary_provider_jobs() {
+        let workspace_id = WorkspaceId::new("workspace-provider-jobs").unwrap();
+        let session_id = SessionId::new("session-provider-jobs").unwrap();
+        let job_id = JobId::new("job-provider-duplicate").unwrap();
+
+        let unknown_err = build_runtime_summary_from_events(
+            workspace_id.clone(),
+            session_id.clone(),
+            &[RuntimeEvent::JobStateChanged {
+                job_id: job_id.clone(),
+                state: JobState::Running,
+            }],
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            unknown_err,
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary_provider.unknown_job_id"
+            }
+        );
+
+        let duplicate_err = build_runtime_summary_from_events(
+            workspace_id,
+            session_id.clone(),
+            &[
+                RuntimeEvent::JobQueued {
+                    session_id: session_id.clone(),
+                    job_id: job_id.clone(),
+                    kind: JobKind::CompareModelScores,
+                },
+                RuntimeEvent::JobQueued {
+                    session_id,
+                    job_id,
+                    kind: JobKind::RefreshEvidenceIndex,
+                },
+            ],
+            NativeInferenceRuntimeState::Disabled,
+            &RuntimeSummaryProviderPolicy::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            duplicate_err,
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_summary_provider.duplicate_job_id"
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_runtime_summary_provider_policy_flags() {
+        let mut policy = RuntimeSummaryProviderPolicy::new();
+        policy.storage_provider_enabled = true;
+
+        let err = build_runtime_summary_from_events(
+            WorkspaceId::new("workspace-unsafe-provider").unwrap(),
+            SessionId::new("session-unsafe-provider").unwrap(),
+            &[RuntimeEvent::WorkspaceOpened {
+                workspace_id: WorkspaceId::new("workspace-unsafe-provider").unwrap(),
+            }],
+            NativeInferenceRuntimeState::Disabled,
+            &policy,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_summary_provider.storage_provider_enabled"
+            }
+        );
     }
 
     #[test]

@@ -44,6 +44,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     expected_anchors = [
         "RUNTIME_CONTRACT_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
+        "RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
@@ -64,6 +65,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "JobKind",
         "JobState",
         "RuntimeSummary",
+        "RuntimeSummaryProviderContract",
+        "RuntimeSummaryProviderPolicy",
         "ModelRegistryMetadata",
         "ModelRegistryEntry",
         "ModelRegistryAggregateSummary",
@@ -144,6 +147,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
         "parse_handoff_snapshot_file",
+        "build_runtime_summary_from_events",
         "parse_model_registry_metadata_json",
         "parse_model_registry_metadata_file",
         "execute_local_command",
@@ -167,6 +171,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
 
     assert 'pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";' in lib_rs
     assert 'pub const RUNTIME_SUMMARY_SCHEMA_VERSION: &str = "runtime_summary.v0";' in lib_rs
+    assert (
+        'pub const RUNTIME_SUMMARY_PROVIDER_SCHEMA_VERSION: &str = "runtime_summary_provider.v0";'
+        in lib_rs
+    )
     assert (
         'pub const MODEL_REGISTRY_METADATA_SCHEMA_VERSION: &str = "model_registry_metadata.v0";'
         in lib_rs
@@ -233,6 +241,65 @@ def test_rust_core_exposes_runtime_summary_contract_shape() -> None:
     assert 'WorkspaceId::new("fixture-workspace-alpha")' in lib_rs
     assert 'SessionId::new("fixture-session-runtime-summary")' in lib_rs
     assert "native_inference_state: NativeInferenceRuntimeState::Disabled" in lib_rs
+
+
+def test_rust_core_exposes_runtime_summary_provider_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub output_summary_schema: &'static str",
+        "pub local_only: bool",
+        "pub caller_provided_events_only: bool",
+        "pub event_replay_enabled: bool",
+        "pub storage_provider_enabled: bool",
+        "pub live_runtime_connection_enabled: bool",
+        "pub file_io_enabled: bool",
+        "pub process_spawning_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+        "pub non_claims: &'static [&'static str]",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_anchors = [
+        "impl RuntimeSummaryProviderContract",
+        "impl RuntimeSummaryProviderPolicy",
+        "impl Default for RuntimeSummaryProviderPolicy",
+        "RUNTIME_SUMMARY_PROVIDER_NON_CLAIMS",
+        "pub fn build_runtime_summary_from_events",
+        "fn count_runtime_jobs_by_state",
+        "fn runtime_event_label",
+        "RuntimeSummaryJobState",
+        "runtime_summary_provider.local_only",
+        "runtime_summary_provider.caller_provided_events_only",
+        "runtime_summary_provider.storage_provider_enabled",
+        "runtime_summary_provider.live_runtime_connection_enabled",
+        "runtime_summary_provider.file_io_enabled",
+        "runtime_summary_provider.process_spawning_enabled",
+        "runtime_summary_provider.qt_binding_enabled",
+        "runtime_summary_provider.capture_enabled",
+        "runtime_summary_provider.external_services_used",
+        "runtime_summary_provider.deployment_allowed",
+        "runtime_summary_provider.native_inference_execution_enabled",
+        "runtime_summary_provider.duplicate_job_id",
+        "runtime_summary_provider.unknown_job_id",
+        '"not_runtime_service"',
+        '"not_persistent_storage"',
+        '"not_event_store"',
+        '"not_file_loader"',
+        '"not_process_spawner"',
+        '"not_qt_binding"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+    ]
+    for anchor in expected_anchors:
+        assert anchor in lib_rs
 
 
 def test_rust_core_exposes_model_registry_metadata_contract_shape() -> None:
@@ -867,6 +934,8 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "use std::io::{Read, Write};" in rust_source
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
+    assert "RuntimeSummaryProviderContract" in rust_source
+    assert "RuntimeSummaryProviderPolicy" in rust_source
     assert "RuntimeControlPlaneFramePolicy" in rust_source
     assert "RuntimeControlPlaneIpcPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointPolicy" in rust_source
@@ -888,6 +957,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "execute_control_plane_endpoint_stream" in rust_source
     assert "validate_control_plane_endpoint_policy" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
+    assert "build_runtime_summary_from_events" in rust_source
     assert "parse_model_registry_metadata_json" in rust_source
     assert "parse_model_registry_metadata_file" in rust_source
     assert "execute_local_command" in rust_source
@@ -924,6 +994,11 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "runtime_summary.v0",
         "RuntimeSummary",
         "NativeInferenceRuntimeState",
+        "runtime_summary_provider.v0",
+        "RuntimeSummaryProviderContract",
+        "RuntimeSummaryProviderPolicy",
+        "RuntimeEvent",
+        "build_runtime_summary_from_events",
         "model_registry_metadata.v0",
         "ModelRegistryMetadata",
         "ModelRegistryEntry",
@@ -970,6 +1045,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "RuntimeControlPlaneMessageOutcome",
         "RuntimeControlPlaneMessageErrorCode",
         "static runtime_summary.v0 handoff",
+        "runtime_summary_provider.v0 over caller-provided local RuntimeEvent slices",
+        "first real Rust runtime summary provider",
+        "rejects empty event streams",
+        "duplicate job queue events",
+        "job state changes for unknown jobs",
+        "not an event store",
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
