@@ -30,6 +30,13 @@ Qt shell the owner of workspace, session, job, or native inference state.
 The Model Registry Snapshot panel is also a source-level handoff preview only;
 it is not a persistent registry, does not read generated reports, and does not
 own model promotion or deployment state.
+The Rust runtime now also defines a typed `model_registry_metadata_adapter.v0`
+for caller-provided `model_registry_metadata.v0` JSON strings and bounded local
+metadata `.json` files. Qt still displays its own static Model Registry
+Snapshot preview object; it does not call `parse_model_registry_metadata_json`,
+call `parse_model_registry_metadata_file`, perform registry metadata file I/O,
+load generated reports, bind to a storage provider, own promotion/deployment
+state, use external services, capture traffic, or execute native inference.
 The Rust runtime now also defines a static `runtime_handoff_snapshot.v0`
 envelope that composes the runtime summary and model registry metadata fixtures.
 Qt still displays its own static preview objects; it does not read the Rust
@@ -78,6 +85,7 @@ QML shell scaffold
   -> buildable Qt project in an environment with Qt 6 and CMake
   -> static runtime_summary.v0 handoff preview
   -> static model_registry_metadata.v0 handoff preview
+  -> typed model_registry_metadata_adapter.v0 in the Rust runtime, not called by Qt
   -> static runtime_handoff_snapshot.v0 envelope in the Rust runtime
   -> static runtime_control_plane_adapter.v0 contract in the Rust runtime
   -> Rust JSON-string parser and bounded local file adapter for local handoff snapshots
