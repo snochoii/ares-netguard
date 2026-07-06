@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub const RUNTIME_CONTRACT_VERSION: &str = "rust_runtime_contract.v0";
@@ -10,9 +11,11 @@ pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str = "runtime_control_plane_frame.v0";
+pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str = "runtime_control_plane_ipc.v0";
 pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
 pub const RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES: u64 = 256 * 1024;
 pub const RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES: usize = 256 * 1024;
+pub const RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES: usize = 4;
 pub const RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES: usize = 96;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -63,6 +66,10 @@ pub enum RuntimeControlPlaneAdapterError {
     },
     FileReadFailed,
     InvalidUtf8,
+    IpcReadFailed,
+    IpcWriteFailed,
+    MalformedIpcFrame,
+    IncompleteIpcFrame,
     UnsupportedSchemaVersion {
         field: &'static str,
         expected: &'static str,
@@ -149,6 +156,7 @@ pub enum RuntimeControlPlaneAdapterKind {
     LocalJsonFileAdapter,
     LocalControlPlaneMessageEnvelope,
     LocalControlPlaneFrameAdapter,
+    LocalControlPlaneIpcStreamAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -159,6 +167,7 @@ pub enum RuntimeControlPlaneInputMode {
     AcceptedLocalJsonFile,
     AcceptedLocalMessageEnvelope,
     AcceptedLocalMessageFrame,
+    AcceptedLocalIpcStream,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -169,6 +178,7 @@ pub enum RuntimeControlPlaneAdapterState {
     LocalFileAdapterAvailable,
     LocalMessageEnvelopeAvailable,
     LocalMessageFrameAvailable,
+    LocalIpcStreamAvailable,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -286,6 +296,11 @@ pub struct RuntimeControlPlaneFramePolicy {
     pub max_frame_bytes: usize,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RuntimeControlPlaneIpcPolicy {
+    pub frame_policy: RuntimeControlPlaneFramePolicy,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuntimeControlPlaneFrameAdapterContract {
     pub schema_version: &'static str,
@@ -303,6 +318,35 @@ pub struct RuntimeControlPlaneFrameAdapterContract {
     pub qt_binding_enabled: bool,
     pub storage_provider_enabled: bool,
     pub capture_enabled: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneIpcAdapterContract {
+    pub schema_version: &'static str,
+    pub frame_schema_version: &'static str,
+    pub message_schema_version: &'static str,
+    pub length_prefix_bytes: usize,
+    pub max_frame_bytes: usize,
+    pub local_only: bool,
+    pub caller_provided_streams_only: bool,
+    pub one_shot_request_response: bool,
+    pub big_endian_length_prefix_required: bool,
+    pub utf8_json_payload_required: bool,
+    pub additional_dependencies_required: bool,
+    pub stream_io_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub native_inference_execution_enabled: bool,
     pub non_claims: &'static [&'static str],
@@ -374,6 +418,10 @@ pub enum RuntimeControlPlaneMessageErrorCode {
     OversizedFrame,
     FileReadFailed,
     InvalidUtf8,
+    IpcReadFailed,
+    IpcWriteFailed,
+    MalformedIpcFrame,
+    IncompleteIpcFrame,
     UnsupportedSchemaVersion,
     UnsupportedValue,
     UnsafeFlag,
@@ -569,6 +617,7 @@ impl RuntimeControlPlaneAdapterKind {
             Self::LocalJsonFileAdapter => "local_json_file_adapter",
             Self::LocalControlPlaneMessageEnvelope => "local_control_plane_message_envelope",
             Self::LocalControlPlaneFrameAdapter => "local_control_plane_frame_adapter",
+            Self::LocalControlPlaneIpcStreamAdapter => "local_control_plane_ipc_stream_adapter",
         }
     }
 }
@@ -581,6 +630,7 @@ impl RuntimeControlPlaneInputMode {
             Self::AcceptedLocalJsonFile => "accepted_local_json_file",
             Self::AcceptedLocalMessageEnvelope => "accepted_local_message_envelope",
             Self::AcceptedLocalMessageFrame => "accepted_local_message_frame",
+            Self::AcceptedLocalIpcStream => "accepted_local_ipc_stream",
         }
     }
 }
@@ -593,6 +643,7 @@ impl RuntimeControlPlaneAdapterState {
             Self::LocalFileAdapterAvailable => "local_file_adapter_available",
             Self::LocalMessageEnvelopeAvailable => "local_message_envelope_available",
             Self::LocalMessageFrameAvailable => "local_message_frame_available",
+            Self::LocalIpcStreamAvailable => "local_ipc_stream_available",
         }
     }
 }
@@ -634,6 +685,10 @@ impl RuntimeControlPlaneMessageErrorCode {
             Self::OversizedFrame => "oversized_frame",
             Self::FileReadFailed => "file_read_failed",
             Self::InvalidUtf8 => "invalid_utf8",
+            Self::IpcReadFailed => "ipc_read_failed",
+            Self::IpcWriteFailed => "ipc_write_failed",
+            Self::MalformedIpcFrame => "malformed_ipc_frame",
+            Self::IncompleteIpcFrame => "incomplete_ipc_frame",
             Self::UnsupportedSchemaVersion => "unsupported_schema_version",
             Self::UnsupportedValue => "unsupported_value",
             Self::UnsafeFlag => "unsafe_flag",
@@ -665,6 +720,10 @@ impl From<&RuntimeControlPlaneAdapterError> for RuntimeControlPlaneMessageErrorC
             RuntimeControlPlaneAdapterError::OversizedFrame { .. } => Self::OversizedFrame,
             RuntimeControlPlaneAdapterError::FileReadFailed => Self::FileReadFailed,
             RuntimeControlPlaneAdapterError::InvalidUtf8 => Self::InvalidUtf8,
+            RuntimeControlPlaneAdapterError::IpcReadFailed => Self::IpcReadFailed,
+            RuntimeControlPlaneAdapterError::IpcWriteFailed => Self::IpcWriteFailed,
+            RuntimeControlPlaneAdapterError::MalformedIpcFrame => Self::MalformedIpcFrame,
+            RuntimeControlPlaneAdapterError::IncompleteIpcFrame => Self::IncompleteIpcFrame,
             RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion { .. } => {
                 Self::UnsupportedSchemaVersion
             }
@@ -748,9 +807,9 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneFrameAdapter,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageFrame,
-            adapter_state: RuntimeControlPlaneAdapterState::LocalMessageFrameAvailable,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneIpcStreamAdapter,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalIpcStream,
+            adapter_state: RuntimeControlPlaneAdapterState::LocalIpcStreamAvailable,
             output_snapshot_schema:
                 RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
@@ -922,6 +981,38 @@ impl RuntimeControlPlaneFrameAdapterContract {
     }
 }
 
+impl RuntimeControlPlaneIpcAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
+            frame_schema_version: RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
+            message_schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            length_prefix_bytes: RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES,
+            max_frame_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+            local_only: true,
+            caller_provided_streams_only: true,
+            one_shot_request_response: true,
+            big_endian_length_prefix_required: true,
+            utf8_json_payload_required: true,
+            additional_dependencies_required: false,
+            stream_io_enabled: true,
+            live_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_CONTROL_PLANE_IPC_NON_CLAIMS,
+        }
+    }
+}
+
 impl Default for RuntimeControlPlaneFramePolicy {
     fn default() -> Self {
         Self {
@@ -942,6 +1033,16 @@ impl RuntimeControlPlaneFramePolicy {
 
     pub fn max_bytes(&self) -> usize {
         self.max_frame_bytes
+    }
+}
+
+impl RuntimeControlPlaneIpcPolicy {
+    pub fn new(frame_policy: RuntimeControlPlaneFramePolicy) -> Self {
+        Self { frame_policy }
+    }
+
+    pub fn max_frame_bytes(&self) -> usize {
+        self.frame_policy.max_bytes()
     }
 }
 
@@ -970,6 +1071,61 @@ pub fn serialize_control_plane_message_response_frame_bytes(
         response,
         &RuntimeControlPlaneFramePolicy::default(),
     )
+}
+
+pub fn read_control_plane_message_ipc_frame<R: Read>(
+    reader: &mut R,
+    policy: &RuntimeControlPlaneIpcPolicy,
+) -> Result<Vec<u8>, RuntimeControlPlaneAdapterError> {
+    let mut length_prefix = [0_u8; RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES];
+    read_exact_control_plane_ipc(reader, &mut length_prefix)?;
+
+    let frame_len = u32::from_be_bytes(length_prefix) as usize;
+    if frame_len == 0 {
+        return Err(RuntimeControlPlaneAdapterError::InvalidJson);
+    }
+    if frame_len > policy.frame_policy.max_bytes() {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFrame {
+            max_bytes: policy.frame_policy.max_bytes(),
+        });
+    }
+
+    let mut frame = vec![0_u8; frame_len];
+    read_exact_control_plane_ipc(reader, &mut frame)?;
+    Ok(frame)
+}
+
+pub fn write_control_plane_message_ipc_frame<W: Write>(
+    writer: &mut W,
+    frame: &[u8],
+    policy: &RuntimeControlPlaneIpcPolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_control_plane_frame_bytes(frame, &policy.frame_policy)?;
+    let frame_len = u32::try_from(frame.len()).map_err(|_| {
+        RuntimeControlPlaneAdapterError::OversizedFrame {
+            max_bytes: policy.frame_policy.max_bytes(),
+        }
+    })?;
+    writer
+        .write_all(&frame_len.to_be_bytes())
+        .map_err(|_| RuntimeControlPlaneAdapterError::IpcWriteFailed)?;
+    writer
+        .write_all(frame)
+        .map_err(|_| RuntimeControlPlaneAdapterError::IpcWriteFailed)
+}
+
+pub fn execute_control_plane_message_ipc_stream<R: Read, W: Write>(
+    reader: &mut R,
+    writer: &mut W,
+    policy: &RuntimeControlPlaneIpcPolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    let request_frame = read_control_plane_message_ipc_frame(reader, policy)?;
+    let response_frame =
+        RuntimeControlPlaneFrameAdapterContract::execute_control_plane_message_frame_bytes(
+            &request_frame,
+            &policy.frame_policy,
+        )?;
+    write_control_plane_message_ipc_frame(writer, &response_frame, policy)
 }
 
 impl RuntimeControlPlaneFilePolicy {
@@ -1111,6 +1267,23 @@ fn validate_control_plane_frame_bytes<'a>(
         });
     }
     std::str::from_utf8(frame).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)
+}
+
+fn read_exact_control_plane_ipc<R: Read>(
+    reader: &mut R,
+    mut buffer: &mut [u8],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    while !buffer.is_empty() {
+        match reader.read(buffer) {
+            Ok(0) => return Err(RuntimeControlPlaneAdapterError::IncompleteIpcFrame),
+            Ok(bytes_read) => {
+                let remaining = buffer;
+                buffer = &mut remaining[bytes_read..];
+            }
+            Err(_) => return Err(RuntimeControlPlaneAdapterError::IpcReadFailed),
+        }
+    }
+    Ok(())
 }
 
 fn validate_runtime_handoff_snapshot_file_path(
@@ -1590,6 +1763,7 @@ fn validate_control_plane_request_id(value: &str) -> Result<(), RuntimeControlPl
 }
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
+    RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
     RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
@@ -1603,9 +1777,11 @@ const RUNTIME_CONTROL_PLANE_REQUEST_ID_BLOCKED_PARTS: &[&str] =
 const RUNTIME_CONTROL_PLANE_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_arbitrary_file_loader",
     "not_file_watcher",
-    "not_ipc_or_socket_transport",
     "not_live_transport",
-    "not_message_transport",
+    "not_socket_listener",
+    "not_daemon_lifecycle",
+    "not_filesystem_socket_path_policy",
+    "not_process_spawner",
     "not_qt_binding",
     "not_external_service",
     "not_deployment_approval",
@@ -1623,6 +1799,21 @@ const RUNTIME_CONTROL_PLANE_FRAME_NON_CLAIMS: &[&str] = &[
     "not_qt_binding",
     "not_storage_provider",
     "not_capture_boundary",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_CONTROL_PLANE_IPC_NON_CLAIMS: &[&str] = &[
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_daemon_lifecycle",
+    "not_filesystem_socket_path_policy",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_storage_provider",
+    "not_capture_boundary",
+    "not_external_service",
     "not_deployment_approval",
     "not_native_runtime_execution",
 ];
@@ -1902,6 +2093,8 @@ mod tests {
     use std::ffi::CString;
     #[cfg(unix)]
     use std::os::unix::ffi::OsStrExt;
+    #[cfg(unix)]
+    use std::os::unix::net::UnixStream;
 
     #[cfg(unix)]
     unsafe extern "C" {
@@ -2262,6 +2455,50 @@ mod tests {
         serde_json::from_str(&response_json).expect("response frame must parse")
     }
 
+    fn ipc_frame_bytes(frame: &[u8]) -> Vec<u8> {
+        let mut ipc_frame = u32::try_from(frame.len())
+            .expect("test frame length must fit in the IPC prefix")
+            .to_be_bytes()
+            .to_vec();
+        ipc_frame.extend_from_slice(frame);
+        ipc_frame
+    }
+
+    fn ipc_response_payload(ipc_frame: &[u8]) -> &[u8] {
+        assert!(ipc_frame.len() >= RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES);
+        let length_prefix: [u8; RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES] = ipc_frame
+            [..RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES]
+            .try_into()
+            .expect("IPC response prefix must be four bytes");
+        let frame_len = u32::from_be_bytes(length_prefix) as usize;
+        let payload_start = RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES;
+        let payload_end = payload_start + frame_len;
+        assert_eq!(ipc_frame.len(), payload_end);
+        &ipc_frame[payload_start..payload_end]
+    }
+
+    fn response_from_ipc_bytes(ipc_frame: &[u8]) -> RuntimeControlPlaneMessageResponse {
+        let response_json = String::from_utf8(ipc_response_payload(ipc_frame).to_vec()).unwrap();
+        serde_json::from_str(&response_json).expect("IPC response frame must parse")
+    }
+
+    fn execute_ipc_frame_bytes(
+        frame: &[u8],
+    ) -> (Result<(), RuntimeControlPlaneAdapterError>, Vec<u8>) {
+        execute_ipc_frame_bytes_with_policy(frame, &RuntimeControlPlaneIpcPolicy::default())
+    }
+
+    fn execute_ipc_frame_bytes_with_policy(
+        frame: &[u8],
+        policy: &RuntimeControlPlaneIpcPolicy,
+    ) -> (Result<(), RuntimeControlPlaneAdapterError>, Vec<u8>) {
+        let input = ipc_frame_bytes(frame);
+        let mut reader = input.as_slice();
+        let mut writer = Vec::new();
+        let result = execute_control_plane_message_ipc_stream(&mut reader, &mut writer, policy);
+        (result, writer)
+    }
+
     fn remove_temp_root(root: &Path) {
         let _ = std::fs::remove_dir_all(root);
     }
@@ -2277,6 +2514,17 @@ mod tests {
     #[cfg(unix)]
     fn effective_user_id_is_root() -> bool {
         unsafe { geteuid() == 0 }
+    }
+
+    #[cfg(unix)]
+    fn unix_stream_pair_writes_are_permitted() -> bool {
+        let (mut client, _server) =
+            UnixStream::pair().expect("test connected stream pair must be created");
+        match client.write(&[0]) {
+            Ok(_) => true,
+            Err(error) if error.raw_os_error() == Some(1) => false,
+            Err(error) => panic!("test UnixStream probe failed unexpectedly: {error}"),
+        }
     }
 
     #[test]
@@ -2435,12 +2683,12 @@ mod tests {
         );
         assert_eq!(
             contract.adapter_kind.as_str(),
-            "local_control_plane_frame_adapter"
+            "local_control_plane_ipc_stream_adapter"
         );
-        assert_eq!(contract.input_mode.as_str(), "accepted_local_message_frame");
+        assert_eq!(contract.input_mode.as_str(), "accepted_local_ipc_stream");
         assert_eq!(
             contract.adapter_state.as_str(),
-            "local_message_frame_available"
+            "local_ipc_stream_available"
         );
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
@@ -2449,6 +2697,7 @@ mod tests {
         assert_eq!(
             contract.accepted_input_schemas,
             &[
+                RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
                 RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
@@ -2470,14 +2719,78 @@ mod tests {
             &[
                 "not_arbitrary_file_loader",
                 "not_file_watcher",
-                "not_ipc_or_socket_transport",
                 "not_live_transport",
-                "not_message_transport",
+                "not_socket_listener",
+                "not_daemon_lifecycle",
+                "not_filesystem_socket_path_policy",
+                "not_process_spawner",
                 "not_qt_binding",
                 "not_external_service",
                 "not_deployment_approval",
                 "not_runtime_service",
                 "not_generated_report_loader"
+            ]
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_control_plane_ipc_adapter_contract_fixture() {
+        let contract = RuntimeControlPlaneIpcAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.frame_schema_version,
+            RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.message_schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.length_prefix_bytes,
+            RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES
+        );
+        assert_eq!(
+            contract.max_frame_bytes,
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_provided_streams_only);
+        assert!(contract.one_shot_request_response);
+        assert!(contract.big_endian_length_prefix_required);
+        assert!(contract.utf8_json_payload_required);
+        assert!(!contract.additional_dependencies_required);
+        assert!(contract.stream_io_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.filesystem_socket_path_policy_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_public_network_transport",
+                "not_socket_listener",
+                "not_daemon_lifecycle",
+                "not_filesystem_socket_path_policy",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_storage_provider",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_native_runtime_execution"
             ]
         );
     }
@@ -2563,6 +2876,19 @@ mod tests {
                 field: "frame.max_frame_bytes",
             }
         );
+    }
+
+    #[test]
+    fn exposes_bounded_runtime_control_plane_ipc_policy() {
+        let policy = RuntimeControlPlaneIpcPolicy::default();
+        assert_eq!(
+            policy.max_frame_bytes(),
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+
+        let frame_policy = RuntimeControlPlaneFramePolicy::new(1024).unwrap();
+        let ipc_policy = RuntimeControlPlaneIpcPolicy::new(frame_policy);
+        assert_eq!(ipc_policy.max_frame_bytes(), 1024);
     }
 
     #[test]
@@ -2839,6 +3165,208 @@ mod tests {
         );
 
         remove_temp_root(&root);
+    }
+
+    #[test]
+    fn dispatches_runtime_control_plane_json_message_ipc_stream() {
+        let request_json = json_message_request("request-ipc-json-001", synthetic_handoff_json());
+        let (result, response_bytes) = execute_ipc_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let from_ipc = response_from_ipc_bytes(&response_bytes);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+
+        assert_eq!(from_ipc, from_frame);
+        assert_eq!(from_ipc.request_id.as_str(), "request-ipc-json-001");
+        assert_eq!(from_ipc.outcome, RuntimeControlPlaneMessageOutcome::Success);
+        assert_eq!(
+            from_ipc
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .runtime_summary
+                .workspace_id
+                .as_str(),
+            "fixture-workspace-alpha"
+        );
+    }
+
+    #[test]
+    fn dispatches_runtime_control_plane_file_message_ipc_stream() {
+        let root = temp_policy_root("valid-file-ipc");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let request_json = file_message_request("request-ipc-file-001", &path, &root);
+        let (result, response_bytes) = execute_ipc_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let from_ipc = response_from_ipc_bytes(&response_bytes);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+
+        assert_eq!(from_ipc, from_frame);
+        assert_eq!(from_ipc.request_id.as_str(), "request-ipc-file-001");
+        assert_eq!(from_ipc.outcome, RuntimeControlPlaneMessageOutcome::Success);
+        assert_eq!(
+            from_ipc
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .model_registry_metadata
+                .entries[9]
+                .model_id,
+            "time_series_residual"
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dispatches_runtime_control_plane_message_over_unix_stream_pair() {
+        if !unix_stream_pair_writes_are_permitted() {
+            return;
+        }
+
+        let root = temp_policy_root("valid-unix-ipc");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let policy = RuntimeControlPlaneIpcPolicy::default();
+        let request_json = file_message_request("request-ipc-unix-001", &path, &root);
+        let (mut client, server) =
+            UnixStream::pair().expect("test connected stream pair must be created");
+        let server_policy = policy.clone();
+        let server_thread = std::thread::spawn(move || {
+            let mut server_stream = server;
+            let request_frame =
+                read_control_plane_message_ipc_frame(&mut server_stream, &server_policy)?;
+            let response_frame =
+                RuntimeControlPlaneFrameAdapterContract::execute_control_plane_message_frame_bytes(
+                    &request_frame,
+                    &server_policy.frame_policy,
+                )?;
+            write_control_plane_message_ipc_frame(
+                &mut server_stream,
+                &response_frame,
+                &server_policy,
+            )
+        });
+
+        write_control_plane_message_ipc_frame(&mut client, request_json.as_bytes(), &policy)
+            .unwrap();
+        server_thread
+            .join()
+            .expect("test server thread must complete")
+            .unwrap();
+
+        let response_frame = read_control_plane_message_ipc_frame(&mut client, &policy).unwrap();
+        let from_ipc = response_from_frame_bytes(response_frame);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+
+        assert_eq!(from_ipc, from_frame);
+        assert_eq!(from_ipc.request_id.as_str(), "request-ipc-unix-001");
+        assert_eq!(from_ipc.outcome, RuntimeControlPlaneMessageOutcome::Success);
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_ipc_write_failures_without_fabricating_responses() {
+        if !unix_stream_pair_writes_are_permitted() {
+            return;
+        }
+
+        let policy = RuntimeControlPlaneIpcPolicy::default();
+        let request_json = json_message_request("request-ipc-write-001", "{");
+        let (mut client, server) =
+            UnixStream::pair().expect("test connected stream pair must be created");
+        let server_policy = policy.clone();
+        let server_thread = std::thread::spawn(move || {
+            let mut server_stream = server;
+            let request_frame =
+                read_control_plane_message_ipc_frame(&mut server_stream, &server_policy)?;
+            let response_frame =
+                RuntimeControlPlaneFrameAdapterContract::execute_control_plane_message_frame_bytes(
+                    &request_frame,
+                    &server_policy.frame_policy,
+                )?;
+            write_control_plane_message_ipc_frame(
+                &mut server_stream,
+                &response_frame,
+                &server_policy,
+            )
+        });
+
+        write_control_plane_message_ipc_frame(&mut client, request_json.as_bytes(), &policy)
+            .unwrap();
+        drop(client);
+
+        assert_eq!(
+            server_thread
+                .join()
+                .expect("test server thread must complete")
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::IpcWriteFailed
+        );
+    }
+
+    #[test]
+    fn message_ipc_stream_returns_failure_response_for_valid_request_execution_errors() {
+        let request_json = json_message_request("request-ipc-006", "{");
+        let (result, response_bytes) = execute_ipc_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let response = response_from_ipc_bytes(&response_bytes);
+
+        assert_eq!(response.request_id.as_str(), "request-ipc-006");
+        assert_eq!(response.outcome, RuntimeControlPlaneMessageOutcome::Failure);
+        assert!(response.snapshot.is_none());
+        assert_eq!(
+            response.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn message_ipc_stream_parse_failures_return_adapter_errors_without_responses() {
+        let invalid_schema =
+            json_message_request("request-ipc-parse-001", synthetic_handoff_json()).replacen(
+                RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+                "runtime_control_plane_message.v1",
+                1,
+            );
+        let (result, response_bytes) = execute_ipc_frame_bytes(invalid_schema.as_bytes());
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            }
+        );
+        assert!(response_bytes.is_empty());
+
+        let (result, response_bytes) = execute_ipc_frame_bytes(
+            json_message_request("secret-ipc", synthetic_handoff_json()).as_bytes(),
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "request_id",
+            }
+        );
+        assert!(response_bytes.is_empty());
     }
 
     #[test]
@@ -3171,6 +3699,88 @@ mod tests {
                 field: "request_id",
             }
         );
+    }
+
+    #[test]
+    fn message_ipc_stream_fails_closed_for_invalid_ipc_frames() {
+        let policy = RuntimeControlPlaneIpcPolicy::default();
+
+        let zero_length = 0_u32.to_be_bytes().to_vec();
+        let mut zero_reader = zero_length.as_slice();
+        assert_eq!(
+            read_control_plane_message_ipc_frame(&mut zero_reader, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let oversized_length = (RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES as u32 + 1).to_be_bytes();
+        let mut oversized_reader = oversized_length.as_slice();
+        assert_eq!(
+            read_control_plane_message_ipc_frame(&mut oversized_reader, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFrame {
+                max_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+            }
+        );
+
+        let incomplete_prefix_bytes = [0_u8, 0_u8];
+        let mut incomplete_prefix = incomplete_prefix_bytes.as_slice();
+        let mut response_bytes = Vec::new();
+        assert_eq!(
+            execute_control_plane_message_ipc_stream(
+                &mut incomplete_prefix,
+                &mut response_bytes,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::IncompleteIpcFrame
+        );
+        assert!(response_bytes.is_empty());
+
+        let incomplete_payload_bytes = vec![0_u8, 0_u8, 0_u8, 4_u8, b'{'];
+        let mut incomplete_payload = incomplete_payload_bytes.as_slice();
+        assert_eq!(
+            execute_control_plane_message_ipc_stream(
+                &mut incomplete_payload,
+                &mut response_bytes,
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::IncompleteIpcFrame
+        );
+
+        let (result, response_bytes) = execute_ipc_frame_bytes(&[0xff]);
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+        assert!(response_bytes.is_empty());
+
+        let (result, response_bytes) = execute_ipc_frame_bytes(b"{");
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert!(response_bytes.is_empty());
+
+        let (result, response_bytes) = execute_ipc_frame_bytes(b"[]");
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+        assert!(response_bytes.is_empty());
+
+        let short_policy =
+            RuntimeControlPlaneIpcPolicy::new(RuntimeControlPlaneFramePolicy::new(8).unwrap());
+        let mut writer = Vec::new();
+        assert_eq!(
+            write_control_plane_message_ipc_frame(
+                &mut writer,
+                br#"{"too_long":true}"#,
+                &short_policy
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFrame { max_bytes: 8 }
+        );
+        assert!(writer.is_empty());
     }
 
     #[test]

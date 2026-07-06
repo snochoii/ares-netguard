@@ -50,9 +50,18 @@ the dispatcher, open a transport, or bind to live runtime state. Rust now also
 defines a bounded local `runtime_control_plane_frame.v0` byte-frame adapter
 over that message envelope, with caller-provided UTF-8 JSON bytes, a 256 KiB
 default frame cap, and serialized UTF-8 JSON response bytes. Qt does not parse
-frame bytes, call the frame adapter, perform file I/O, open IPC, bind to live
-runtime state, load generated reports, use external services, allow deployment,
-capture traffic, or execute native inference.
+frame bytes, call the frame adapter, perform file I/O, bind to live runtime
+state, load generated reports, use external services, allow deployment, capture
+traffic, or execute native inference. Rust now also defines a bounded
+`runtime_control_plane_ipc.v0` connected-stream adapter over that frame layer,
+with caller-provided streams, a 4-byte big-endian length prefix, the same
+256 KiB frame cap, and a one-shot request/response execution path. Qt does not
+open IPC, call `read_control_plane_message_ipc_frame`, call
+`write_control_plane_message_ipc_frame`, call
+`execute_control_plane_message_ipc_stream`, bind to live runtime state, start a
+listener, manage a filesystem socket path, spawn a process, load generated
+reports, use external services, allow deployment, capture traffic, or execute
+native inference.
 
 Expected integration path:
 
@@ -67,7 +76,8 @@ QML shell scaffold
   -> typed local control-plane command dispatcher in the Rust runtime
   -> strict local runtime_control_plane_message.v0 envelope in the Rust runtime
   -> bounded runtime_control_plane_frame.v0 byte-frame adapter in the Rust runtime
-  -> future local IPC/control-plane adapter from the Rust runtime
+  -> bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime
+  -> future OS-local endpoint/listener policy from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging

@@ -50,9 +50,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES",
         "RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES",
+        "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES",
         "RUNTIME_CONTROL_PLANE_REQUEST_ID_MAX_BYTES",
         "WorkspaceId",
         "SessionId",
@@ -76,7 +78,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneAdapterState",
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFramePolicy",
+        "RuntimeControlPlaneIpcPolicy",
         "RuntimeControlPlaneFrameAdapterContract",
+        "RuntimeControlPlaneIpcAdapterContract",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
         "RuntimeControlPlaneRequestId",
@@ -102,15 +106,18 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "LocalJsonFileAdapter",
         "LocalControlPlaneMessageEnvelope",
         "LocalControlPlaneFrameAdapter",
+        "LocalControlPlaneIpcStreamAdapter",
         "AcceptedSchemaDeclarationOnly",
         "AcceptedLocalJsonString",
         "AcceptedLocalJsonFile",
         "AcceptedLocalMessageEnvelope",
         "AcceptedLocalMessageFrame",
+        "AcceptedLocalIpcStream",
         "JsonStringParserAvailable",
         "LocalFileAdapterAvailable",
         "LocalMessageEnvelopeAvailable",
         "LocalMessageFrameAvailable",
+        "LocalIpcStreamAvailable",
         "RuntimeHandoffSnapshotV0",
         "ParseHandoffSnapshotJson",
         "ParseHandoffSnapshotFile",
@@ -118,6 +125,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "Failure",
         "InvalidJson",
         "OversizedFrame",
+        "IpcReadFailed",
+        "IpcWriteFailed",
+        "MalformedIpcFrame",
+        "IncompleteIpcFrame",
         "UnsafeFlag",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
@@ -130,6 +141,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "parse_control_plane_message_frame_bytes",
         "execute_control_plane_message_frame_bytes",
         "serialize_control_plane_message_response_frame_bytes",
+        "read_control_plane_message_ipc_frame",
+        "write_control_plane_message_ipc_frame",
+        "execute_control_plane_message_ipc_stream",
         "command_kind",
         "output_snapshot_schema",
     ]
@@ -155,9 +169,14 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         ' "runtime_control_plane_frame.v0";' in " ".join(lib_rs.split())
     )
     assert (
+        "pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_ipc.v0";' in " ".join(lib_rs.split())
+    )
+    assert (
         "pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_message.v0";' in " ".join(lib_rs.split())
     )
+    assert "pub const RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES: usize = 4;" in lib_rs
     assert "fn validate_coarse_id(" in lib_rs
     assert "fn validate_control_plane_request_id(" in lib_rs
     assert "RuntimeIdError::RawIdentifier" in lib_rs
@@ -323,6 +342,8 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub fn max_bytes(&self) -> u64" in lib_rs
     assert "pub struct RuntimeControlPlaneFramePolicy" in lib_rs
     assert "pub max_frame_bytes: usize" in lib_rs
+    assert "pub struct RuntimeControlPlaneIpcPolicy" in lib_rs
+    assert "pub frame_policy: RuntimeControlPlaneFramePolicy" in lib_rs
     assert "pub struct RuntimeControlPlaneFrameAdapterContract" in lib_rs
     assert "pub payload_schema_version: &'static str" in lib_rs
     assert "pub caller_provided_bytes_only: bool" in lib_rs
@@ -335,9 +356,21 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub storage_provider_enabled: bool" in lib_rs
     assert "pub capture_enabled: bool" in lib_rs
     assert "pub native_inference_execution_enabled: bool" in lib_rs
+    assert "pub struct RuntimeControlPlaneIpcAdapterContract" in lib_rs
+    assert "pub frame_schema_version: &'static str" in lib_rs
+    assert "pub message_schema_version: &'static str" in lib_rs
+    assert "pub length_prefix_bytes: usize" in lib_rs
+    assert "pub caller_provided_streams_only: bool" in lib_rs
+    assert "pub one_shot_request_response: bool" in lib_rs
+    assert "pub big_endian_length_prefix_required: bool" in lib_rs
+    assert "pub stream_io_enabled: bool" in lib_rs
+    assert "pub filesystem_socket_path_policy_enabled: bool" in lib_rs
+    assert "impl RuntimeControlPlaneIpcAdapterContract" in lib_rs
     assert "impl RuntimeControlPlaneFrameAdapterContract" in lib_rs
     assert "impl RuntimeControlPlaneFramePolicy" in lib_rs
+    assert "impl RuntimeControlPlaneIpcPolicy" in lib_rs
     assert "impl Default for RuntimeControlPlaneFramePolicy" in lib_rs
+    assert "#[derive(Clone, Debug, Default, Eq, PartialEq)]" in lib_rs
     assert (
         "pub fn new(max_frame_bytes: usize) -> "
         "Result<Self, RuntimeControlPlaneAdapterError>" in lib_rs
@@ -353,6 +386,10 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub fn parse_control_plane_message_frame_bytes(" in lib_rs
     assert "pub fn execute_control_plane_message_frame_bytes(" in lib_rs
     assert "pub fn serialize_control_plane_message_response_frame_bytes(" in lib_rs
+    assert "pub fn read_control_plane_message_ipc_frame" in lib_rs
+    assert "pub fn write_control_plane_message_ipc_frame" in lib_rs
+    assert "pub fn execute_control_plane_message_ipc_stream" in lib_rs
+    assert "fn read_exact_control_plane_ipc" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
     assert "pub fn command_kind(&self) -> &'static str" in lib_rs
@@ -420,6 +457,10 @@ def test_rust_core_exposes_control_plane_message_envelope_shape() -> None:
         '"invalid_json"',
         '"non_object_root"',
         '"oversized_frame"',
+        '"ipc_read_failed"',
+        '"ipc_write_failed"',
+        '"malformed_ipc_frame"',
+        '"incomplete_ipc_frame"',
         '"unsupported_schema_version"',
         '"unsupported_value"',
         '"unsafe_flag"',
@@ -473,19 +514,22 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     expected_values = [
         '"runtime_control_plane_adapter.v0"',
+        '"runtime_control_plane_ipc.v0"',
         '"runtime_control_plane_frame.v0"',
         '"runtime_control_plane_message.v0"',
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"local_control_plane_frame_adapter"',
-        '"accepted_local_message_frame"',
-        '"local_message_frame_available"',
+        '"local_control_plane_ipc_stream_adapter"',
+        '"accepted_local_ipc_stream"',
+        '"local_ipc_stream_available"',
         '"not_arbitrary_file_loader"',
         '"not_file_watcher"',
-        '"not_ipc_or_socket_transport"',
         '"not_live_transport"',
-        '"not_message_transport"',
+        '"not_socket_listener"',
+        '"not_daemon_lifecycle"',
+        '"not_filesystem_socket_path_policy"',
+        '"not_process_spawner"',
         '"not_qt_binding"',
         '"not_external_service"',
         '"not_deployment_approval"',
@@ -497,12 +541,12 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     assert (
         "adapter_kind: RuntimeControlPlaneAdapterKind::"
-        "LocalControlPlaneFrameAdapter" in " ".join(lib_rs.split())
+        "LocalControlPlaneIpcStreamAdapter" in " ".join(lib_rs.split())
     )
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalMessageFrame" in " ".join(
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalIpcStream" in " ".join(
         lib_rs.split()
     )
-    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalMessageFrameAvailable" in " ".join(
+    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalIpcStreamAvailable" in " ".join(
         lib_rs.split()
     )
     assert (
@@ -529,12 +573,44 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     assert [
         schema.strip() for schema in accepted_schema_block.group(1).split(",") if schema.strip()
     ] == [
+        "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_SUMMARY_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCHEMA_VERSION",
     ]
+
+    ipc_expected_values = [
+        "RuntimeControlPlaneIpcAdapterContract",
+        "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES",
+        "caller_provided_streams_only: true",
+        "one_shot_request_response: true",
+        "big_endian_length_prefix_required: true",
+        "stream_io_enabled: true",
+        "socket_listener_enabled: false",
+        "filesystem_socket_path_policy_enabled: false",
+        "daemon_lifecycle_enabled: false",
+        "process_spawning_enabled: false",
+        "file_watching_enabled: false",
+        "qt_binding_enabled: false",
+        "storage_provider_enabled: false",
+        "capture_enabled: false",
+        "external_services_used: false",
+        "deployment_allowed: false",
+        "native_inference_execution_enabled: false",
+        '"not_public_network_transport"',
+        '"not_socket_listener"',
+        '"not_daemon_lifecycle"',
+        '"not_filesystem_socket_path_policy"',
+        '"not_process_spawner"',
+        '"not_file_watcher"',
+        '"not_storage_provider"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+    ]
+    for value in ipc_expected_values:
+        assert value in lib_rs
 
 
 def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot() -> None:
@@ -631,7 +707,6 @@ def test_rust_core_source_stays_local_contract_only() -> None:
         "tcpstream",
         "udp",
         "std::net",
-        "std::io",
         "file::open",
         "read_to_string",
         "from_reader",
@@ -661,14 +736,19 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     for term in forbidden_terms:
         assert term not in lowered
 
+    rust_without_allowed_io_import = rust_source.replace("use std::io::{Read, Write};", "")
+    assert "std::io::" not in rust_without_allowed_io_import.lower()
     assert "serde" in lowered
     assert "serde_json::from_str" in rust_source
     assert "serde_json::from_value" not in rust_source
     assert "std::fs" in rust_source
+    assert "use std::io::{Read, Write};" in rust_source
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
     assert "RuntimeControlPlaneFramePolicy" in rust_source
+    assert "RuntimeControlPlaneIpcPolicy" in rust_source
     assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
+    assert "RuntimeControlPlaneIpcAdapterContract" in rust_source
     assert "RuntimeControlPlaneCommand" in rust_source
     assert "RuntimeControlPlaneMessageRequest" in rust_source
     assert "RuntimeControlPlaneMessageResponse" in rust_source
@@ -676,6 +756,9 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "parse_control_plane_message_frame_bytes" in rust_source
     assert "execute_control_plane_message_frame_bytes" in rust_source
     assert "serialize_control_plane_message_response_frame_bytes" in rust_source
+    assert "read_control_plane_message_ipc_frame" in rust_source
+    assert "write_control_plane_message_ipc_frame" in rust_source
+    assert "execute_control_plane_message_ipc_stream" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
     assert "execute_local_command" in rust_source
     assert "parse_control_plane_message_request_json" in rust_source
@@ -684,6 +767,8 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION" in rust_source
     assert re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", rust_source) is None
     assert re.search(r"\b[A-Za-z0-9.-]+\.(?:com|net|org|io)\b", rust_source) is None
@@ -727,6 +812,13 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "parse_control_plane_message_frame_bytes",
         "execute_control_plane_message_frame_bytes",
         "serialize_control_plane_message_response_frame_bytes",
+        "runtime_control_plane_ipc.v0",
+        "RuntimeControlPlaneIpcPolicy",
+        "RuntimeControlPlaneIpcAdapterContract",
+        "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES",
+        "read_control_plane_message_ipc_frame",
+        "write_control_plane_message_ipc_frame",
+        "execute_control_plane_message_ipc_stream",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
         "runtime_control_plane_message.v0",
@@ -739,7 +831,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
-        "accepted local message and handoff schemas",
+        "accepted local IPC, frame, message, and handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
         "bounded local file adapter is now enabled",
         "typed local command dispatcher",
@@ -774,10 +866,13 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",
-        "local IPC/control-plane adapter",
+        "bounded runtime_control_plane_ipc.v0 connected-stream adapter",
+        "local OS endpoint/listener policy",
         "does not implement a daemon",
         "not arbitrary file loading",
         "not file watching",
+        "no socket listener",
+        "no filesystem socket path policy",
         "does not require Rust tooling for `make verify`",
         "make verify-rust-core",
         "Qt workstation data-flow integration",
