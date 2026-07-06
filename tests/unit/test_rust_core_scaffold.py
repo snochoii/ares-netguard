@@ -49,6 +49,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
@@ -79,8 +80,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneOutputSnapshotSchema",
         "RuntimeControlPlaneFramePolicy",
         "RuntimeControlPlaneIpcPolicy",
+        "RuntimeControlPlaneEndpointPolicy",
         "RuntimeControlPlaneFrameAdapterContract",
         "RuntimeControlPlaneIpcAdapterContract",
+        "RuntimeControlPlaneEndpointAdapterContract",
+        "RuntimeControlPlaneEndpointKind",
         "RuntimeControlPlaneFilePolicy",
         "RuntimeControlPlaneCommand",
         "RuntimeControlPlaneRequestId",
@@ -107,17 +111,21 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "LocalControlPlaneMessageEnvelope",
         "LocalControlPlaneFrameAdapter",
         "LocalControlPlaneIpcStreamAdapter",
+        "LocalControlPlaneEndpointPolicy",
         "AcceptedSchemaDeclarationOnly",
         "AcceptedLocalJsonString",
         "AcceptedLocalJsonFile",
         "AcceptedLocalMessageEnvelope",
         "AcceptedLocalMessageFrame",
         "AcceptedLocalIpcStream",
+        "AcceptedLocalEndpointPolicy",
         "JsonStringParserAvailable",
         "LocalFileAdapterAvailable",
         "LocalMessageEnvelopeAvailable",
         "LocalMessageFrameAvailable",
         "LocalIpcStreamAvailable",
+        "LocalEndpointPolicyAvailable",
+        "CallerProvidedConnectedStream",
         "RuntimeHandoffSnapshotV0",
         "ParseHandoffSnapshotJson",
         "ParseHandoffSnapshotFile",
@@ -144,6 +152,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "read_control_plane_message_ipc_frame",
         "write_control_plane_message_ipc_frame",
         "execute_control_plane_message_ipc_stream",
+        "execute_control_plane_endpoint_stream",
+        "validate_control_plane_endpoint_policy",
         "command_kind",
         "output_snapshot_schema",
     ]
@@ -167,6 +177,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_frame.v0";' in " ".join(lib_rs.split())
+    )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_endpoint.v0";' in " ".join(lib_rs.split())
     )
     assert (
         "pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str ="
@@ -357,6 +371,18 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub capture_enabled: bool" in lib_rs
     assert "pub native_inference_execution_enabled: bool" in lib_rs
     assert "pub struct RuntimeControlPlaneIpcAdapterContract" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointPolicy" in lib_rs
+    assert "pub endpoint_kind: RuntimeControlPlaneEndpointKind" in lib_rs
+    assert "pub ipc_policy: RuntimeControlPlaneIpcPolicy" in lib_rs
+    assert "pub public_network_transport_enabled: bool" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointAdapterContract" in lib_rs
+    assert "pub ipc_schema_version: &'static str" in lib_rs
+    assert "pub endpoint_policy_validation_enabled: bool" in lib_rs
+    assert "pub connected_stream_execution_enabled: bool" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointKind" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointAdapterContract" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointPolicy" in lib_rs
+    assert "impl Default for RuntimeControlPlaneEndpointPolicy" in lib_rs
     assert "pub frame_schema_version: &'static str" in lib_rs
     assert "pub message_schema_version: &'static str" in lib_rs
     assert "pub length_prefix_bytes: usize" in lib_rs
@@ -389,7 +415,9 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub fn read_control_plane_message_ipc_frame" in lib_rs
     assert "pub fn write_control_plane_message_ipc_frame" in lib_rs
     assert "pub fn execute_control_plane_message_ipc_stream" in lib_rs
+    assert "pub fn execute_control_plane_endpoint_stream" in lib_rs
     assert "fn read_exact_control_plane_ipc" in lib_rs
+    assert "fn validate_control_plane_endpoint_policy" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
     assert "pub fn command_kind(&self) -> &'static str" in lib_rs
@@ -514,15 +542,16 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     expected_values = [
         '"runtime_control_plane_adapter.v0"',
+        '"runtime_control_plane_endpoint.v0"',
         '"runtime_control_plane_ipc.v0"',
         '"runtime_control_plane_frame.v0"',
         '"runtime_control_plane_message.v0"',
         '"runtime_handoff_snapshot.v0"',
         '"runtime_summary.v0"',
         '"model_registry_metadata.v0"',
-        '"local_control_plane_ipc_stream_adapter"',
-        '"accepted_local_ipc_stream"',
-        '"local_ipc_stream_available"',
+        '"local_control_plane_endpoint_policy"',
+        '"accepted_local_endpoint_policy"',
+        '"local_endpoint_policy_available"',
         '"not_arbitrary_file_loader"',
         '"not_file_watcher"',
         '"not_live_transport"',
@@ -541,13 +570,14 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
 
     assert (
         "adapter_kind: RuntimeControlPlaneAdapterKind::"
-        "LocalControlPlaneIpcStreamAdapter" in " ".join(lib_rs.split())
+        "LocalControlPlaneEndpointPolicy" in " ".join(lib_rs.split())
     )
-    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalIpcStream" in " ".join(
+    assert "input_mode: RuntimeControlPlaneInputMode::AcceptedLocalEndpointPolicy" in " ".join(
         lib_rs.split()
     )
-    assert "adapter_state: RuntimeControlPlaneAdapterState::LocalIpcStreamAvailable" in " ".join(
-        lib_rs.split()
+    assert (
+        "adapter_state: RuntimeControlPlaneAdapterState::LocalEndpointPolicyAvailable"
+        in " ".join(lib_rs.split())
     )
     assert (
         "output_snapshot_schema: RuntimeControlPlaneOutputSnapshotSchema::"
@@ -573,6 +603,7 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     assert [
         schema.strip() for schema in accepted_schema_block.group(1).split(",") if schema.strip()
     ] == [
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION",
@@ -610,6 +641,36 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
         '"not_external_service"',
     ]
     for value in ipc_expected_values:
+        assert value in lib_rs
+
+    endpoint_expected_values = [
+        "RuntimeControlPlaneEndpointPolicy",
+        "RuntimeControlPlaneEndpointAdapterContract",
+        "RuntimeControlPlaneEndpointKind",
+        "CallerProvidedConnectedStream",
+        "caller_provided_connected_stream",
+        "endpoint_kind: RuntimeControlPlaneEndpointKind::CallerProvidedConnectedStream",
+        "endpoint_policy_validation_enabled: true",
+        "connected_stream_execution_enabled: true",
+        "public_network_transport_enabled: false",
+        "socket_listener_enabled: false",
+        "filesystem_socket_path_policy_enabled: false",
+        "daemon_lifecycle_enabled: false",
+        "process_spawning_enabled: false",
+        "file_watching_enabled: false",
+        "qt_binding_enabled: false",
+        "storage_provider_enabled: false",
+        "capture_enabled: false",
+        "external_services_used: false",
+        "deployment_allowed: false",
+        "native_inference_execution_enabled: false",
+        "execute_control_plane_endpoint_stream",
+        "validate_control_plane_endpoint_policy",
+        '"not_public_network_transport"',
+        '"not_filesystem_socket_path_policy"',
+        '"not_native_runtime_execution"',
+    ]
+    for value in endpoint_expected_values:
         assert value in lib_rs
 
 
@@ -747,8 +808,10 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeControlPlaneFilePolicy" in rust_source
     assert "RuntimeControlPlaneFramePolicy" in rust_source
     assert "RuntimeControlPlaneIpcPolicy" in rust_source
+    assert "RuntimeControlPlaneEndpointPolicy" in rust_source
     assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
     assert "RuntimeControlPlaneIpcAdapterContract" in rust_source
+    assert "RuntimeControlPlaneEndpointAdapterContract" in rust_source
     assert "RuntimeControlPlaneCommand" in rust_source
     assert "RuntimeControlPlaneMessageRequest" in rust_source
     assert "RuntimeControlPlaneMessageResponse" in rust_source
@@ -759,6 +822,8 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "read_control_plane_message_ipc_frame" in rust_source
     assert "write_control_plane_message_ipc_frame" in rust_source
     assert "execute_control_plane_message_ipc_stream" in rust_source
+    assert "execute_control_plane_endpoint_stream" in rust_source
+    assert "validate_control_plane_endpoint_policy" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
     assert "execute_local_command" in rust_source
     assert "parse_control_plane_message_request_json" in rust_source
@@ -767,6 +832,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION" in rust_source
@@ -812,6 +878,12 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "parse_control_plane_message_frame_bytes",
         "execute_control_plane_message_frame_bytes",
         "serialize_control_plane_message_response_frame_bytes",
+        "runtime_control_plane_endpoint.v0",
+        "RuntimeControlPlaneEndpointPolicy",
+        "RuntimeControlPlaneEndpointAdapterContract",
+        "RuntimeControlPlaneEndpointKind",
+        "execute_control_plane_endpoint_stream",
+        "validate_control_plane_endpoint_policy",
         "runtime_control_plane_ipc.v0",
         "RuntimeControlPlaneIpcPolicy",
         "RuntimeControlPlaneIpcAdapterContract",
@@ -831,7 +903,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "static model_registry_metadata.v0 handoff",
         "static runtime_handoff_snapshot.v0 handoff",
         "static runtime_control_plane_adapter.v0 contract",
-        "accepted local IPC, frame, message, and handoff schemas",
+        "accepted local endpoint, IPC, frame, message, and handoff schemas",
         "JSON-string parsing is now enabled through `serde` and `serde_json`",
         "bounded local file adapter is now enabled",
         "typed local command dispatcher",
@@ -867,7 +939,8 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",
         "bounded runtime_control_plane_ipc.v0 connected-stream adapter",
-        "local OS endpoint/listener policy",
+        "bounded runtime_control_plane_endpoint.v0 endpoint policy",
+        "future OS-local listener/path binding implementation",
         "does not implement a daemon",
         "not arbitrary file loading",
         "not file watching",

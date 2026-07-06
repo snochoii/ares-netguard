@@ -10,6 +10,7 @@ pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
+pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str = "runtime_control_plane_endpoint.v0";
 pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str = "runtime_control_plane_frame.v0";
 pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str = "runtime_control_plane_ipc.v0";
 pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
@@ -157,6 +158,7 @@ pub enum RuntimeControlPlaneAdapterKind {
     LocalControlPlaneMessageEnvelope,
     LocalControlPlaneFrameAdapter,
     LocalControlPlaneIpcStreamAdapter,
+    LocalControlPlaneEndpointPolicy,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -168,6 +170,7 @@ pub enum RuntimeControlPlaneInputMode {
     AcceptedLocalMessageEnvelope,
     AcceptedLocalMessageFrame,
     AcceptedLocalIpcStream,
+    AcceptedLocalEndpointPolicy,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -179,6 +182,12 @@ pub enum RuntimeControlPlaneAdapterState {
     LocalMessageEnvelopeAvailable,
     LocalMessageFrameAvailable,
     LocalIpcStreamAvailable,
+    LocalEndpointPolicyAvailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneEndpointKind {
+    CallerProvidedConnectedStream,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -302,6 +311,27 @@ pub struct RuntimeControlPlaneIpcPolicy {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointPolicy {
+    pub schema_version: &'static str,
+    pub endpoint_kind: RuntimeControlPlaneEndpointKind,
+    pub ipc_policy: RuntimeControlPlaneIpcPolicy,
+    pub local_only: bool,
+    pub caller_provided_streams_only: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuntimeControlPlaneFrameAdapterContract {
     pub schema_version: &'static str,
     pub payload_schema_version: &'static str,
@@ -338,6 +368,32 @@ pub struct RuntimeControlPlaneIpcAdapterContract {
     pub additional_dependencies_required: bool,
     pub stream_io_enabled: bool,
     pub live_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub filesystem_socket_path_policy_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointAdapterContract {
+    pub schema_version: &'static str,
+    pub ipc_schema_version: &'static str,
+    pub frame_schema_version: &'static str,
+    pub message_schema_version: &'static str,
+    pub endpoint_kind: RuntimeControlPlaneEndpointKind,
+    pub local_only: bool,
+    pub caller_provided_streams_only: bool,
+    pub endpoint_policy_validation_enabled: bool,
+    pub connected_stream_execution_enabled: bool,
+    pub public_network_transport_enabled: bool,
     pub socket_listener_enabled: bool,
     pub filesystem_socket_path_policy_enabled: bool,
     pub daemon_lifecycle_enabled: bool,
@@ -618,6 +674,7 @@ impl RuntimeControlPlaneAdapterKind {
             Self::LocalControlPlaneMessageEnvelope => "local_control_plane_message_envelope",
             Self::LocalControlPlaneFrameAdapter => "local_control_plane_frame_adapter",
             Self::LocalControlPlaneIpcStreamAdapter => "local_control_plane_ipc_stream_adapter",
+            Self::LocalControlPlaneEndpointPolicy => "local_control_plane_endpoint_policy",
         }
     }
 }
@@ -631,6 +688,7 @@ impl RuntimeControlPlaneInputMode {
             Self::AcceptedLocalMessageEnvelope => "accepted_local_message_envelope",
             Self::AcceptedLocalMessageFrame => "accepted_local_message_frame",
             Self::AcceptedLocalIpcStream => "accepted_local_ipc_stream",
+            Self::AcceptedLocalEndpointPolicy => "accepted_local_endpoint_policy",
         }
     }
 }
@@ -644,6 +702,15 @@ impl RuntimeControlPlaneAdapterState {
             Self::LocalMessageEnvelopeAvailable => "local_message_envelope_available",
             Self::LocalMessageFrameAvailable => "local_message_frame_available",
             Self::LocalIpcStreamAvailable => "local_ipc_stream_available",
+            Self::LocalEndpointPolicyAvailable => "local_endpoint_policy_available",
+        }
+    }
+}
+
+impl RuntimeControlPlaneEndpointKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CallerProvidedConnectedStream => "caller_provided_connected_stream",
         }
     }
 }
@@ -807,9 +874,9 @@ impl RuntimeControlPlaneAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
             schema_version: RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION,
-            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneIpcStreamAdapter,
-            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalIpcStream,
-            adapter_state: RuntimeControlPlaneAdapterState::LocalIpcStreamAvailable,
+            adapter_kind: RuntimeControlPlaneAdapterKind::LocalControlPlaneEndpointPolicy,
+            input_mode: RuntimeControlPlaneInputMode::AcceptedLocalEndpointPolicy,
+            adapter_state: RuntimeControlPlaneAdapterState::LocalEndpointPolicyAvailable,
             output_snapshot_schema:
                 RuntimeControlPlaneOutputSnapshotSchema::RuntimeHandoffSnapshotV0,
             accepted_input_schemas: RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS,
@@ -1013,6 +1080,35 @@ impl RuntimeControlPlaneIpcAdapterContract {
     }
 }
 
+impl RuntimeControlPlaneEndpointAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+            ipc_schema_version: RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
+            frame_schema_version: RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
+            message_schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            endpoint_kind: RuntimeControlPlaneEndpointKind::CallerProvidedConnectedStream,
+            local_only: true,
+            caller_provided_streams_only: true,
+            endpoint_policy_validation_enabled: true,
+            connected_stream_execution_enabled: true,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_CONTROL_PLANE_ENDPOINT_NON_CLAIMS,
+        }
+    }
+}
+
 impl Default for RuntimeControlPlaneFramePolicy {
     fn default() -> Self {
         Self {
@@ -1043,6 +1139,44 @@ impl RuntimeControlPlaneIpcPolicy {
 
     pub fn max_frame_bytes(&self) -> usize {
         self.frame_policy.max_bytes()
+    }
+}
+
+impl Default for RuntimeControlPlaneEndpointPolicy {
+    fn default() -> Self {
+        Self::caller_provided_connected_stream(RuntimeControlPlaneIpcPolicy::default())
+    }
+}
+
+impl RuntimeControlPlaneEndpointPolicy {
+    pub fn caller_provided_connected_stream(ipc_policy: RuntimeControlPlaneIpcPolicy) -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+            endpoint_kind: RuntimeControlPlaneEndpointKind::CallerProvidedConnectedStream,
+            ipc_policy,
+            local_only: true,
+            caller_provided_streams_only: true,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            filesystem_socket_path_policy_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_control_plane_endpoint_policy(self)
+    }
+
+    pub fn max_frame_bytes(&self) -> usize {
+        self.ipc_policy.max_frame_bytes()
     }
 }
 
@@ -1126,6 +1260,15 @@ pub fn execute_control_plane_message_ipc_stream<R: Read, W: Write>(
             &policy.frame_policy,
         )?;
     write_control_plane_message_ipc_frame(writer, &response_frame, policy)
+}
+
+pub fn execute_control_plane_endpoint_stream<R: Read, W: Write>(
+    reader: &mut R,
+    writer: &mut W,
+    policy: &RuntimeControlPlaneEndpointPolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    execute_control_plane_message_ipc_stream(reader, writer, &policy.ipc_policy)
 }
 
 impl RuntimeControlPlaneFilePolicy {
@@ -1267,6 +1410,88 @@ fn validate_control_plane_frame_bytes<'a>(
         });
     }
     std::str::from_utf8(frame).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)
+}
+
+fn validate_control_plane_endpoint_policy(
+    policy: &RuntimeControlPlaneEndpointPolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "endpoint.schema_version",
+        policy.schema_version,
+        RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+    )?;
+    match policy.endpoint_kind {
+        RuntimeControlPlaneEndpointKind::CallerProvidedConnectedStream => {}
+    }
+    if policy.ipc_policy.frame_policy.max_frame_bytes == 0
+        || policy.ipc_policy.frame_policy.max_frame_bytes > RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "endpoint.ipc_policy.frame_policy.max_frame_bytes",
+        });
+    }
+    validate_required_flag("endpoint.local_only", policy.local_only, true)?;
+    validate_required_flag(
+        "endpoint.caller_provided_streams_only",
+        policy.caller_provided_streams_only,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint.public_network_transport_enabled",
+        policy.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.socket_listener_enabled",
+        policy.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.filesystem_socket_path_policy_enabled",
+        policy.filesystem_socket_path_policy_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.daemon_lifecycle_enabled",
+        policy.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.process_spawning_enabled",
+        policy.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.file_watching_enabled",
+        policy.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.qt_binding_enabled",
+        policy.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.storage_provider_enabled",
+        policy.storage_provider_enabled,
+        false,
+    )?;
+    validate_required_flag("endpoint.capture_enabled", policy.capture_enabled, false)?;
+    validate_required_flag(
+        "endpoint.external_services_used",
+        policy.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.deployment_allowed",
+        policy.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint.native_inference_execution_enabled",
+        policy.native_inference_execution_enabled,
+        false,
+    )
 }
 
 fn read_exact_control_plane_ipc<R: Read>(
@@ -1763,6 +1988,7 @@ fn validate_control_plane_request_id(value: &str) -> Result<(), RuntimeControlPl
 }
 
 const RUNTIME_CONTROL_PLANE_ADAPTER_ACCEPTED_SCHEMAS: &[&str] = &[
+    RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
     RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
@@ -1808,6 +2034,21 @@ const RUNTIME_CONTROL_PLANE_IPC_NON_CLAIMS: &[&str] = &[
     "not_socket_listener",
     "not_daemon_lifecycle",
     "not_filesystem_socket_path_policy",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_storage_provider",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_CONTROL_PLANE_ENDPOINT_NON_CLAIMS: &[&str] = &[
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_filesystem_socket_path_policy",
+    "not_daemon_lifecycle",
     "not_process_spawner",
     "not_file_watcher",
     "not_qt_binding",
@@ -2499,6 +2740,26 @@ mod tests {
         (result, writer)
     }
 
+    fn execute_endpoint_frame_bytes(
+        frame: &[u8],
+    ) -> (Result<(), RuntimeControlPlaneAdapterError>, Vec<u8>) {
+        execute_endpoint_frame_bytes_with_policy(
+            frame,
+            &RuntimeControlPlaneEndpointPolicy::default(),
+        )
+    }
+
+    fn execute_endpoint_frame_bytes_with_policy(
+        frame: &[u8],
+        policy: &RuntimeControlPlaneEndpointPolicy,
+    ) -> (Result<(), RuntimeControlPlaneAdapterError>, Vec<u8>) {
+        let input = ipc_frame_bytes(frame);
+        let mut reader = input.as_slice();
+        let mut writer = Vec::new();
+        let result = execute_control_plane_endpoint_stream(&mut reader, &mut writer, policy);
+        (result, writer)
+    }
+
     fn remove_temp_root(root: &Path) {
         let _ = std::fs::remove_dir_all(root);
     }
@@ -2683,12 +2944,15 @@ mod tests {
         );
         assert_eq!(
             contract.adapter_kind.as_str(),
-            "local_control_plane_ipc_stream_adapter"
+            "local_control_plane_endpoint_policy"
         );
-        assert_eq!(contract.input_mode.as_str(), "accepted_local_ipc_stream");
+        assert_eq!(
+            contract.input_mode.as_str(),
+            "accepted_local_endpoint_policy"
+        );
         assert_eq!(
             contract.adapter_state.as_str(),
-            "local_ipc_stream_available"
+            "local_endpoint_policy_available"
         );
         assert_eq!(
             contract.output_snapshot_schema.as_str(),
@@ -2697,6 +2961,7 @@ mod tests {
         assert_eq!(
             contract.accepted_input_schemas,
             &[
+                RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
                 RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
@@ -2783,6 +3048,65 @@ mod tests {
                 "not_socket_listener",
                 "not_daemon_lifecycle",
                 "not_filesystem_socket_path_policy",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_storage_provider",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_control_plane_endpoint_adapter_contract_fixture() {
+        let contract = RuntimeControlPlaneEndpointAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.ipc_schema_version,
+            RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.frame_schema_version,
+            RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.message_schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.endpoint_kind.as_str(),
+            "caller_provided_connected_stream"
+        );
+        assert!(contract.local_only);
+        assert!(contract.caller_provided_streams_only);
+        assert!(contract.endpoint_policy_validation_enabled);
+        assert!(contract.connected_stream_execution_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.filesystem_socket_path_policy_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_public_network_transport",
+                "not_socket_listener",
+                "not_filesystem_socket_path_policy",
+                "not_daemon_lifecycle",
                 "not_process_spawner",
                 "not_file_watcher",
                 "not_qt_binding",
@@ -2889,6 +3213,45 @@ mod tests {
         let frame_policy = RuntimeControlPlaneFramePolicy::new(1024).unwrap();
         let ipc_policy = RuntimeControlPlaneIpcPolicy::new(frame_policy);
         assert_eq!(ipc_policy.max_frame_bytes(), 1024);
+    }
+
+    #[test]
+    fn exposes_bounded_runtime_control_plane_endpoint_policy() {
+        let policy = RuntimeControlPlaneEndpointPolicy::default();
+
+        assert_eq!(
+            policy.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            policy.endpoint_kind.as_str(),
+            "caller_provided_connected_stream"
+        );
+        assert_eq!(
+            policy.max_frame_bytes(),
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+        assert!(policy.local_only);
+        assert!(policy.caller_provided_streams_only);
+        assert!(!policy.public_network_transport_enabled);
+        assert!(!policy.socket_listener_enabled);
+        assert!(!policy.filesystem_socket_path_policy_enabled);
+        assert!(!policy.daemon_lifecycle_enabled);
+        assert!(!policy.process_spawning_enabled);
+        assert!(!policy.file_watching_enabled);
+        assert!(!policy.qt_binding_enabled);
+        assert!(!policy.storage_provider_enabled);
+        assert!(!policy.capture_enabled);
+        assert!(!policy.external_services_used);
+        assert!(!policy.deployment_allowed);
+        assert!(!policy.native_inference_execution_enabled);
+        policy.validate().unwrap();
+
+        let frame_policy = RuntimeControlPlaneFramePolicy::new(1024).unwrap();
+        let ipc_policy = RuntimeControlPlaneIpcPolicy::new(frame_policy);
+        let endpoint_policy =
+            RuntimeControlPlaneEndpointPolicy::caller_provided_connected_stream(ipc_policy);
+        assert_eq!(endpoint_policy.max_frame_bytes(), 1024);
     }
 
     #[test]
@@ -3194,6 +3557,39 @@ mod tests {
     }
 
     #[test]
+    fn dispatches_runtime_control_plane_json_message_endpoint_stream() {
+        let request_json =
+            json_message_request("request-endpoint-json-001", synthetic_handoff_json());
+        let (result, response_bytes) = execute_endpoint_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let from_endpoint = response_from_ipc_bytes(&response_bytes);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+
+        assert_eq!(from_endpoint, from_frame);
+        assert_eq!(
+            from_endpoint.request_id.as_str(),
+            "request-endpoint-json-001"
+        );
+        assert_eq!(
+            from_endpoint.outcome,
+            RuntimeControlPlaneMessageOutcome::Success
+        );
+        assert_eq!(
+            from_endpoint
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .runtime_summary
+                .workspace_id
+                .as_str(),
+            "fixture-workspace-alpha"
+        );
+    }
+
+    #[test]
     fn dispatches_runtime_control_plane_file_message_ipc_stream() {
         let root = temp_policy_root("valid-file-ipc");
         let path = write_test_file(
@@ -3215,6 +3611,46 @@ mod tests {
         assert_eq!(from_ipc.outcome, RuntimeControlPlaneMessageOutcome::Success);
         assert_eq!(
             from_ipc
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .model_registry_metadata
+                .entries[9]
+                .model_id,
+            "time_series_residual"
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn dispatches_runtime_control_plane_file_message_endpoint_stream() {
+        let root = temp_policy_root("valid-file-endpoint");
+        let path = write_test_file(
+            &root,
+            "runtime_handoff_snapshot.json",
+            synthetic_handoff_json(),
+        );
+        let request_json = file_message_request("request-endpoint-file-001", &path, &root);
+        let (result, response_bytes) = execute_endpoint_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let from_endpoint = response_from_ipc_bytes(&response_bytes);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+
+        assert_eq!(from_endpoint, from_frame);
+        assert_eq!(
+            from_endpoint.request_id.as_str(),
+            "request-endpoint-file-001"
+        );
+        assert_eq!(
+            from_endpoint.outcome,
+            RuntimeControlPlaneMessageOutcome::Success
+        );
+        assert_eq!(
+            from_endpoint
                 .snapshot
                 .as_ref()
                 .unwrap()
@@ -3340,6 +3776,23 @@ mod tests {
     }
 
     #[test]
+    fn endpoint_stream_returns_failure_response_for_valid_request_execution_errors() {
+        let request_json = json_message_request("request-endpoint-006", "{");
+        let (result, response_bytes) = execute_endpoint_frame_bytes(request_json.as_bytes());
+
+        result.unwrap();
+        let response = response_from_ipc_bytes(&response_bytes);
+
+        assert_eq!(response.request_id.as_str(), "request-endpoint-006");
+        assert_eq!(response.outcome, RuntimeControlPlaneMessageOutcome::Failure);
+        assert!(response.snapshot.is_none());
+        assert_eq!(
+            response.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidJson)
+        );
+    }
+
+    #[test]
     fn message_ipc_stream_parse_failures_return_adapter_errors_without_responses() {
         let invalid_schema =
             json_message_request("request-ipc-parse-001", synthetic_handoff_json()).replacen(
@@ -3364,6 +3817,37 @@ mod tests {
             result.unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
                 field: "request_id",
+            }
+        );
+        assert!(response_bytes.is_empty());
+    }
+
+    #[test]
+    fn endpoint_policy_parse_failures_return_adapter_errors_without_responses() {
+        let request_json =
+            json_message_request("request-endpoint-policy-001", synthetic_handoff_json());
+
+        let mut unsafe_policy = RuntimeControlPlaneEndpointPolicy::default();
+        unsafe_policy.socket_listener_enabled = true;
+        let (result, response_bytes) =
+            execute_endpoint_frame_bytes_with_policy(request_json.as_bytes(), &unsafe_policy);
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint.socket_listener_enabled",
+            }
+        );
+        assert!(response_bytes.is_empty());
+
+        let mut drifted_policy = RuntimeControlPlaneEndpointPolicy::default();
+        drifted_policy.schema_version = "runtime_control_plane_endpoint.v1";
+        let (result, response_bytes) =
+            execute_endpoint_frame_bytes_with_policy(request_json.as_bytes(), &drifted_policy);
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "endpoint.schema_version",
+                expected: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
             }
         );
         assert!(response_bytes.is_empty());

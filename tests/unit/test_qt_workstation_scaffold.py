@@ -290,7 +290,13 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "write_control_plane_message_ipc_frame",
         "execute_control_plane_message_ipc_stream",
         "bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime",
-        "future OS-local endpoint/listener policy from the Rust runtime",
+        "runtime_control_plane_endpoint.v0",
+        "bounded `runtime_control_plane_endpoint.v0` endpoint policy",
+        "caller-provided connected stream endpoint kind",
+        "strict endpoint policy validation",
+        "execute_control_plane_endpoint_stream",
+        "bounded runtime_control_plane_endpoint.v0 endpoint policy in the Rust runtime",
+        "future OS-local listener/path binding implementation from the Rust runtime",
         "perform file I/O",
         "open IPC",
         "bind to live runtime state",
@@ -321,7 +327,9 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "byte-frame adapter",
         "runtime_control_plane_ipc.v0",
         "connected-stream adapter",
-        "future OS-local endpoint/listener policy from the Rust runtime",
+        "runtime_control_plane_endpoint.v0",
+        "endpoint policy",
+        "future OS-local listener/path binding implementation from the Rust runtime",
     ]
     for text in expected_text:
         assert text in normalized_strategy
