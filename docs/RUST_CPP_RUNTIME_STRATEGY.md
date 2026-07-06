@@ -62,8 +62,8 @@ is now enabled through `serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
 unsupported schema versions and enum values, validates coarse runtime IDs,
-enforces local-only and non-deployment safety flags, preserves the exact
-Python-derived synthetic registry entry order and aggregate metadata, and
+enforces local-only and non-deployment safety flags, validates sorted
+Python-derived synthetic registry entries and derived aggregate metadata, and
 returns a typed `RuntimeHandoffSnapshot`.
 
 The bounded local file adapter is now enabled through

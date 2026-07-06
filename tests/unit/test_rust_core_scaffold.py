@@ -797,7 +797,10 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
     assert "live_capture_used: false" in lib_rs
     assert "external_services_used: false" in lib_rs
 
-    entry_model_ids = re.findall(r'model_id: "([^"]+)"', lib_rs)
+    static_entries_block = lib_rs.split("fn model_registry_metadata_entries()", 1)[1].split(
+        "#[cfg(test)]", 1
+    )[0]
+    entry_model_ids = re.findall(r'model_id: "([^"]+)"', static_entries_block)
     assert entry_model_ids == [
         "graph_novelty",
         "isolation_forest",
@@ -1000,7 +1003,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
             "rejects symlinks, directories, non-regular files, missing files, "
             "non-JSON paths, oversized files, and invalid UTF-8"
         ),
-        "preserves the exact Python-derived synthetic registry entry order and aggregate metadata",
+        "validates sorted Python-derived synthetic registry entries and derived aggregate metadata",
         "Live transport, Qt binding, external services, and deployment remain disabled",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
