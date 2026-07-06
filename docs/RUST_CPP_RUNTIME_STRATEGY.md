@@ -61,16 +61,17 @@ claiming adapter behavior.
 
 The scaffold now also owns a `runtime_control_plane_adapter.v0` contract through
 `RuntimeControlPlaneAdapterContract`. The adapter contract declares the accepted
-local endpoint, IPC, frame, message, and handoff schemas,
-`runtime_control_plane_endpoint.v0`, `runtime_control_plane_ipc.v0`,
+local endpoint, endpoint path, IPC, frame, message, and handoff schemas,
+`runtime_control_plane_endpoint.v0`,
+`runtime_control_plane_endpoint_path.v0`, `runtime_control_plane_ipc.v0`,
 `runtime_control_plane_frame.v0`, `runtime_control_plane_message.v0`,
 `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
 `model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
 `RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
 `RuntimeControlPlaneOutputSnapshotSchema`. The top local adapter fixture now
 identifies the bounded endpoint policy over the connected-stream IPC adapter as
-available while listener, daemon, filesystem socket path policy, Qt binding,
-external service, and deployment behavior remain disabled. JSON-string parsing
+available while listener, daemon, Qt binding, external service, and deployment
+behavior remain disabled. JSON-string parsing
 is now enabled through `serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
@@ -253,6 +254,31 @@ spawning, no file watcher, no storage provider, no Qt binding, no capture
 behavior, no generated report loading, no deployment behavior, no external
 service, and no native inference execution.
 
+The scaffold now also owns a bounded Rust-owned
+`runtime_control_plane_endpoint_path.v0` path policy through
+`RuntimeControlPlaneEndpointPathContract`,
+`RuntimeControlPlaneEndpointPathPolicy`,
+`RuntimeControlPlaneEndpointPathSelection`, and
+`validate_control_plane_endpoint_path`. The policy validates caller-authorized
+OS-local endpoint path selection only. It accepts absolute `.sock` endpoint
+paths under a caller-provided absolute allowed root, caps selected paths at
+`RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES` / 107 UTF-8 bytes, requires the
+allowed root to exist as a non-symlink directory, requires the target parent to
+exist as a non-symlink directory canonicalized under the allowed root, requires
+the target path not to exist, and rejects relative paths, relative roots,
+missing roots, symlink roots, file roots, missing parents, symlink parents,
+outside-root parents, existing files, existing directories, symlink targets,
+non-regular targets, non-`.sock` paths, non-UTF-8 paths, oversized paths, and
+unsafe endpoint filenames such as `secret.sock` and `private-key.sock`. The
+selection document keeps local-only path selection explicit while disabling
+public network transport, socket listener behavior, filesystem mutation, daemon
+lifecycle, process spawning, file watching, Qt binding, storage provider
+behavior, capture, external services, deployment, and native inference
+execution. This is a path-selection contract only and a future precursor to
+binding; actual listener binding, daemon lifecycle, supervision, Qt live
+binding, capture, deployment, external services, and native inference execution
+remain future work.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser and
 local JSON storage behavior. It does not implement a daemon, indexed storage
 engine, process supervisor,
@@ -272,11 +298,12 @@ generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
 local command dispatcher, strict local request/response message envelope, and
 bounded local byte-frame adapter plus a bounded connected-stream IPC adapter and
-bounded endpoint policy only; it is not arbitrary file loading, not file
-watching, not a public network transport, not a socket listener, not a
-filesystem socket path policy, not Qt binding, not external-service integration,
-not storage, not deployment behavior, not capture behavior, and not native
-inference execution. The runtime summary provider derives a summary only from
+bounded endpoint policy plus endpoint path-selection policy only; it is not
+arbitrary file loading, not file watching, not a public network transport, not
+a socket listener, not socket binding, not filesystem mutation, not Qt binding,
+not external-service integration, not storage, not deployment behavior, not
+capture behavior, and not native inference execution. The runtime summary
+provider derives a summary only from
 explicit caller-provided events; it is not an event store, storage provider,
 runtime service, Qt data binding, live transport, process supervisor, capture
 boundary, deployment workflow, external service, or native inference executor.
@@ -310,9 +337,10 @@ Rust source contract
   -> bounded runtime_control_plane_frame.v0 local byte-frame adapter
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
+  -> bounded runtime_control_plane_endpoint_path.v0 path policy
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
   -> bounded runtime_registry_storage_provider.v0 local JSON persistence
-  -> future OS-local listener/path binding implementation
+  -> future OS-local listener binding over validated endpoint paths
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
   -> runtime storage, job supervision, and stable native inference adapters
