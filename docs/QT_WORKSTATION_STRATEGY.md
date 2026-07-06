@@ -40,9 +40,11 @@ contract, parse generated JSON, open a live transport, or bind to live runtime
 state yet. Rust can now parse a caller-provided local
 `runtime_handoff_snapshot.v0` JSON string and can read a bounded local
 `runtime_handoff_snapshot.v0` JSON file under a caller-supplied allowed root
-into typed contract structs. Qt still performs no file I/O and has no IPC, live
-runtime service, Qt data binding, generated report loading, external service
-use, deployment behavior, capture behavior, or native inference execution.
+into typed contract structs. Rust also has a typed local control-plane command
+dispatcher over those JSON/file parser paths, but Qt does not call it or bind
+to it. Qt still performs no file I/O and has no IPC, live runtime service, Qt
+data binding, generated report loading, external service use, deployment
+behavior, capture behavior, or native inference execution.
 
 Expected integration path:
 
@@ -54,6 +56,7 @@ QML shell scaffold
   -> static runtime_handoff_snapshot.v0 envelope in the Rust runtime
   -> static runtime_control_plane_adapter.v0 contract in the Rust runtime
   -> Rust JSON-string parser and bounded local file adapter for local handoff snapshots
+  -> typed local control-plane command dispatcher in the Rust runtime
   -> future local IPC/control-plane adapter from the Rust runtime
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration

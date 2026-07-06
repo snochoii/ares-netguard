@@ -72,6 +72,21 @@ handoff path; it is not an arbitrary file loader and does not load generated
 reports, model artifacts, telemetry, databases, or runtime output trees. Live
 transport, Qt binding, external services, and deployment remain disabled.
 
+The scaffold now adds a typed local command dispatcher over those existing
+parsers through `RuntimeControlPlaneCommand` and
+`RuntimeControlPlaneAdapterContract::execute_local_command`. The typed local
+command dispatcher accepts only `ParseHandoffSnapshotJson` for a
+caller-provided `runtime_handoff_snapshot.v0` JSON string and
+`ParseHandoffSnapshotFile` for a bounded local
+`runtime_handoff_snapshot.v0` JSON file with an explicit
+`RuntimeControlPlaneFilePolicy`. Dispatch returns the same typed
+`RuntimeHandoffSnapshot` as the lower-level parser APIs and preserves the same
+fail-closed schema, registry, safety flag, UTF-8, file size, symlink,
+directory, regular-file, extension, and allowed-root checks. This command layer
+is still local and pre-IPC; it does not add sockets, daemon lifecycle,
+watching, storage, generated report loading, Qt binding, capture, deployment,
+external services, or native inference execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser
 behavior. It does not implement a daemon, storage engine, process supervisor,
 capture wrapper, native inference executor, model artifact loader, external
@@ -83,10 +98,11 @@ registry provider, generated JSON file loader, or native inference execution
 path. The handoff snapshot is not a live
 control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
-strict local JSON-string parsing plus bounded local file reading only; it is
-not arbitrary file loading, not file watching, not socket/IPC transport, not Qt
-binding, not external-service integration, not storage, not deployment
-behavior, not capture behavior, and not native inference execution.
+strict local JSON-string parsing plus bounded local file reading behind a typed
+local command dispatcher only; it is not arbitrary file loading, not file
+watching, not socket/IPC transport, not Qt binding, not external-service
+integration, not storage, not deployment behavior, not capture behavior, and
+not native inference execution.
 
 Expected integration path:
 
@@ -98,8 +114,8 @@ Rust source contract
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
   -> typed JSON-string parser and bounded local file adapter for handoff snapshots
+  -> typed local control-plane command dispatcher over JSON/file parsers
   -> local IPC/control-plane adapter
-  -> local control-plane adapter
   -> typed registry metadata adapter
   -> real Rust runtime summary provider
   -> runtime registry/storage provider
