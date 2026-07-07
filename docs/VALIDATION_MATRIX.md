@@ -51,6 +51,14 @@ pytest -q tests/unit tests/integration -k "telemetry or ingest or feature or evi
 make fixture-smoke
 ```
 
+## Evidence index and storage contract
+
+```bash
+pytest -q tests/unit/test_evidence_index.py tests/integration/test_evidence_index_fixture.py
+pytest -q tests/unit tests/integration -k "telemetry or feature or evidence or index or investigation or detection or evaluation or registry"
+make fixture-smoke
+```
+
 ## Agentic investigation
 
 ```bash
