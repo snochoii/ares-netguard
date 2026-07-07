@@ -136,6 +136,13 @@ runtime state, use a database or indexing engine, load generated reports, load
 generated JSON, open transport, start a listener, manage a filesystem socket
 path, spawn a process, use external services, allow deployment, capture
 traffic, or execute native inference.
+Rust now also defines a typed `evidence_index_adapter.v0` for caller-provided
+pointer-only `evidence_index.v0` JSON strings and bounded local `.json` files.
+Qt still does not call `parse_evidence_index_json`, call
+`parse_evidence_index_file`, read evidence index files, bind to live runtime
+state, use a database or indexing engine, load generated reports, copy raw
+evidence payloads, perform file I/O, open transport, use external services,
+allow deployment, capture traffic, or execute native inference.
 
 Expected integration path:
 
@@ -160,6 +167,7 @@ QML shell scaffold
   -> bounded one-shot runtime_control_plane_service_lifecycle.v0 service lifecycle wrapper in the Rust runtime, not called by Qt
   -> bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt
   -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
+  -> typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt
   -> future supervised local runtime service daemon with explicit async start/stop
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration

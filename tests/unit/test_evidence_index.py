@@ -160,6 +160,9 @@ def test_generates_deterministic_pointer_only_index() -> None:
         "model_score_rows.v0",
         "telemetry_feature_window_report.v0",
     ]
+    assert [summary["source_name"] for summary in index["source_summaries"]] == sorted(
+        summary["source_name"] for summary in index["source_summaries"]
+    )
     assert index["entity_window_index"][0]["entity_id"] == "host-alpha"
     assert "dns_failure_ratio" in index["entity_window_index"][0]["feature_names"]
     assert "isolation_forest" in index["entity_window_index"][0]["model_ids"]
@@ -214,6 +217,53 @@ def test_validate_index_rejects_tampered_aggregate() -> None:
     tampered["aggregate_summary"]["source_ref_count"] += 1
 
     with pytest.raises(ValueError, match="aggregate_summary must be derived"):
+        evidence_index.validate_evidence_index(tampered)
+
+
+def test_validate_index_rejects_source_summary_drift() -> None:
+    index = evidence_index.generate_evidence_index([[_score_row()]])
+    tampered = json.loads(json.dumps(index))
+    tampered["source_summaries"][0]["source_ref_count"] += 1
+
+    with pytest.raises(ValueError, match="source summary source_ref_count"):
+        evidence_index.validate_evidence_index(tampered)
+
+
+def test_validate_index_rejects_unsorted_source_summaries() -> None:
+    index = evidence_index.generate_evidence_index([_feature_report(), [_score_row()]])
+    tampered = json.loads(json.dumps(index))
+    tampered["source_summaries"].reverse()
+
+    with pytest.raises(ValueError, match="source_summaries must be sorted"):
+        evidence_index.validate_evidence_index(tampered)
+
+
+def test_validate_index_rejects_duplicate_source_refs() -> None:
+    index = evidence_index.generate_evidence_index([[_score_row()]])
+    tampered = json.loads(json.dumps(index))
+    duplicate = dict(tampered["entity_window_index"][0]["source_refs"][0])
+    tampered["entity_window_index"][0]["source_refs"].insert(1, duplicate)
+
+    with pytest.raises(ValueError, match="source_refs must be sorted and unique"):
+        evidence_index.validate_evidence_index(tampered)
+
+
+def test_validate_index_rejects_source_ref_row_index_drift() -> None:
+    index = evidence_index.generate_evidence_index([[_score_row()]])
+    tampered = json.loads(json.dumps(index))
+    tampered["entity_window_index"][0]["source_refs"][0]["row_index"] = 1
+
+    with pytest.raises(ValueError, match="row_index must be inside"):
+        evidence_index.validate_evidence_index(tampered)
+
+
+def test_validate_index_rejects_evidence_model_outside_source_ref_models() -> None:
+    index = evidence_index.generate_evidence_index([[_score_row()]])
+    tampered = json.loads(json.dumps(index))
+    ref = tampered["entity_window_index"][0]["source_refs"][0]
+    ref["model_ids"] = [ref["model_ids"][0]]
+
+    with pytest.raises(ValueError, match="evidence index model_id"):
         evidence_index.validate_evidence_index(tampered)
 
 
