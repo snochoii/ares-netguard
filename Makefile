@@ -26,10 +26,6 @@ fixture-smoke:
 		tests/fixtures/telemetry_foundation/synthetic_events.jsonl \
 		/tmp/ares-netguard/telemetry-feature-windows.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/telemetry-feature-windows.json >/dev/null
-	$(PYTHON) -m ares_netguard.models.disagreement \
-		tests/fixtures/model_disagreement/synthetic_scores.jsonl \
-		/tmp/ares-netguard/model-disagreement-report.json
-	$(PYTHON) -m json.tool /tmp/ares-netguard/model-disagreement-report.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.time_series_residual \
 		tests/fixtures/time_series_residual/synthetic_windows.jsonl \
 		/tmp/ares-netguard/time-series-residual-report.json
@@ -44,6 +40,23 @@ fixture-smoke:
 		--history-window 3 \
 		--min-history-windows 2
 	$(PYTHON) -m json.tool /tmp/ares-netguard/temporal-security-graph-report.json >/dev/null
+	$(PYTHON) -m ares_netguard.native_inference.adapters \
+		tests/fixtures/native_inference/manifest.json \
+		tests/fixtures/native_inference/feature_rows.jsonl \
+		/tmp/ares-netguard/native-inference-score-rows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/native-inference-score-rows.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.score_row_composer \
+		/tmp/ares-netguard/composed-model-score-rows.json \
+		--score-rows tests/fixtures/model_disagreement/synthetic_scores.jsonl \
+		--score-rows /tmp/ares-netguard/native-inference-score-rows.json \
+		--residual-report /tmp/ares-netguard/time-series-residual-report.json \
+		--representation-report /tmp/ares-netguard/traffic-representation-report.json \
+		--graph-report /tmp/ares-netguard/temporal-security-graph-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/composed-model-score-rows.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.disagreement \
+		/tmp/ares-netguard/composed-model-score-rows.json \
+		/tmp/ares-netguard/model-disagreement-report.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/model-disagreement-report.json >/dev/null
 	$(PYTHON) -m ares_netguard.investigation.agentic_layer \
 		/tmp/ares-netguard/model-disagreement-report.json \
 		/tmp/ares-netguard/agentic-investigation-report.json \
@@ -55,11 +68,6 @@ fixture-smoke:
 		/tmp/ares-netguard/model-disagreement-report.json \
 		/tmp/ares-netguard/detection-candidate-report.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/detection-candidate-report.json >/dev/null
-	$(PYTHON) -m ares_netguard.native_inference.adapters \
-		tests/fixtures/native_inference/manifest.json \
-		tests/fixtures/native_inference/feature_rows.jsonl \
-		/tmp/ares-netguard/native-inference-score-rows.json
-	$(PYTHON) -m json.tool /tmp/ares-netguard/native-inference-score-rows.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.evaluation_bundle \
 		/tmp/ares-netguard/model-evaluation-bundle.json \
 		/tmp/ares-netguard/model-disagreement-report.json \
@@ -68,7 +76,7 @@ fixture-smoke:
 		/tmp/ares-netguard/temporal-security-graph-report.json \
 		/tmp/ares-netguard/agentic-investigation-report.json \
 		/tmp/ares-netguard/detection-candidate-report.json \
-		/tmp/ares-netguard/native-inference-score-rows.json
+		/tmp/ares-netguard/composed-model-score-rows.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/model-evaluation-bundle.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.registry_metadata \
 		/tmp/ares-netguard/model-registry-metadata.json \
@@ -83,6 +91,6 @@ fixture-smoke:
 		/tmp/ares-netguard/temporal-security-graph-report.json \
 		/tmp/ares-netguard/agentic-investigation-report.json \
 		/tmp/ares-netguard/detection-candidate-report.json \
-		/tmp/ares-netguard/native-inference-score-rows.json \
+		/tmp/ares-netguard/composed-model-score-rows.json \
 		/tmp/ares-netguard/model-registry-metadata.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/evidence-index.json >/dev/null

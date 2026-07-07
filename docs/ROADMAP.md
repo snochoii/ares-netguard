@@ -72,8 +72,17 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
       deployment approval, or UI integration.
     - See `docs/EVIDENCE_INDEX.md`.
 
-14. **Qt/QML AI-NDR Workstation Shell**
+14. **Score Row Composer**
+    - Local `model_score_row.v0` composer for synthetic fixture smoke plumbing.
+    - Merges handcrafted base, native reference, residual, representation, and
+      graph score rows before the primary disagreement report.
+    - Fails closed on duplicate `(entity_id, window_start, model_id)` tuples.
+    - Not a new detector, live capture path, durable store, deployment flow, or
+      native runtime executor.
+    - See `docs/MODEL_DISAGREEMENT_ENGINE.md`.
+
+15. **Qt/QML AI-NDR Workstation Shell**
    - Product UI begins once ML evidence artifacts are meaningful.
 
-15. **Rust/C++ Product Runtime**
+16. **Rust/C++ Product Runtime**
    - Workspace/session/job/storage/native inference core.
