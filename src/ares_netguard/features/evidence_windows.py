@@ -421,7 +421,7 @@ def _validate_output_path(path: str | Path) -> None:
     output = Path(path)
     if output.is_dir():
         raise ValueError("output path must be a file")
-    repo_root = Path.cwd().resolve()
+    repo_root = _repository_root()
     resolved = output.resolve(strict=False)
     try:
         relative = resolved.relative_to(repo_root)
@@ -435,6 +435,13 @@ def _validate_output_path(path: str | Path) -> None:
     )
     if not any(relative == prefix or prefix in relative.parents for prefix in allowed_prefixes):
         raise ValueError("repository output paths must be under ignored runtime roots")
+
+
+def _repository_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "AGENTS.md").is_file() and (parent / "pyproject.toml").is_file():
+            return parent
+    return Path.cwd().resolve()
 
 
 def _loads_strict(text: str) -> Any:

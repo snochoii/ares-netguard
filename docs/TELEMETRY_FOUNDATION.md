@@ -44,7 +44,7 @@ The pipeline emits `telemetry_feature_window_report.v0` with 1m and 5m
 - `window_start`
 - `features`
 
-The v0 feature set is:
+The v0 feature set for this telemetry foundation producer is:
 
 ```text
 window_size_minutes
