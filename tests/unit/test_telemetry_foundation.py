@@ -170,3 +170,14 @@ def test_dump_rejects_repository_root_outputs(tmp_path: Path) -> None:
     assert json.loads(allowed_output.read_text(encoding="utf-8"))["schema_version"] == (
         REPORT_SCHEMA_VERSION
     )
+
+
+def test_dump_rejects_repository_root_outputs_from_subdirectory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report = generate_feature_window_report([normalize_telemetry_event(_event(), event_index=0)])
+    repo_root = Path(__file__).resolve().parents[2]
+    monkeypatch.chdir(repo_root / "src")
+
+    with pytest.raises(ValueError, match="ignored runtime roots"):
+        dump_feature_window_report(report, Path("../telemetry-feature-report.json"))
