@@ -328,6 +328,16 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
             "bounded one-shot runtime_control_plane_endpoint_lifecycle.v0 lifecycle wrapper "
             "in the Rust runtime, not called by Qt"
         ),
+        "runtime_control_plane_service_lifecycle.v0",
+        "service lifecycle state wrapper",
+        "execute_control_plane_service_lifecycle_once",
+        "Qt still does not call or bind the service lifecycle wrapper",
+        "own service lifecycle state",
+        "start or stop service lifecycle",
+        (
+            "bounded one-shot runtime_control_plane_service_lifecycle.v0 service lifecycle "
+            "wrapper in the Rust runtime, not called by Qt"
+        ),
         "runtime_registry_provider.v0",
         "bounded in-memory `runtime_registry_provider.v0`",
         "runtime_handoff_snapshot.v0` values",
@@ -344,7 +354,7 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "load generated JSON",
         "bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt",
         "bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt",
-        "future supervised local runtime service lifecycle",
+        "future supervised local runtime service daemon with explicit async start/stop",
         "perform file I/O",
         "open IPC",
         "bind to live runtime state",
@@ -389,6 +399,9 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "runtime_control_plane_endpoint_lifecycle.v0",
         "one-shot endpoint lifecycle wrapper",
         "execute_control_plane_endpoint_lifecycle_once",
+        "runtime_control_plane_service_lifecycle.v0",
+        "service lifecycle state wrapper",
+        "execute_control_plane_service_lifecycle_once",
         "runtime_registry_provider.v0",
         "does not call `RuntimeRegistryProvider`",
         "read `RuntimeRegistrySnapshot`",
@@ -396,7 +409,7 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "does not call `RuntimeRegistryStorageProvider`",
         "read `RuntimeRegistryStorageDocument`",
         "not called by Qt",
-        "future supervised local runtime service lifecycle",
+        "future supervised local runtime service daemon with explicit async start/stop",
     ]
     for text in expected_text:
         assert text in normalized_strategy
