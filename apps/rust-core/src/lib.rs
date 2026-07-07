@@ -33,6 +33,8 @@ pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION: &str =
     "runtime_control_plane_endpoint_path.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION: &str =
     "runtime_control_plane_endpoint_listener.v0";
+pub const RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION: &str =
+    "runtime_control_plane_endpoint_lifecycle.v0";
 pub const RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION: &str = "runtime_control_plane_frame.v0";
 pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str = "runtime_control_plane_ipc.v0";
 pub const RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION: &str = "runtime_control_plane_message.v0";
@@ -881,6 +883,144 @@ pub struct RuntimeControlPlaneEndpointListenerOutcome {
     pub non_claims: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneEndpointLifecycleState {
+    NotStarted,
+    StartRequested,
+    Listening,
+    Stopping,
+    Stopped,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeControlPlaneEndpointLifecycleEventKind {
+    StartRequested,
+    PathValidated,
+    SocketBound,
+    ClientAccepted,
+    RequestCompleted,
+    CleanupCompleted,
+    StopRequested,
+    Failed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointLifecycleEvent {
+    pub schema_version: String,
+    pub event_index: u32,
+    pub state: RuntimeControlPlaneEndpointLifecycleState,
+    pub event_kind: RuntimeControlPlaneEndpointLifecycleEventKind,
+    pub event_label: &'static str,
+    pub local_only: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointLifecycleContract {
+    pub schema_version: &'static str,
+    pub listener_schema_version: &'static str,
+    pub endpoint_schema_version: &'static str,
+    pub endpoint_path_schema_version: &'static str,
+    pub ipc_schema_version: &'static str,
+    pub frame_schema_version: &'static str,
+    pub message_schema_version: &'static str,
+    pub max_path_bytes: usize,
+    pub max_frame_bytes: usize,
+    pub local_only: bool,
+    pub one_shot_lifecycle: bool,
+    pub start_stop_state_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub endpoint_listener_execution_enabled: bool,
+    pub cleanup_on_completion: bool,
+    pub public_network_transport_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub persistent_event_store_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointLifecyclePolicy {
+    pub listener_policy: RuntimeControlPlaneEndpointListenerPolicy,
+    pub local_only: bool,
+    pub one_shot_lifecycle: bool,
+    pub start_stop_state_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub endpoint_listener_execution_enabled: bool,
+    pub cleanup_on_completion: bool,
+    pub public_network_transport_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub persistent_event_store_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeControlPlaneEndpointLifecycleOutcome {
+    pub schema_version: String,
+    pub listener_schema_version: String,
+    pub endpoint_schema_version: String,
+    pub endpoint_path_schema_version: String,
+    pub listener_outcome: Option<RuntimeControlPlaneEndpointListenerOutcome>,
+    pub final_state: RuntimeControlPlaneEndpointLifecycleState,
+    pub failure_error_code: Option<RuntimeControlPlaneMessageErrorCode>,
+    pub events: Vec<RuntimeControlPlaneEndpointLifecycleEvent>,
+    pub cleanup_attempted: bool,
+    pub socket_path_removed: bool,
+    pub local_only: bool,
+    pub one_shot_lifecycle: bool,
+    pub start_stop_state_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub endpoint_listener_execution_enabled: bool,
+    pub cleanup_on_completion: bool,
+    pub public_network_transport_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub persistent_event_store_enabled: bool,
+    pub non_claims: Vec<String>,
+}
+
+#[cfg(unix)]
+#[derive(Debug, Eq, PartialEq)]
+struct RuntimeControlPlaneEndpointListenerFailure {
+    error: RuntimeControlPlaneAdapterError,
+    cleanup_attempted: bool,
+    socket_path_removed: bool,
+}
+
+#[cfg(unix)]
+#[derive(Debug, Eq, PartialEq)]
+enum RuntimeControlPlaneEndpointListenerExecution {
+    Succeeded(Box<RuntimeControlPlaneEndpointListenerOutcome>),
+    Failed(RuntimeControlPlaneEndpointListenerFailure),
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeControlPlaneFilePolicy {
@@ -1218,6 +1358,34 @@ impl RuntimeControlPlaneEndpointKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::CallerProvidedConnectedStream => "caller_provided_connected_stream",
+        }
+    }
+}
+
+impl RuntimeControlPlaneEndpointLifecycleState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotStarted => "not_started",
+            Self::StartRequested => "start_requested",
+            Self::Listening => "listening",
+            Self::Stopping => "stopping",
+            Self::Stopped => "stopped",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl RuntimeControlPlaneEndpointLifecycleEventKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::StartRequested => "start_requested",
+            Self::PathValidated => "path_validated",
+            Self::SocketBound => "socket_bound",
+            Self::ClientAccepted => "client_accepted",
+            Self::RequestCompleted => "request_completed",
+            Self::CleanupCompleted => "cleanup_completed",
+            Self::StopRequested => "stop_requested",
+            Self::Failed => "failed",
         }
     }
 }
@@ -2489,6 +2657,41 @@ impl RuntimeControlPlaneEndpointListenerContract {
     }
 }
 
+impl RuntimeControlPlaneEndpointLifecycleContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION,
+            listener_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION,
+            endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION,
+            endpoint_path_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION,
+            ipc_schema_version: RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION,
+            frame_schema_version: RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION,
+            message_schema_version: RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION,
+            max_path_bytes: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES,
+            max_frame_bytes: RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES,
+            local_only: true,
+            one_shot_lifecycle: true,
+            start_stop_state_enabled: true,
+            audit_events_enabled: true,
+            endpoint_listener_execution_enabled: true,
+            cleanup_on_completion: true,
+            public_network_transport_enabled: false,
+            listener_loop_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            persistent_event_store_enabled: false,
+            non_claims: RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_NON_CLAIMS,
+        }
+    }
+}
+
 impl Default for RuntimeControlPlaneFramePolicy {
     fn default() -> Self {
         Self {
@@ -2733,6 +2936,44 @@ impl RuntimeControlPlaneEndpointListenerPolicy {
     }
 }
 
+impl RuntimeControlPlaneEndpointLifecyclePolicy {
+    pub fn new(listener_policy: RuntimeControlPlaneEndpointListenerPolicy) -> Self {
+        Self {
+            listener_policy,
+            local_only: true,
+            one_shot_lifecycle: true,
+            start_stop_state_enabled: true,
+            audit_events_enabled: true,
+            endpoint_listener_execution_enabled: true,
+            cleanup_on_completion: true,
+            public_network_transport_enabled: false,
+            listener_loop_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            storage_provider_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            persistent_event_store_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_control_plane_endpoint_lifecycle_policy(self)
+    }
+
+    pub fn max_path_bytes(&self) -> usize {
+        self.listener_policy.max_path_bytes()
+    }
+
+    pub fn max_frame_bytes(&self) -> usize {
+        self.listener_policy.max_frame_bytes()
+    }
+}
+
 pub fn parse_control_plane_message_frame_bytes(
     frame: &[u8],
 ) -> Result<RuntimeControlPlaneMessageRequest, RuntimeControlPlaneAdapterError> {
@@ -2829,60 +3070,114 @@ pub fn execute_control_plane_endpoint_listener_once(
     path: impl AsRef<Path>,
     policy: &RuntimeControlPlaneEndpointListenerPolicy,
 ) -> Result<RuntimeControlPlaneEndpointListenerOutcome, RuntimeControlPlaneAdapterError> {
+    match execute_control_plane_endpoint_listener_once_audited(path.as_ref(), policy)? {
+        RuntimeControlPlaneEndpointListenerExecution::Succeeded(outcome) => Ok(*outcome),
+        RuntimeControlPlaneEndpointListenerExecution::Failed(failure) => Err(failure.error),
+    }
+}
+
+#[cfg(unix)]
+fn execute_control_plane_endpoint_listener_once_audited(
+    path: &Path,
+    policy: &RuntimeControlPlaneEndpointListenerPolicy,
+) -> Result<RuntimeControlPlaneEndpointListenerExecution, RuntimeControlPlaneAdapterError> {
     policy.validate()?;
-    let selection =
-        validate_control_plane_endpoint_path(path.as_ref(), &policy.endpoint_path_policy)?;
+    let selection = validate_control_plane_endpoint_path(path, &policy.endpoint_path_policy)?;
     let endpoint_path = PathBuf::from(&selection.endpoint_path);
     validate_control_plane_endpoint_listener_path_permissions(&selection)?;
     let listener = UnixListener::bind(&endpoint_path)
         .map_err(|_| RuntimeControlPlaneAdapterError::EndpointBindFailed)?;
     if let Err(error) = restrict_control_plane_endpoint_socket_permissions(&endpoint_path) {
         drop(listener);
-        let _ = cleanup_control_plane_endpoint_socket_path(&endpoint_path);
-        return Err(error);
+        let cleanup_result = cleanup_control_plane_endpoint_socket_path(&endpoint_path);
+        let failure = match cleanup_result {
+            Ok(socket_path_removed) => RuntimeControlPlaneEndpointListenerFailure {
+                error,
+                cleanup_attempted: true,
+                socket_path_removed,
+            },
+            Err(cleanup_error) => RuntimeControlPlaneEndpointListenerFailure {
+                error: cleanup_error,
+                cleanup_attempted: true,
+                socket_path_removed: false,
+            },
+        };
+        return Ok(RuntimeControlPlaneEndpointListenerExecution::Failed(
+            failure,
+        ));
     }
     let execution_result = match listener.accept() {
-        Ok((mut stream, _address)) => {
-            let mut writer = stream
-                .try_clone()
-                .map_err(|_| RuntimeControlPlaneAdapterError::EndpointAcceptFailed)?;
-            execute_control_plane_endpoint_stream(&mut stream, &mut writer, &policy.endpoint_policy)
-        }
+        Ok((mut stream, _address)) => match stream.try_clone() {
+            Ok(mut writer) => execute_control_plane_endpoint_stream(
+                &mut stream,
+                &mut writer,
+                &policy.endpoint_policy,
+            ),
+            Err(_) => Err(RuntimeControlPlaneAdapterError::EndpointAcceptFailed),
+        },
         Err(_) => Err(RuntimeControlPlaneAdapterError::EndpointAcceptFailed),
     };
     drop(listener);
 
     let cleanup_result = cleanup_control_plane_endpoint_socket_path(&endpoint_path);
     match (execution_result, cleanup_result) {
-        (Ok(()), Ok(socket_path_removed)) => Ok(RuntimeControlPlaneEndpointListenerOutcome {
-            schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION.to_owned(),
-            endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION.to_owned(),
-            endpoint_path_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION
-                .to_owned(),
-            endpoint_path_selection: selection,
-            local_only: true,
-            one_shot_listener: true,
-            filesystem_socket_binding_enabled: true,
-            endpoint_path_validation_enabled: true,
-            endpoint_stream_execution_enabled: true,
-            cleanup_attempted: true,
-            socket_path_removed,
-            public_network_transport_enabled: false,
-            listener_loop_enabled: false,
-            daemon_lifecycle_enabled: false,
-            process_spawning_enabled: false,
-            file_watching_enabled: false,
-            qt_binding_enabled: false,
-            storage_provider_enabled: false,
-            capture_enabled: false,
-            external_services_used: false,
-            deployment_allowed: false,
-            native_inference_execution_enabled: false,
-            non_claims: static_str_vec(RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_NON_CLAIMS),
-        }),
-        (Ok(()), Err(cleanup_error)) => Err(cleanup_error),
-        (Err(error), Ok(_socket_path_removed)) => Err(error),
-        (Err(_error), Err(cleanup_error)) => Err(cleanup_error),
+        (Ok(()), Ok(socket_path_removed)) => {
+            Ok(RuntimeControlPlaneEndpointListenerExecution::Succeeded(
+                Box::new(RuntimeControlPlaneEndpointListenerOutcome {
+                    schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION
+                        .to_owned(),
+                    endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+                        .to_owned(),
+                    endpoint_path_schema_version:
+                        RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION.to_owned(),
+                    endpoint_path_selection: selection,
+                    local_only: true,
+                    one_shot_listener: true,
+                    filesystem_socket_binding_enabled: true,
+                    endpoint_path_validation_enabled: true,
+                    endpoint_stream_execution_enabled: true,
+                    cleanup_attempted: true,
+                    socket_path_removed,
+                    public_network_transport_enabled: false,
+                    listener_loop_enabled: false,
+                    daemon_lifecycle_enabled: false,
+                    process_spawning_enabled: false,
+                    file_watching_enabled: false,
+                    qt_binding_enabled: false,
+                    storage_provider_enabled: false,
+                    capture_enabled: false,
+                    external_services_used: false,
+                    deployment_allowed: false,
+                    native_inference_execution_enabled: false,
+                    non_claims: static_str_vec(RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_NON_CLAIMS),
+                }),
+            ))
+        }
+        (Ok(()), Err(cleanup_error)) => Ok(RuntimeControlPlaneEndpointListenerExecution::Failed(
+            RuntimeControlPlaneEndpointListenerFailure {
+                error: cleanup_error,
+                cleanup_attempted: true,
+                socket_path_removed: false,
+            },
+        )),
+        (Err(error), Ok(socket_path_removed)) => {
+            Ok(RuntimeControlPlaneEndpointListenerExecution::Failed(
+                RuntimeControlPlaneEndpointListenerFailure {
+                    error,
+                    cleanup_attempted: true,
+                    socket_path_removed,
+                },
+            ))
+        }
+        (Err(_error), Err(cleanup_error)) => {
+            Ok(RuntimeControlPlaneEndpointListenerExecution::Failed(
+                RuntimeControlPlaneEndpointListenerFailure {
+                    error: cleanup_error,
+                    cleanup_attempted: true,
+                    socket_path_removed: false,
+                },
+            ))
+        }
     }
 }
 
@@ -2896,6 +3191,143 @@ pub fn execute_control_plane_endpoint_listener_once(
     Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
         field: "endpoint_listener.platform",
     })
+}
+
+#[cfg(unix)]
+pub fn execute_control_plane_endpoint_lifecycle_once(
+    path: impl AsRef<Path>,
+    policy: &RuntimeControlPlaneEndpointLifecyclePolicy,
+) -> Result<RuntimeControlPlaneEndpointLifecycleOutcome, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    let path = path.as_ref();
+    let mut events = Vec::new();
+    push_control_plane_endpoint_lifecycle_event(
+        &mut events,
+        RuntimeControlPlaneEndpointLifecycleState::StartRequested,
+        RuntimeControlPlaneEndpointLifecycleEventKind::StartRequested,
+    );
+
+    match execute_control_plane_endpoint_listener_once_audited(path, &policy.listener_policy) {
+        Ok(RuntimeControlPlaneEndpointListenerExecution::Succeeded(listener_outcome)) => {
+            let listener_outcome = *listener_outcome;
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Listening,
+                RuntimeControlPlaneEndpointLifecycleEventKind::PathValidated,
+            );
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Listening,
+                RuntimeControlPlaneEndpointLifecycleEventKind::SocketBound,
+            );
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Listening,
+                RuntimeControlPlaneEndpointLifecycleEventKind::ClientAccepted,
+            );
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Stopping,
+                RuntimeControlPlaneEndpointLifecycleEventKind::RequestCompleted,
+            );
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Stopping,
+                RuntimeControlPlaneEndpointLifecycleEventKind::StopRequested,
+            );
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Stopped,
+                RuntimeControlPlaneEndpointLifecycleEventKind::CleanupCompleted,
+            );
+            let cleanup_attempted = listener_outcome.cleanup_attempted;
+            let socket_path_removed = listener_outcome.socket_path_removed;
+            Ok(control_plane_endpoint_lifecycle_outcome(
+                policy,
+                Some(listener_outcome),
+                RuntimeControlPlaneEndpointLifecycleState::Stopped,
+                None,
+                events,
+                cleanup_attempted,
+                socket_path_removed,
+            ))
+        }
+        Ok(RuntimeControlPlaneEndpointListenerExecution::Failed(failure)) => {
+            if failure.cleanup_attempted {
+                push_control_plane_endpoint_lifecycle_event(
+                    &mut events,
+                    RuntimeControlPlaneEndpointLifecycleState::Listening,
+                    RuntimeControlPlaneEndpointLifecycleEventKind::PathValidated,
+                );
+            }
+            if failure.socket_path_removed {
+                push_control_plane_endpoint_lifecycle_event(
+                    &mut events,
+                    RuntimeControlPlaneEndpointLifecycleState::Stopping,
+                    RuntimeControlPlaneEndpointLifecycleEventKind::CleanupCompleted,
+                );
+            }
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Failed,
+                RuntimeControlPlaneEndpointLifecycleEventKind::Failed,
+            );
+            Ok(control_plane_endpoint_lifecycle_outcome(
+                policy,
+                None,
+                RuntimeControlPlaneEndpointLifecycleState::Failed,
+                Some((&failure.error).into()),
+                events,
+                failure.cleanup_attempted,
+                failure.socket_path_removed,
+            ))
+        }
+        Err(error) => {
+            push_control_plane_endpoint_lifecycle_event(
+                &mut events,
+                RuntimeControlPlaneEndpointLifecycleState::Failed,
+                RuntimeControlPlaneEndpointLifecycleEventKind::Failed,
+            );
+            Ok(control_plane_endpoint_lifecycle_outcome(
+                policy,
+                None,
+                RuntimeControlPlaneEndpointLifecycleState::Failed,
+                Some((&error).into()),
+                events,
+                false,
+                false,
+            ))
+        }
+    }
+}
+
+#[cfg(not(unix))]
+pub fn execute_control_plane_endpoint_lifecycle_once(
+    path: impl AsRef<Path>,
+    policy: &RuntimeControlPlaneEndpointLifecyclePolicy,
+) -> Result<RuntimeControlPlaneEndpointLifecycleOutcome, RuntimeControlPlaneAdapterError> {
+    let _ = path.as_ref();
+    policy.validate()?;
+    let mut events = Vec::new();
+    push_control_plane_endpoint_lifecycle_event(
+        &mut events,
+        RuntimeControlPlaneEndpointLifecycleState::StartRequested,
+        RuntimeControlPlaneEndpointLifecycleEventKind::StartRequested,
+    );
+    push_control_plane_endpoint_lifecycle_event(
+        &mut events,
+        RuntimeControlPlaneEndpointLifecycleState::Failed,
+        RuntimeControlPlaneEndpointLifecycleEventKind::Failed,
+    );
+    Ok(control_plane_endpoint_lifecycle_outcome(
+        policy,
+        None,
+        RuntimeControlPlaneEndpointLifecycleState::Failed,
+        Some(RuntimeControlPlaneMessageErrorCode::UnsupportedValue),
+        events,
+        false,
+        false,
+    ))
 }
 
 pub fn validate_control_plane_endpoint_path(
@@ -3547,6 +3979,158 @@ fn validate_control_plane_endpoint_listener_policy(
         policy.native_inference_execution_enabled,
         false,
     )
+}
+
+fn validate_control_plane_endpoint_lifecycle_policy(
+    policy: &RuntimeControlPlaneEndpointLifecyclePolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    policy.listener_policy.validate()?;
+    validate_required_flag("endpoint_lifecycle.local_only", policy.local_only, true)?;
+    validate_required_flag(
+        "endpoint_lifecycle.one_shot_lifecycle",
+        policy.one_shot_lifecycle,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.start_stop_state_enabled",
+        policy.start_stop_state_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.audit_events_enabled",
+        policy.audit_events_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.endpoint_listener_execution_enabled",
+        policy.endpoint_listener_execution_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.cleanup_on_completion",
+        policy.cleanup_on_completion,
+        true,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.public_network_transport_enabled",
+        policy.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.listener_loop_enabled",
+        policy.listener_loop_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.daemon_lifecycle_enabled",
+        policy.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.process_spawning_enabled",
+        policy.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.file_watching_enabled",
+        policy.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.qt_binding_enabled",
+        policy.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.storage_provider_enabled",
+        policy.storage_provider_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.capture_enabled",
+        policy.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.external_services_used",
+        policy.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.deployment_allowed",
+        policy.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.native_inference_execution_enabled",
+        policy.native_inference_execution_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "endpoint_lifecycle.persistent_event_store_enabled",
+        policy.persistent_event_store_enabled,
+        false,
+    )
+}
+
+fn push_control_plane_endpoint_lifecycle_event(
+    events: &mut Vec<RuntimeControlPlaneEndpointLifecycleEvent>,
+    state: RuntimeControlPlaneEndpointLifecycleState,
+    event_kind: RuntimeControlPlaneEndpointLifecycleEventKind,
+) {
+    events.push(RuntimeControlPlaneEndpointLifecycleEvent {
+        schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION.to_owned(),
+        event_index: u32::try_from(events.len()).unwrap_or(u32::MAX),
+        state,
+        event_kind,
+        event_label: event_kind.as_str(),
+        local_only: true,
+        external_services_used: false,
+        deployment_allowed: false,
+        native_inference_execution_enabled: false,
+    });
+}
+
+fn control_plane_endpoint_lifecycle_outcome(
+    policy: &RuntimeControlPlaneEndpointLifecyclePolicy,
+    listener_outcome: Option<RuntimeControlPlaneEndpointListenerOutcome>,
+    final_state: RuntimeControlPlaneEndpointLifecycleState,
+    failure_error_code: Option<RuntimeControlPlaneMessageErrorCode>,
+    events: Vec<RuntimeControlPlaneEndpointLifecycleEvent>,
+    cleanup_attempted: bool,
+    socket_path_removed: bool,
+) -> RuntimeControlPlaneEndpointLifecycleOutcome {
+    RuntimeControlPlaneEndpointLifecycleOutcome {
+        schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION.to_owned(),
+        listener_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION.to_owned(),
+        endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION.to_owned(),
+        endpoint_path_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION.to_owned(),
+        listener_outcome,
+        final_state,
+        failure_error_code,
+        events,
+        cleanup_attempted,
+        socket_path_removed,
+        local_only: policy.local_only,
+        one_shot_lifecycle: policy.one_shot_lifecycle,
+        start_stop_state_enabled: policy.start_stop_state_enabled,
+        audit_events_enabled: policy.audit_events_enabled,
+        endpoint_listener_execution_enabled: policy.endpoint_listener_execution_enabled,
+        cleanup_on_completion: policy.cleanup_on_completion,
+        public_network_transport_enabled: policy.public_network_transport_enabled,
+        listener_loop_enabled: policy.listener_loop_enabled,
+        daemon_lifecycle_enabled: policy.daemon_lifecycle_enabled,
+        process_spawning_enabled: policy.process_spawning_enabled,
+        file_watching_enabled: policy.file_watching_enabled,
+        qt_binding_enabled: policy.qt_binding_enabled,
+        storage_provider_enabled: policy.storage_provider_enabled,
+        capture_enabled: policy.capture_enabled,
+        external_services_used: policy.external_services_used,
+        deployment_allowed: policy.deployment_allowed,
+        native_inference_execution_enabled: policy.native_inference_execution_enabled,
+        persistent_event_store_enabled: policy.persistent_event_store_enabled,
+        non_claims: static_str_vec(RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_NON_CLAIMS),
+    }
 }
 
 fn read_exact_control_plane_ipc<R: Read>(
@@ -4741,6 +5325,23 @@ const RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_NON_CLAIMS: &[&str] = &[
     "not_native_runtime_execution",
     "not_runtime_service",
     "not_supervised_service",
+];
+
+const RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_NON_CLAIMS: &[&str] = &[
+    "not_public_network_transport",
+    "not_listener_loop",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_storage_provider",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+    "not_runtime_service_daemon",
+    "not_persistent_event_store",
+    "not_async_stop_api",
 ];
 
 const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
@@ -7462,6 +8063,93 @@ mod tests {
     }
 
     #[test]
+    fn emits_static_runtime_control_plane_endpoint_lifecycle_contract_fixture() {
+        let contract = RuntimeControlPlaneEndpointLifecycleContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.listener_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.endpoint_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.endpoint_path_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.ipc_schema_version,
+            RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.frame_schema_version,
+            RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.message_schema_version,
+            RUNTIME_CONTROL_PLANE_MESSAGE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.max_path_bytes,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        );
+        assert_eq!(
+            contract.max_frame_bytes,
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.one_shot_lifecycle);
+        assert!(contract.start_stop_state_enabled);
+        assert!(contract.audit_events_enabled);
+        assert!(contract.endpoint_listener_execution_enabled);
+        assert!(contract.cleanup_on_completion);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.listener_loop_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert!(!contract.persistent_event_store_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_public_network_transport",
+                "not_listener_loop",
+                "not_daemon_lifecycle",
+                "not_process_spawner",
+                "not_file_watcher",
+                "not_qt_binding",
+                "not_storage_provider",
+                "not_capture_boundary",
+                "not_external_service",
+                "not_deployment_approval",
+                "not_native_runtime_execution",
+                "not_runtime_service_daemon",
+                "not_persistent_event_store",
+                "not_async_stop_api"
+            ]
+        );
+        assert_eq!(
+            RuntimeControlPlaneEndpointLifecycleState::NotStarted.as_str(),
+            "not_started"
+        );
+        assert_eq!(
+            RuntimeControlPlaneEndpointLifecycleEventKind::StartRequested.as_str(),
+            "start_requested"
+        );
+    }
+
+    #[test]
     fn emits_static_runtime_control_plane_frame_adapter_contract_fixture() {
         let contract = RuntimeControlPlaneFrameAdapterContract::synthetic_fixture();
 
@@ -7701,6 +8389,45 @@ mod tests {
     }
 
     #[test]
+    fn exposes_bounded_runtime_control_plane_endpoint_lifecycle_policy() {
+        let root = temp_policy_root("endpoint-lifecycle-policy");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+        let policy = RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+
+        assert_eq!(
+            policy.max_path_bytes(),
+            RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES
+        );
+        assert_eq!(
+            policy.max_frame_bytes(),
+            RUNTIME_CONTROL_PLANE_FRAME_MAX_BYTES
+        );
+        assert!(policy.local_only);
+        assert!(policy.one_shot_lifecycle);
+        assert!(policy.start_stop_state_enabled);
+        assert!(policy.audit_events_enabled);
+        assert!(policy.endpoint_listener_execution_enabled);
+        assert!(policy.cleanup_on_completion);
+        assert!(!policy.public_network_transport_enabled);
+        assert!(!policy.listener_loop_enabled);
+        assert!(!policy.daemon_lifecycle_enabled);
+        assert!(!policy.process_spawning_enabled);
+        assert!(!policy.file_watching_enabled);
+        assert!(!policy.qt_binding_enabled);
+        assert!(!policy.storage_provider_enabled);
+        assert!(!policy.capture_enabled);
+        assert!(!policy.external_services_used);
+        assert!(!policy.deployment_allowed);
+        assert!(!policy.native_inference_execution_enabled);
+        assert!(!policy.persistent_event_store_enabled);
+        policy.validate().unwrap();
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
     fn endpoint_listener_policy_rejects_unsafe_flags_and_nested_drift() {
         let root = temp_policy_root("endpoint-listener-policy-drift");
 
@@ -7775,6 +8502,69 @@ mod tests {
             oversized_frame_policy.validate().unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
                 field: "endpoint.ipc_policy.frame_policy.max_frame_bytes",
+            }
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn endpoint_lifecycle_policy_rejects_unsafe_flags_and_nested_drift() {
+        let root = temp_policy_root("endpoint-lifecycle-policy-drift");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+
+        let mut network_policy =
+            RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy.clone());
+        network_policy.public_network_transport_enabled = true;
+        assert_eq!(
+            network_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_lifecycle.public_network_transport_enabled",
+            }
+        );
+
+        let mut loop_policy =
+            RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy.clone());
+        loop_policy.listener_loop_enabled = true;
+        assert_eq!(
+            loop_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_lifecycle.listener_loop_enabled",
+            }
+        );
+
+        let mut audit_policy =
+            RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy.clone());
+        audit_policy.audit_events_enabled = false;
+        assert_eq!(
+            audit_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_lifecycle.audit_events_enabled",
+            }
+        );
+
+        let mut event_store_policy =
+            RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy.clone());
+        event_store_policy.persistent_event_store_enabled = true;
+        assert_eq!(
+            event_store_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint_lifecycle.persistent_event_store_enabled",
+            }
+        );
+
+        let mut unsafe_listener_policy =
+            RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+        unsafe_listener_policy
+            .listener_policy
+            .endpoint_policy
+            .socket_listener_enabled = true;
+        assert_eq!(
+            unsafe_listener_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "endpoint.socket_listener_enabled",
             }
         );
 
@@ -7997,6 +8787,271 @@ mod tests {
             RuntimeControlPlaneAdapterError::InvalidUtf8
         );
         assert!(!socket_path.exists());
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dispatches_runtime_control_plane_json_message_endpoint_lifecycle_once() {
+        if !unix_stream_pair_writes_are_permitted() {
+            return;
+        }
+
+        let root = temp_policy_root("valid-endpoint-lifecycle");
+        let socket_path = root.join("runtime-control.sock");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+        let policy = RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+        let request_json =
+            json_message_request("request-lifecycle-json-001", synthetic_handoff_json());
+
+        let server_path = socket_path.clone();
+        let server_policy = policy.clone();
+        let server_thread = std::thread::spawn(move || {
+            execute_control_plane_endpoint_lifecycle_once(&server_path, &server_policy)
+        });
+
+        let mut client = connect_control_plane_listener_client(&socket_path);
+        write_control_plane_message_ipc_frame(
+            &mut client,
+            request_json.as_bytes(),
+            &policy.listener_policy.endpoint_policy.ipc_policy,
+        )
+        .unwrap();
+        let response_frame = read_control_plane_message_ipc_frame(
+            &mut client,
+            &policy.listener_policy.endpoint_policy.ipc_policy,
+        )
+        .unwrap();
+        let from_lifecycle = response_from_frame_bytes(response_frame);
+        let from_frame = response_from_frame_bytes(
+            execute_control_plane_message_frame_bytes(request_json.as_bytes()).unwrap(),
+        );
+        let outcome = server_thread
+            .join()
+            .expect("test lifecycle thread must complete")
+            .unwrap();
+
+        assert_eq!(from_lifecycle, from_frame);
+        assert_eq!(
+            from_lifecycle.request_id.as_str(),
+            "request-lifecycle-json-001"
+        );
+        assert_eq!(
+            from_lifecycle.outcome,
+            RuntimeControlPlaneMessageOutcome::Success
+        );
+        assert_eq!(
+            outcome.schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            outcome.listener_schema_version,
+            RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            outcome.final_state,
+            RuntimeControlPlaneEndpointLifecycleState::Stopped
+        );
+        assert!(outcome.failure_error_code.is_none());
+        assert!(outcome.listener_outcome.is_some());
+        assert!(outcome.cleanup_attempted);
+        assert!(outcome.socket_path_removed);
+        assert!(outcome.local_only);
+        assert!(outcome.one_shot_lifecycle);
+        assert!(outcome.start_stop_state_enabled);
+        assert!(outcome.audit_events_enabled);
+        assert!(outcome.endpoint_listener_execution_enabled);
+        assert!(!outcome.public_network_transport_enabled);
+        assert!(!outcome.listener_loop_enabled);
+        assert!(!outcome.daemon_lifecycle_enabled);
+        assert!(!outcome.process_spawning_enabled);
+        assert!(!outcome.file_watching_enabled);
+        assert!(!outcome.qt_binding_enabled);
+        assert!(!outcome.storage_provider_enabled);
+        assert!(!outcome.capture_enabled);
+        assert!(!outcome.external_services_used);
+        assert!(!outcome.deployment_allowed);
+        assert!(!outcome.native_inference_execution_enabled);
+        assert!(!outcome.persistent_event_store_enabled);
+        assert_eq!(
+            outcome
+                .events
+                .iter()
+                .map(|event| event.event_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                RuntimeControlPlaneEndpointLifecycleEventKind::StartRequested,
+                RuntimeControlPlaneEndpointLifecycleEventKind::PathValidated,
+                RuntimeControlPlaneEndpointLifecycleEventKind::SocketBound,
+                RuntimeControlPlaneEndpointLifecycleEventKind::ClientAccepted,
+                RuntimeControlPlaneEndpointLifecycleEventKind::RequestCompleted,
+                RuntimeControlPlaneEndpointLifecycleEventKind::StopRequested,
+                RuntimeControlPlaneEndpointLifecycleEventKind::CleanupCompleted,
+            ]
+        );
+        assert_eq!(
+            outcome.events[0].state,
+            RuntimeControlPlaneEndpointLifecycleState::StartRequested
+        );
+        assert_eq!(outcome.events[0].event_index, 0);
+        assert_eq!(outcome.events[0].event_label, "start_requested");
+        assert_eq!(
+            outcome.non_claims,
+            strings(RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_NON_CLAIMS)
+        );
+        assert!(!socket_path.exists());
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn endpoint_lifecycle_returns_failure_response_and_cleans_up_for_nested_rejections() {
+        if !unix_stream_pair_writes_are_permitted() {
+            return;
+        }
+
+        let root = temp_policy_root("endpoint-lifecycle-nested-failure");
+        let socket_path = root.join("runtime-control.sock");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+        let policy = RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+        let request_json = json_message_request("request-lifecycle-006", "{");
+
+        let server_path = socket_path.clone();
+        let server_policy = policy.clone();
+        let server_thread = std::thread::spawn(move || {
+            execute_control_plane_endpoint_lifecycle_once(&server_path, &server_policy)
+        });
+
+        let mut client = connect_control_plane_listener_client(&socket_path);
+        write_control_plane_message_ipc_frame(
+            &mut client,
+            request_json.as_bytes(),
+            &policy.listener_policy.endpoint_policy.ipc_policy,
+        )
+        .unwrap();
+        let response_frame = read_control_plane_message_ipc_frame(
+            &mut client,
+            &policy.listener_policy.endpoint_policy.ipc_policy,
+        )
+        .unwrap();
+        let response = response_from_frame_bytes(response_frame);
+        let outcome = server_thread
+            .join()
+            .expect("test lifecycle thread must complete")
+            .unwrap();
+
+        assert_eq!(response.request_id.as_str(), "request-lifecycle-006");
+        assert_eq!(response.outcome, RuntimeControlPlaneMessageOutcome::Failure);
+        assert!(response.snapshot.is_none());
+        assert_eq!(
+            response.error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidJson)
+        );
+        assert_eq!(
+            outcome.final_state,
+            RuntimeControlPlaneEndpointLifecycleState::Stopped
+        );
+        assert!(outcome.failure_error_code.is_none());
+        assert!(outcome.listener_outcome.is_some());
+        assert!(outcome.cleanup_attempted);
+        assert!(outcome.socket_path_removed);
+        assert!(!socket_path.exists());
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn endpoint_lifecycle_parse_failures_return_typed_failure_and_clean_up() {
+        if !unix_stream_pair_writes_are_permitted() {
+            return;
+        }
+
+        let root = temp_policy_root("endpoint-lifecycle-parse-failure");
+        let socket_path = root.join("runtime-control.sock");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+        let policy = RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+
+        let server_path = socket_path.clone();
+        let server_policy = policy.clone();
+        let server_thread = std::thread::spawn(move || {
+            execute_control_plane_endpoint_lifecycle_once(&server_path, &server_policy)
+        });
+
+        let mut client = connect_control_plane_listener_client(&socket_path);
+        client.write_all(&ipc_frame_bytes(&[0xff])).unwrap();
+        drop(client);
+
+        let outcome = server_thread
+            .join()
+            .expect("test lifecycle thread must complete")
+            .unwrap();
+
+        assert_eq!(
+            outcome.final_state,
+            RuntimeControlPlaneEndpointLifecycleState::Failed
+        );
+        assert_eq!(
+            outcome.failure_error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::InvalidUtf8)
+        );
+        assert!(outcome.listener_outcome.is_none());
+        assert!(outcome.cleanup_attempted);
+        assert!(outcome.socket_path_removed);
+        assert_eq!(
+            outcome.events.last().unwrap().event_kind,
+            RuntimeControlPlaneEndpointLifecycleEventKind::Failed
+        );
+        assert!(outcome.events.iter().any(|event| event.event_kind
+            == RuntimeControlPlaneEndpointLifecycleEventKind::CleanupCompleted));
+        assert!(!socket_path.exists());
+
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn endpoint_lifecycle_rejections_before_bind_return_failed_outcomes() {
+        let root = temp_policy_root("elifecycle-path");
+        let listener_policy = RuntimeControlPlaneEndpointListenerPolicy::new(
+            RuntimeControlPlaneEndpointPathPolicy::new(root.clone()),
+        );
+        let policy = RuntimeControlPlaneEndpointLifecyclePolicy::new(listener_policy);
+
+        let outcome =
+            execute_control_plane_endpoint_lifecycle_once(Path::new("relative.sock"), &policy)
+                .unwrap();
+
+        assert_eq!(
+            outcome.final_state,
+            RuntimeControlPlaneEndpointLifecycleState::Failed
+        );
+        assert_eq!(
+            outcome.failure_error_code,
+            Some(RuntimeControlPlaneMessageErrorCode::RelativeFilePath)
+        );
+        assert!(outcome.listener_outcome.is_none());
+        assert!(!outcome.cleanup_attempted);
+        assert!(!outcome.socket_path_removed);
+        assert_eq!(
+            outcome
+                .events
+                .iter()
+                .map(|event| event.event_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                RuntimeControlPlaneEndpointLifecycleEventKind::StartRequested,
+                RuntimeControlPlaneEndpointLifecycleEventKind::Failed,
+            ]
+        );
 
         remove_temp_root(&root);
     }
