@@ -91,6 +91,14 @@ endpoint path policy, choose endpoint paths, bind a listener, manage daemon
 lifecycle, supervise a process, bind to live runtime state, load generated
 reports, use external services, allow deployment, capture traffic, or execute
 native inference.
+Rust now also defines a bounded
+`runtime_control_plane_endpoint_listener.v0` one-shot OS-local listener over
+validated endpoint paths through `execute_control_plane_endpoint_listener_once`.
+Qt still does not call or bind the listener, open IPC, choose endpoint paths,
+manage a filesystem socket path, run a listener loop, manage daemon lifecycle,
+supervise a process, bind to live runtime state, load generated reports, use
+external services, allow deployment, capture traffic, or execute native
+inference.
 Rust now also defines a bounded in-memory `runtime_registry_provider.v0` that
 stores already validated `runtime_handoff_snapshot.v0` values and emits a typed
 `RuntimeRegistrySnapshot` sorted by workspace/session key. Qt still displays
@@ -128,9 +136,10 @@ QML shell scaffold
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter in the Rust runtime
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy in the Rust runtime
   -> bounded runtime_control_plane_endpoint_path.v0 path policy in the Rust runtime, not called by Qt
+  -> bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener in the Rust runtime, not called by Qt
   -> bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt
   -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
-  -> future OS-local listener binding over validated endpoint paths from the Rust runtime
+  -> future supervised local runtime endpoint lifecycle
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging

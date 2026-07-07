@@ -57,6 +57,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_DIRECTORY_MODE_MASK",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SOCKET_MODE",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES",
         "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION",
@@ -105,6 +108,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneEndpointPathContract",
         "RuntimeControlPlaneEndpointPathPolicy",
         "RuntimeControlPlaneEndpointPathSelection",
+        "RuntimeControlPlaneEndpointListenerContract",
+        "RuntimeControlPlaneEndpointListenerPolicy",
+        "RuntimeControlPlaneEndpointListenerOutcome",
         "RuntimeControlPlaneFrameAdapterContract",
         "RuntimeControlPlaneIpcAdapterContract",
         "RuntimeControlPlaneEndpointAdapterContract",
@@ -162,6 +168,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "IpcWriteFailed",
         "MalformedIpcFrame",
         "IncompleteIpcFrame",
+        "EndpointBindFailed",
+        "EndpointAcceptFailed",
+        "EndpointCleanupFailed",
         "UnsafeFlag",
         "synthetic_fixture",
         "parse_handoff_snapshot_json",
@@ -189,7 +198,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "write_control_plane_message_ipc_frame",
         "execute_control_plane_message_ipc_stream",
         "execute_control_plane_endpoint_stream",
+        "execute_control_plane_endpoint_listener_once",
         "validate_control_plane_endpoint_policy",
+        "validate_control_plane_endpoint_listener_policy",
         "validate_control_plane_endpoint_path",
         "command_kind",
         "output_snapshot_schema",
@@ -241,6 +252,12 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_endpoint_path.v0";' in " ".join(lib_rs.split())
     )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_endpoint_listener.v0";' in " ".join(lib_rs.split())
+    )
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_DIRECTORY_MODE_MASK: u32 = 0o077" in lib_rs
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SOCKET_MODE: u32 = 0o600" in lib_rs
     assert "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES: usize = 107;" in lib_rs
     assert (
         "pub const RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION: &str ="
@@ -719,6 +736,9 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "RuntimeControlPlaneAdapterError::FileReadFailed" in lib_rs
     assert "RuntimeControlPlaneAdapterError::FileWriteFailed" in lib_rs
     assert "RuntimeControlPlaneAdapterError::InvalidUtf8" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::EndpointBindFailed" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::EndpointAcceptFailed" in lib_rs
+    assert "RuntimeControlPlaneAdapterError::EndpointCleanupFailed" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsafeFlag" in lib_rs
     assert "RuntimeControlPlaneAdapterError::UnsupportedValue" in lib_rs
@@ -753,6 +773,16 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub struct RuntimeControlPlaneEndpointPathContract" in lib_rs
     assert "pub struct RuntimeControlPlaneEndpointPathPolicy" in lib_rs
     assert "pub struct RuntimeControlPlaneEndpointPathSelection" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointListenerContract" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointListenerPolicy" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointListenerOutcome" in lib_rs
+    assert "pub endpoint_path_policy: RuntimeControlPlaneEndpointPathPolicy" in lib_rs
+    assert "pub endpoint_path_selection: RuntimeControlPlaneEndpointPathSelection" in lib_rs
+    assert "pub filesystem_socket_binding_enabled: bool" in lib_rs
+    assert "pub cleanup_on_completion: bool" in lib_rs
+    assert "pub cleanup_attempted: bool" in lib_rs
+    assert "pub socket_path_removed: bool" in lib_rs
+    assert "pub listener_loop_enabled: bool" in lib_rs
     assert "pub ipc_schema_version: &'static str" in lib_rs
     assert "pub endpoint_policy_validation_enabled: bool" in lib_rs
     assert "pub connected_stream_execution_enabled: bool" in lib_rs
@@ -767,8 +797,10 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "impl RuntimeControlPlaneEndpointKind" in lib_rs
     assert "impl RuntimeControlPlaneEndpointAdapterContract" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPathContract" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointListenerContract" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPolicy" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPathPolicy" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointListenerPolicy" in lib_rs
     assert "impl Default for RuntimeControlPlaneEndpointPolicy" in lib_rs
     assert "pub frame_schema_version: &'static str" in lib_rs
     assert "pub message_schema_version: &'static str" in lib_rs
@@ -803,11 +835,15 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub fn write_control_plane_message_ipc_frame" in lib_rs
     assert "pub fn execute_control_plane_message_ipc_stream" in lib_rs
     assert "pub fn execute_control_plane_endpoint_stream" in lib_rs
+    assert "pub fn execute_control_plane_endpoint_listener_once" in lib_rs
     assert "pub fn validate_control_plane_endpoint_path" in lib_rs
     assert "fn read_exact_control_plane_ipc" in lib_rs
     assert "fn validate_control_plane_endpoint_policy" in lib_rs
+    assert "fn validate_control_plane_endpoint_listener_policy" in lib_rs
+    assert "fn cleanup_control_plane_endpoint_socket_path" in lib_rs
     assert "fn validate_safe_endpoint_filename" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS" in lib_rs
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_NON_CLAIMS" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_BLOCKED_PARTS" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
@@ -881,6 +917,9 @@ def test_rust_core_exposes_control_plane_message_envelope_shape() -> None:
         '"ipc_write_failed"',
         '"malformed_ipc_frame"',
         '"incomplete_ipc_frame"',
+        '"endpoint_bind_failed"',
+        '"endpoint_accept_failed"',
+        '"endpoint_cleanup_failed"',
         '"unsupported_schema_version"',
         '"unsupported_value"',
         '"unsafe_flag"',
@@ -1105,6 +1144,66 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     for value in endpoint_path_expected_values:
         assert value in lib_rs
 
+    endpoint_listener_expected_values = [
+        "RuntimeControlPlaneEndpointListenerContract",
+        "RuntimeControlPlaneEndpointListenerPolicy",
+        "RuntimeControlPlaneEndpointListenerOutcome",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION",
+        "runtime_control_plane_endpoint_listener.v0",
+        "endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
+        "endpoint_path_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
+        "filesystem_socket_binding_enabled: true",
+        "cleanup_on_completion: true",
+        "cleanup_attempted: true",
+        "socket_path_removed",
+        "endpoint_path_validation_enabled: true",
+        "endpoint_stream_execution_enabled: true",
+        "public_network_transport_enabled: false",
+        "listener_loop_enabled: false",
+        "daemon_lifecycle_enabled: false",
+        "process_spawning_enabled: false",
+        "file_watching_enabled: false",
+        "qt_binding_enabled: false",
+        "storage_provider_enabled: false",
+        "capture_enabled: false",
+        "external_services_used: false",
+        "deployment_allowed: false",
+        "native_inference_execution_enabled: false",
+        "execute_control_plane_endpoint_listener_once",
+        "validate_control_plane_endpoint_listener_policy",
+        "cleanup_control_plane_endpoint_socket_path",
+        "UnixListener::bind",
+        ".accept()",
+        ".try_clone()",
+        "execute_control_plane_endpoint_stream",
+        "validate_control_plane_endpoint_listener_path_permissions",
+        "validate_control_plane_endpoint_socket_metadata",
+        "restrict_control_plane_endpoint_socket_permissions",
+        "current_effective_user_id",
+        "endpoint_listener.allowed_root_owner",
+        "endpoint_listener.allowed_root_permissions",
+        "endpoint_listener.parent_owner",
+        "endpoint_listener.parent_permissions",
+        "endpoint_listener.socket_owner",
+        "endpoint_listener.socket_permissions",
+        'field: "endpoint_listener.platform"',
+        '"not_public_network_transport"',
+        '"not_listener_loop"',
+        '"not_daemon_lifecycle"',
+        '"not_process_spawner"',
+        '"not_file_watcher"',
+        '"not_qt_binding"',
+        '"not_storage_provider"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+        '"not_runtime_service"',
+        '"not_supervised_service"',
+    ]
+    for value in endpoint_listener_expected_values:
+        assert value in lib_rs
+
 
 def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot() -> None:
     lib_rs = _read("src/lib.rs")
@@ -1202,7 +1301,6 @@ def test_rust_core_source_stays_local_contract_only() -> None:
         "live capture",
         "tcpstream",
         "tcplistener",
-        "unixlistener",
         "udp",
         "std::net",
         "file::open",
@@ -1241,6 +1339,9 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "serde_json::from_value" not in rust_source
     assert "std::fs" in rust_source
     assert "use std::io::{Read, Write};" in rust_source
+    assert "use std::os::unix::net::UnixListener;" in rust_source
+    assert "TcpListener" not in rust_source
+    assert "TcpStream" not in rust_source
     assert "std::path::{Path, PathBuf}" in rust_source
     assert "RuntimeControlPlaneFilePolicy" in rust_source
     assert "RuntimeSummaryProviderContract" in rust_source
@@ -1260,6 +1361,9 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeControlPlaneEndpointPathContract" in rust_source
     assert "RuntimeControlPlaneEndpointPathPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointPathSelection" in rust_source
+    assert "RuntimeControlPlaneEndpointListenerContract" in rust_source
+    assert "RuntimeControlPlaneEndpointListenerPolicy" in rust_source
+    assert "RuntimeControlPlaneEndpointListenerOutcome" in rust_source
     assert "ModelRegistryMetadataAdapterContract" in rust_source
     assert "ModelRegistryMetadataAdapterPolicy" in rust_source
     assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
@@ -1276,7 +1380,9 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "write_control_plane_message_ipc_frame" in rust_source
     assert "execute_control_plane_message_ipc_stream" in rust_source
     assert "execute_control_plane_endpoint_stream" in rust_source
+    assert "execute_control_plane_endpoint_listener_once" in rust_source
     assert "validate_control_plane_endpoint_policy" in rust_source
+    assert "validate_control_plane_endpoint_listener_policy" in rust_source
     assert "validate_control_plane_endpoint_path" in rust_source
     assert "parse_handoff_snapshot_file" in rust_source
     assert "build_runtime_summary_from_events" in rust_source
@@ -1291,6 +1397,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RUNTIME_CONTROL_PLANE_FRAME_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES" in rust_source
@@ -1440,7 +1547,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "not a generated report loader",
         "not arbitrary file loading",
         "not a control-plane transport",
-        "Indexed storage, migrations, storage compaction, OS-local listener/path binding",
+        "supervised endpoint lifecycle",
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
         "typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files",
@@ -1454,19 +1561,39 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "caller-provided absolute allowed root",
         "107 UTF-8 bytes",
         "path-selection contract only",
-        (
-            "actual listener binding, daemon lifecycle, supervision, Qt live binding, capture, "
-            "deployment, external services, and native inference execution remain future work"
-        ),
+        "separate one-shot binding policy",
+        "runtime_control_plane_endpoint_listener.v0",
+        "RuntimeControlPlaneEndpointListenerContract",
+        "RuntimeControlPlaneEndpointListenerPolicy",
+        "RuntimeControlPlaneEndpointListenerOutcome",
+        "execute_control_plane_endpoint_listener_once",
+        "validates the caller-authorized `.sock` path before binding",
+        "binds a `UnixListener` only to that validated filesystem socket path",
+        "requires the allowed root and endpoint parent directories to be owned",
+        "group/other inaccessible",
+        "owner-only `0600`",
+        "verifies socket type, owner, and permissions",
+        "accepts exactly one client",
+        "clones the accepted stream for read/write halves",
+        "delegates the request/response exchange to `execute_control_plane_endpoint_stream`",
+        "attempts socket-path cleanup",
+        "still an owner-only Unix socket before unlinking",
+        "replacement file, directory, or symlink is not removed",
+        "Cleanup failure is returned even when request execution also failed",
+        'UnsupportedValue { field: "endpoint_listener.platform" }',
+        "local-only one-shot listener behavior",
+        "filesystem socket binding",
+        "cleanup-on-completion",
+        "public network transport, listener loops, daemon lifecycle",
         "bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots",
         "bounded runtime_registry_storage_provider.v0 local JSON persistence",
-        "future OS-local listener binding over validated endpoint paths",
+        "bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener",
+        "supervised local runtime endpoint lifecycle",
         "does not implement a daemon",
         "not a database or indexing engine",
         "not a generated JSON loader",
         "not arbitrary file loading",
         "not file watching",
-        "no socket listener",
         "no filesystem socket path selection",
         "no socket binding",
         "does not require Rust tooling for `make verify`",
