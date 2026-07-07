@@ -310,6 +310,15 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
             "bounded runtime_control_plane_endpoint_path.v0 path policy in the Rust runtime, "
             "not called by Qt"
         ),
+        "runtime_control_plane_endpoint_listener.v0",
+        "one-shot OS-local listener",
+        "execute_control_plane_endpoint_listener_once",
+        "Qt still does not call or bind the listener",
+        "run a listener loop",
+        (
+            "bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener "
+            "in the Rust runtime, not called by Qt"
+        ),
         "runtime_registry_provider.v0",
         "bounded in-memory `runtime_registry_provider.v0`",
         "runtime_handoff_snapshot.v0` values",
@@ -326,7 +335,7 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "load generated JSON",
         "bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt",
         "bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt",
-        "future OS-local listener binding over validated endpoint paths from the Rust runtime",
+        "future supervised local runtime endpoint lifecycle",
         "perform file I/O",
         "open IPC",
         "bind to live runtime state",
@@ -365,6 +374,9 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "endpoint policy",
         "runtime_control_plane_endpoint_path.v0",
         "endpoint path policy",
+        "runtime_control_plane_endpoint_listener.v0",
+        "one-shot OS-local listener",
+        "execute_control_plane_endpoint_listener_once",
         "runtime_registry_provider.v0",
         "does not call `RuntimeRegistryProvider`",
         "read `RuntimeRegistrySnapshot`",
@@ -372,7 +384,7 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "does not call `RuntimeRegistryStorageProvider`",
         "read `RuntimeRegistryStorageDocument`",
         "not called by Qt",
-        "future OS-local listener binding over validated endpoint paths from the Rust runtime",
+        "future supervised local runtime endpoint lifecycle",
     ]
     for text in expected_text:
         assert text in normalized_strategy

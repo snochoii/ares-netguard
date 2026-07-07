@@ -68,10 +68,11 @@ local endpoint, endpoint path, IPC, frame, message, and handoff schemas,
 `runtime_handoff_snapshot.v0`, `runtime_summary.v0`, and
 `model_registry_metadata.v0`, and exposes `RuntimeControlPlaneAdapterKind`,
 `RuntimeControlPlaneInputMode`, `RuntimeControlPlaneAdapterState`, and
-`RuntimeControlPlaneOutputSnapshotSchema`. The top local adapter fixture now
+`RuntimeControlPlaneOutputSnapshotSchema`. The top local adapter fixture still
 identifies the bounded endpoint policy over the connected-stream IPC adapter as
-available while listener, daemon, Qt binding, external service, and deployment
-behavior remain disabled. JSON-string parsing
+available while daemon, Qt binding, external service, and deployment behavior
+remain disabled; the OS-local one-shot listener is documented as its own
+bounded contract below. JSON-string parsing
 is now enabled through `serde` and `serde_json` using
 `RuntimeControlPlaneAdapterContract::parse_handoff_snapshot_json`. The parser
 accepts only a caller-provided local JSON string, denies unknown fields, rejects
@@ -149,7 +150,7 @@ public network transport, not a socket listener, not a filesystem socket path
 policy, not a daemon lifecycle, not process spawning, not file watching, not a
 Qt binding, not a capture boundary, not deployment behavior, not an external
 service, and not native inference execution. Indexed storage, migrations,
-storage compaction, OS-local listener/path binding, Qt live binding, process
+storage compaction, supervised endpoint lifecycle, Qt live binding, process
 supervision, and native inference execution remain future milestones.
 
 The scaffold now adds a typed local command dispatcher over those existing
@@ -274,10 +275,34 @@ selection document keeps local-only path selection explicit while disabling
 public network transport, socket listener behavior, filesystem mutation, daemon
 lifecycle, process spawning, file watching, Qt binding, storage provider
 behavior, capture, external services, deployment, and native inference
-execution. This is a path-selection contract only and a future precursor to
-binding; actual listener binding, daemon lifecycle, supervision, Qt live
-binding, capture, deployment, external services, and native inference execution
-remain future work.
+execution. This is a path-selection contract only and a precursor to the
+separate one-shot binding policy below.
+
+The scaffold now also owns a bounded Rust-owned
+`runtime_control_plane_endpoint_listener.v0` one-shot OS-local listener through
+`RuntimeControlPlaneEndpointListenerContract`,
+`RuntimeControlPlaneEndpointListenerPolicy`,
+`RuntimeControlPlaneEndpointListenerOutcome`, and
+`execute_control_plane_endpoint_listener_once`. The listener composes the
+existing endpoint path policy and connected-stream endpoint policy. On Unix, it
+validates the caller-authorized `.sock` path before binding, binds a
+`UnixListener` only to that validated filesystem socket path, requires the
+allowed root and endpoint parent directories to be owned by the current
+effective user and group/other inaccessible, sets the bound socket to
+owner-only `0600`, verifies socket type, owner, and permissions, accepts
+exactly one client, clones the accepted stream for read/write halves, delegates
+the request/response exchange to `execute_control_plane_endpoint_stream`, drops
+the listener, and attempts socket-path cleanup. Cleanup verifies the path is
+still an owner-only Unix socket before unlinking, so a replacement file,
+directory, or symlink is not removed. Cleanup failure is returned even when
+request execution also failed. On non-Unix platforms, the function compiles as
+a stub returning
+`UnsupportedValue { field: "endpoint_listener.platform" }`. The policy enables
+local-only one-shot listener behavior, filesystem socket binding,
+cleanup-on-completion, endpoint path validation, and endpoint stream execution.
+It keeps public network transport, listener loops, daemon lifecycle, process
+spawning, file watching, Qt binding, storage providers, capture, external
+services, deployment, and native inference execution disabled.
 
 The v0 scaffold is intentionally a source-only contract with bounded parser and
 local JSON storage behavior. It does not implement a daemon, indexed storage
@@ -297,12 +322,13 @@ control-plane transport, runtime service, Qt data binding, storage provider,
 generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
 local command dispatcher, strict local request/response message envelope, and
-bounded local byte-frame adapter plus a bounded connected-stream IPC adapter and
-bounded endpoint policy plus endpoint path-selection policy only; it is not
-arbitrary file loading, not file watching, not a public network transport, not
-a socket listener, not socket binding, not filesystem mutation, not Qt binding,
-not external-service integration, not storage, not deployment behavior, not
-capture behavior, and not native inference execution. The runtime summary
+bounded local byte-frame adapter plus a bounded connected-stream IPC adapter, a
+bounded endpoint policy, endpoint path-selection policy, and a one-shot
+OS-local endpoint listener; it is not arbitrary file loading, not file
+watching, not a public network transport, not a listener loop, not daemon
+lifecycle, not Qt binding, not external-service integration, not storage, not
+deployment behavior, not capture behavior, and not native inference execution.
+The runtime summary
 provider derives a summary only from
 explicit caller-provided events; it is not an event store, storage provider,
 runtime service, Qt data binding, live transport, process supervisor, capture
@@ -338,9 +364,10 @@ Rust source contract
   -> bounded runtime_control_plane_ipc.v0 connected-stream adapter
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
   -> bounded runtime_control_plane_endpoint_path.v0 path policy
+  -> bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
   -> bounded runtime_registry_storage_provider.v0 local JSON persistence
-  -> future OS-local listener binding over validated endpoint paths
+  -> supervised local runtime endpoint lifecycle
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
   -> runtime storage, job supervision, and stable native inference adapters
