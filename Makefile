@@ -74,3 +74,15 @@ fixture-smoke:
 		/tmp/ares-netguard/model-registry-metadata.json \
 		/tmp/ares-netguard/model-evaluation-bundle.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/model-registry-metadata.json >/dev/null
+	$(PYTHON) -m ares_netguard.storage.evidence_index \
+		/tmp/ares-netguard/evidence-index.json \
+		/tmp/ares-netguard/telemetry-feature-windows.json \
+		/tmp/ares-netguard/model-disagreement-report.json \
+		/tmp/ares-netguard/time-series-residual-report.json \
+		/tmp/ares-netguard/traffic-representation-report.json \
+		/tmp/ares-netguard/temporal-security-graph-report.json \
+		/tmp/ares-netguard/agentic-investigation-report.json \
+		/tmp/ares-netguard/detection-candidate-report.json \
+		/tmp/ares-netguard/native-inference-score-rows.json \
+		/tmp/ares-netguard/model-registry-metadata.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/evidence-index.json >/dev/null

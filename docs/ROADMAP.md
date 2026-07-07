@@ -63,8 +63,17 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
       service, or UI integration.
     - See `docs/MODEL_REGISTRY_METADATA.md`.
 
-13. **Qt/QML AI-NDR Workstation Shell**
+13. **Evidence Index**
+    - Local `evidence_index.v0` pointer-only index over synthetic reports and
+      score-row lists.
+    - Entity/window source row references, feature names, model IDs, evidence
+      indexes, counts, and local-only safety flags.
+    - Not durable storage, a database, runtime job execution, live capture,
+      deployment approval, or UI integration.
+    - See `docs/EVIDENCE_INDEX.md`.
+
+14. **Qt/QML AI-NDR Workstation Shell**
    - Product UI begins once ML evidence artifacts are meaningful.
 
-14. **Rust/C++ Product Runtime**
+15. **Rust/C++ Product Runtime**
    - Workspace/session/job/storage/native inference core.
