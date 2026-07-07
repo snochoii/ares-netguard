@@ -44,6 +44,13 @@ pytest -q tests/unit tests/integration -k "model or registry or evaluation or py
 make fixture-smoke
 ```
 
+## Telemetry and feature foundation
+
+```bash
+pytest -q tests/unit tests/integration -k "telemetry or ingest or feature or evidence"
+make fixture-smoke
+```
+
 ## Agentic investigation
 
 ```bash
