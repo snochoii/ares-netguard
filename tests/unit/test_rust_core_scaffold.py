@@ -58,6 +58,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_DIRECTORY_MODE_MASK",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SOCKET_MODE",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES",
@@ -111,6 +112,12 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeControlPlaneEndpointListenerContract",
         "RuntimeControlPlaneEndpointListenerPolicy",
         "RuntimeControlPlaneEndpointListenerOutcome",
+        "RuntimeControlPlaneEndpointLifecycleContract",
+        "RuntimeControlPlaneEndpointLifecyclePolicy",
+        "RuntimeControlPlaneEndpointLifecycleState",
+        "RuntimeControlPlaneEndpointLifecycleEventKind",
+        "RuntimeControlPlaneEndpointLifecycleEvent",
+        "RuntimeControlPlaneEndpointLifecycleOutcome",
         "RuntimeControlPlaneFrameAdapterContract",
         "RuntimeControlPlaneIpcAdapterContract",
         "RuntimeControlPlaneEndpointAdapterContract",
@@ -199,6 +206,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "execute_control_plane_message_ipc_stream",
         "execute_control_plane_endpoint_stream",
         "execute_control_plane_endpoint_listener_once",
+        "execute_control_plane_endpoint_lifecycle_once",
         "validate_control_plane_endpoint_policy",
         "validate_control_plane_endpoint_listener_policy",
         "validate_control_plane_endpoint_path",
@@ -255,6 +263,10 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_endpoint_listener.v0";' in " ".join(lib_rs.split())
+    )
+    assert (
+        "pub const RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION: &str ="
+        ' "runtime_control_plane_endpoint_lifecycle.v0";' in " ".join(lib_rs.split())
     )
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_DIRECTORY_MODE_MASK: u32 = 0o077" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SOCKET_MODE: u32 = 0o600" in lib_rs
@@ -776,13 +788,32 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub struct RuntimeControlPlaneEndpointListenerContract" in lib_rs
     assert "pub struct RuntimeControlPlaneEndpointListenerPolicy" in lib_rs
     assert "pub struct RuntimeControlPlaneEndpointListenerOutcome" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointLifecycleContract" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointLifecyclePolicy" in lib_rs
+    assert "pub enum RuntimeControlPlaneEndpointLifecycleState" in lib_rs
+    assert "pub enum RuntimeControlPlaneEndpointLifecycleEventKind" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointLifecycleEvent" in lib_rs
+    assert "pub struct RuntimeControlPlaneEndpointLifecycleOutcome" in lib_rs
     assert "pub endpoint_path_policy: RuntimeControlPlaneEndpointPathPolicy" in lib_rs
+    assert "pub listener_policy: RuntimeControlPlaneEndpointListenerPolicy" in lib_rs
     assert "pub endpoint_path_selection: RuntimeControlPlaneEndpointPathSelection" in lib_rs
+    assert "pub listener_outcome: Option<RuntimeControlPlaneEndpointListenerOutcome>" in lib_rs
+    assert "pub final_state: RuntimeControlPlaneEndpointLifecycleState" in lib_rs
+    assert "pub failure_error_code: Option<RuntimeControlPlaneMessageErrorCode>" in lib_rs
+    assert "pub events: Vec<RuntimeControlPlaneEndpointLifecycleEvent>" in lib_rs
     assert "pub filesystem_socket_binding_enabled: bool" in lib_rs
     assert "pub cleanup_on_completion: bool" in lib_rs
     assert "pub cleanup_attempted: bool" in lib_rs
     assert "pub socket_path_removed: bool" in lib_rs
     assert "pub listener_loop_enabled: bool" in lib_rs
+    assert "pub one_shot_lifecycle: bool" in lib_rs
+    assert "pub start_stop_state_enabled: bool" in lib_rs
+    assert "pub audit_events_enabled: bool" in lib_rs
+    assert "pub endpoint_listener_execution_enabled: bool" in lib_rs
+    assert "pub persistent_event_store_enabled: bool" in lib_rs
+    assert "pub event_index: u32" in lib_rs
+    assert "pub event_kind: RuntimeControlPlaneEndpointLifecycleEventKind" in lib_rs
+    assert "pub event_label: &'static str" in lib_rs
     assert "pub ipc_schema_version: &'static str" in lib_rs
     assert "pub endpoint_policy_validation_enabled: bool" in lib_rs
     assert "pub connected_stream_execution_enabled: bool" in lib_rs
@@ -798,9 +829,13 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "impl RuntimeControlPlaneEndpointAdapterContract" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPathContract" in lib_rs
     assert "impl RuntimeControlPlaneEndpointListenerContract" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointLifecycleContract" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPolicy" in lib_rs
     assert "impl RuntimeControlPlaneEndpointPathPolicy" in lib_rs
     assert "impl RuntimeControlPlaneEndpointListenerPolicy" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointLifecyclePolicy" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointLifecycleState" in lib_rs
+    assert "impl RuntimeControlPlaneEndpointLifecycleEventKind" in lib_rs
     assert "impl Default for RuntimeControlPlaneEndpointPolicy" in lib_rs
     assert "pub frame_schema_version: &'static str" in lib_rs
     assert "pub message_schema_version: &'static str" in lib_rs
@@ -836,14 +871,19 @@ def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
     assert "pub fn execute_control_plane_message_ipc_stream" in lib_rs
     assert "pub fn execute_control_plane_endpoint_stream" in lib_rs
     assert "pub fn execute_control_plane_endpoint_listener_once" in lib_rs
+    assert "pub fn execute_control_plane_endpoint_lifecycle_once" in lib_rs
     assert "pub fn validate_control_plane_endpoint_path" in lib_rs
     assert "fn read_exact_control_plane_ipc" in lib_rs
     assert "fn validate_control_plane_endpoint_policy" in lib_rs
     assert "fn validate_control_plane_endpoint_listener_policy" in lib_rs
+    assert "fn validate_control_plane_endpoint_lifecycle_policy" in lib_rs
+    assert "fn push_control_plane_endpoint_lifecycle_event" in lib_rs
+    assert "fn control_plane_endpoint_lifecycle_outcome" in lib_rs
     assert "fn cleanup_control_plane_endpoint_socket_path" in lib_rs
     assert "fn validate_safe_endpoint_filename" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_NON_CLAIMS" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_NON_CLAIMS" in lib_rs
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_NON_CLAIMS" in lib_rs
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_BLOCKED_PARTS" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotJson" in lib_rs
     assert "RuntimeControlPlaneCommand::ParseHandoffSnapshotFile" in lib_rs
@@ -1204,6 +1244,87 @@ def test_rust_core_static_control_plane_adapter_fixture_declares_only_local_cont
     for value in endpoint_listener_expected_values:
         assert value in lib_rs
 
+    endpoint_lifecycle_expected_values = [
+        "RuntimeControlPlaneEndpointLifecycleContract",
+        "RuntimeControlPlaneEndpointLifecyclePolicy",
+        "RuntimeControlPlaneEndpointLifecycleState",
+        "RuntimeControlPlaneEndpointLifecycleEventKind",
+        "RuntimeControlPlaneEndpointLifecycleEvent",
+        "RuntimeControlPlaneEndpointLifecycleOutcome",
+        "RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION",
+        "runtime_control_plane_endpoint_lifecycle.v0",
+        "listener_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION",
+        "endpoint_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
+        "endpoint_path_schema_version: RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
+        "one_shot_lifecycle: true",
+        "start_stop_state_enabled: true",
+        "audit_events_enabled: true",
+        "endpoint_listener_execution_enabled: true",
+        "cleanup_on_completion: true",
+        "cleanup_attempted",
+        "socket_path_removed",
+        "final_state",
+        "failure_error_code",
+        "event_index",
+        "event_kind",
+        "event_label",
+        "public_network_transport_enabled: false",
+        "listener_loop_enabled: false",
+        "daemon_lifecycle_enabled: false",
+        "process_spawning_enabled: false",
+        "file_watching_enabled: false",
+        "qt_binding_enabled: false",
+        "storage_provider_enabled: false",
+        "capture_enabled: false",
+        "external_services_used: false",
+        "deployment_allowed: false",
+        "native_inference_execution_enabled: false",
+        "persistent_event_store_enabled: false",
+        "StartRequested",
+        "PathValidated",
+        "SocketBound",
+        "ClientAccepted",
+        "RequestCompleted",
+        "CleanupCompleted",
+        "StopRequested",
+        "execute_control_plane_endpoint_lifecycle_once",
+        "validate_control_plane_endpoint_lifecycle_policy",
+        "push_control_plane_endpoint_lifecycle_event",
+        "control_plane_endpoint_lifecycle_outcome",
+        "execute_control_plane_endpoint_listener_once_audited",
+        "RuntimeControlPlaneEndpointListenerFailure",
+        "RuntimeControlPlaneEndpointListenerExecution",
+        "cleanup_attempted: true",
+        "endpoint_lifecycle.public_network_transport_enabled",
+        "endpoint_lifecycle.listener_loop_enabled",
+        "endpoint_lifecycle.daemon_lifecycle_enabled",
+        "endpoint_lifecycle.process_spawning_enabled",
+        "endpoint_lifecycle.file_watching_enabled",
+        "endpoint_lifecycle.qt_binding_enabled",
+        "endpoint_lifecycle.storage_provider_enabled",
+        "endpoint_lifecycle.capture_enabled",
+        "endpoint_lifecycle.external_services_used",
+        "endpoint_lifecycle.deployment_allowed",
+        "endpoint_lifecycle.native_inference_execution_enabled",
+        "endpoint_lifecycle.persistent_event_store_enabled",
+        '"not_public_network_transport"',
+        '"not_listener_loop"',
+        '"not_daemon_lifecycle"',
+        '"not_process_spawner"',
+        '"not_file_watcher"',
+        '"not_qt_binding"',
+        '"not_storage_provider"',
+        '"not_capture_boundary"',
+        '"not_external_service"',
+        '"not_deployment_approval"',
+        '"not_native_runtime_execution"',
+        '"not_runtime_service_daemon"',
+        '"not_persistent_event_store"',
+        '"not_async_stop_api"',
+    ]
+    for value in endpoint_lifecycle_expected_values:
+        assert value in lib_rs
+
 
 def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot() -> None:
     lib_rs = _read("src/lib.rs")
@@ -1364,6 +1485,12 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RuntimeControlPlaneEndpointListenerContract" in rust_source
     assert "RuntimeControlPlaneEndpointListenerPolicy" in rust_source
     assert "RuntimeControlPlaneEndpointListenerOutcome" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecycleContract" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecyclePolicy" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecycleState" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecycleEventKind" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecycleEvent" in rust_source
+    assert "RuntimeControlPlaneEndpointLifecycleOutcome" in rust_source
     assert "ModelRegistryMetadataAdapterContract" in rust_source
     assert "ModelRegistryMetadataAdapterPolicy" in rust_source
     assert "RuntimeControlPlaneFrameAdapterContract" in rust_source
@@ -1381,6 +1508,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "execute_control_plane_message_ipc_stream" in rust_source
     assert "execute_control_plane_endpoint_stream" in rust_source
     assert "execute_control_plane_endpoint_listener_once" in rust_source
+    assert "execute_control_plane_endpoint_lifecycle_once" in rust_source
     assert "validate_control_plane_endpoint_policy" in rust_source
     assert "validate_control_plane_endpoint_listener_policy" in rust_source
     assert "validate_control_plane_endpoint_path" in rust_source
@@ -1398,6 +1526,7 @@ def test_rust_core_source_stays_local_contract_only() -> None:
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LISTENER_SCHEMA_VERSION" in rust_source
+    assert "RUNTIME_CONTROL_PLANE_ENDPOINT_LIFECYCLE_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_MAX_BYTES" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_SCHEMA_VERSION" in rust_source
     assert "RUNTIME_CONTROL_PLANE_IPC_LENGTH_PREFIX_BYTES" in rust_source
@@ -1588,7 +1717,20 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots",
         "bounded runtime_registry_storage_provider.v0 local JSON persistence",
         "bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener",
-        "supervised local runtime endpoint lifecycle",
+        "runtime_control_plane_endpoint_lifecycle.v0",
+        "RuntimeControlPlaneEndpointLifecycleContract",
+        "RuntimeControlPlaneEndpointLifecyclePolicy",
+        "RuntimeControlPlaneEndpointLifecycleState",
+        "RuntimeControlPlaneEndpointLifecycleEventKind",
+        "RuntimeControlPlaneEndpointLifecycleEvent",
+        "RuntimeControlPlaneEndpointLifecycleOutcome",
+        "execute_control_plane_endpoint_lifecycle_once",
+        "wraps the one-shot listener in explicit start/stop lifecycle state",
+        "records bounded in-memory audit events",
+        "does not add an external async stop API",
+        "not a persistent event store",
+        "bounded one-shot runtime_control_plane_endpoint_lifecycle.v0 lifecycle wrapper",
+        "future supervised local runtime service lifecycle",
         "does not implement a daemon",
         "not a database or indexing engine",
         "not a generated JSON loader",

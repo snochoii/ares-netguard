@@ -304,6 +304,26 @@ It keeps public network transport, listener loops, daemon lifecycle, process
 spawning, file watching, Qt binding, storage providers, capture, external
 services, deployment, and native inference execution disabled.
 
+The scaffold now also owns a bounded Rust-owned
+`runtime_control_plane_endpoint_lifecycle.v0` lifecycle wrapper through
+`RuntimeControlPlaneEndpointLifecycleContract`,
+`RuntimeControlPlaneEndpointLifecyclePolicy`,
+`RuntimeControlPlaneEndpointLifecycleState`,
+`RuntimeControlPlaneEndpointLifecycleEventKind`,
+`RuntimeControlPlaneEndpointLifecycleEvent`,
+`RuntimeControlPlaneEndpointLifecycleOutcome`, and
+`execute_control_plane_endpoint_lifecycle_once`. The wrapper composes the
+one-shot listener policy, validates lifecycle flags and nested listener policy,
+executes the existing listener exactly once, wraps the one-shot listener in
+explicit start/stop lifecycle state, records bounded in-memory audit events,
+and returns a typed final lifecycle state for both successful one-shot
+request/response completion and listener execution failures after policy
+validation. This is still synchronous one-shot endpoint lifecycle accounting:
+it does not add an external async stop API, daemon service, listener loop,
+process supervisor, persistent event store, Qt binding, capture wrapper,
+deployment workflow, external service, public network transport, or native
+inference execution.
+
 The v0 scaffold is intentionally a source-only contract with bounded parser and
 local JSON storage behavior. It does not implement a daemon, indexed storage
 engine, process supervisor,
@@ -323,11 +343,12 @@ generated report loader, or live state feed. The control-plane adapter is
 strict local JSON-string parsing plus bounded local file reading behind a typed
 local command dispatcher, strict local request/response message envelope, and
 bounded local byte-frame adapter plus a bounded connected-stream IPC adapter, a
-bounded endpoint policy, endpoint path-selection policy, and a one-shot
-OS-local endpoint listener; it is not arbitrary file loading, not file
-watching, not a public network transport, not a listener loop, not daemon
-lifecycle, not Qt binding, not external-service integration, not storage, not
-deployment behavior, not capture behavior, and not native inference execution.
+bounded endpoint policy, endpoint path-selection policy, a one-shot OS-local
+endpoint listener, and a bounded one-shot endpoint lifecycle wrapper; it is not
+arbitrary file loading, not file watching, not a public network transport, not
+a listener loop, not daemon lifecycle, not Qt binding, not external-service
+integration, not storage, not deployment behavior, not capture behavior, not a
+persistent event store, and not native inference execution.
 The runtime summary
 provider derives a summary only from
 explicit caller-provided events; it is not an event store, storage provider,
@@ -365,9 +386,10 @@ Rust source contract
   -> bounded runtime_control_plane_endpoint.v0 endpoint policy
   -> bounded runtime_control_plane_endpoint_path.v0 path policy
   -> bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener
+  -> bounded one-shot runtime_control_plane_endpoint_lifecycle.v0 lifecycle wrapper
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
   -> bounded runtime_registry_storage_provider.v0 local JSON persistence
-  -> supervised local runtime endpoint lifecycle
+  -> future supervised local runtime service lifecycle
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
   -> runtime storage, job supervision, and stable native inference adapters
