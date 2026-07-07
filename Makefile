@@ -22,6 +22,10 @@ verify-rust-core:
 
 fixture-smoke:
 	mkdir -p /tmp/ares-netguard
+	$(PYTHON) -m ares_netguard.ingest.telemetry_foundation \
+		tests/fixtures/telemetry_foundation/synthetic_events.jsonl \
+		/tmp/ares-netguard/telemetry-feature-windows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/telemetry-feature-windows.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.disagreement \
 		tests/fixtures/model_disagreement/synthetic_scores.jsonl \
 		/tmp/ares-netguard/model-disagreement-report.json
