@@ -26,6 +26,9 @@ pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str =
     "model_registry_metadata_adapter.v0";
 pub const MODEL_REGISTRY_METADATA_SCOPE: &str = "local_synthetic_model_registry_metadata";
 pub const MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION: &str = "model_evaluation_bundle.v0";
+pub const EVIDENCE_INDEX_SCHEMA_VERSION: &str = "evidence_index.v0";
+pub const EVIDENCE_INDEX_SCOPE: &str = "local_synthetic_evidence_pointer_index";
+pub const EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION: &str = "evidence_index_adapter.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str = "runtime_control_plane_endpoint.v0";
@@ -333,6 +336,136 @@ pub struct ModelRegistrySafetyFlags {
     pub live_capture_used: bool,
     pub external_services_used: bool,
     pub deployment_allowed: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndex {
+    pub schema_version: String,
+    pub index_scope: String,
+    pub source_summaries: Vec<EvidenceIndexSourceSummary>,
+    pub entity_window_index: Vec<EvidenceIndexEntityWindow>,
+    pub aggregate_summary: EvidenceIndexAggregateSummary,
+    pub safety_flags: EvidenceIndexSafetyFlags,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexSourceSummary {
+    pub source_name: String,
+    pub source_schema: String,
+    pub row_count: u32,
+    pub entity_window_count: u32,
+    pub source_ref_count: u32,
+    pub evidence_ref_count: u32,
+    pub feature_count: u32,
+    pub model_count: u32,
+    pub feature_names: Vec<String>,
+    pub model_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexEntityWindow {
+    pub entity_id: String,
+    pub window_start: String,
+    pub source_refs: Vec<EvidenceIndexSourceRef>,
+    pub feature_names: Vec<String>,
+    pub model_ids: Vec<String>,
+    pub source_ref_count: u32,
+    pub evidence_ref_count: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexSourceRef {
+    pub source_name: String,
+    pub source_schema: String,
+    pub row_index: u32,
+    pub row_kind: String,
+    pub feature_names: Vec<String>,
+    pub model_ids: Vec<String>,
+    pub evidence_indexes: Vec<EvidenceIndexEvidenceRef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexEvidenceRef {
+    pub model_id: String,
+    pub evidence_index: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexAggregateSummary {
+    pub source_count: u32,
+    pub schemas_present: Vec<String>,
+    pub source_count_by_schema: BTreeMap<String, u32>,
+    pub row_count_by_schema: BTreeMap<String, u32>,
+    pub entity_count: u32,
+    pub entity_window_count: u32,
+    pub source_ref_count: u32,
+    pub evidence_ref_count: u32,
+    pub feature_count: u32,
+    pub model_count: u32,
+    pub feature_names: Vec<String>,
+    pub model_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceIndexSafetyFlags {
+    pub local_only: bool,
+    pub strict_json_loaded: bool,
+    pub pointer_only: bool,
+    pub input_paths_copied: bool,
+    pub source_filenames_copied: bool,
+    pub raw_evidence_payload_copied: bool,
+    pub raw_identifiers_copied: bool,
+    pub generated_artifact_references_copied: bool,
+    pub secrets_detected: bool,
+    pub capture_claims_copied: bool,
+    pub live_capture_used: bool,
+    pub external_service_claims_copied: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceIndexAdapterContract {
+    pub schema_version: &'static str,
+    pub accepted_index_schema: &'static str,
+    pub accepted_index_scope: &'static str,
+    pub max_file_bytes: u64,
+    pub local_only: bool,
+    pub pointer_only_index: bool,
+    pub strict_json_parsing_enabled: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceIndexAdapterPolicy {
+    pub file_policy: RuntimeControlPlaneFilePolicy,
+    pub local_only: bool,
+    pub pointer_only_index: bool,
+    pub storage_provider_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1817,6 +1950,119 @@ impl ModelRegistryMetadata {
             },
             non_claims: static_str_vec(MODEL_REGISTRY_NON_CLAIMS),
         }
+    }
+}
+
+impl EvidenceIndexAdapterContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION,
+            accepted_index_schema: EVIDENCE_INDEX_SCHEMA_VERSION,
+            accepted_index_scope: EVIDENCE_INDEX_SCOPE,
+            max_file_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            local_only: true,
+            pointer_only_index: true,
+            strict_json_parsing_enabled: true,
+            file_io_enabled: true,
+            storage_provider_enabled: false,
+            generated_report_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: EVIDENCE_INDEX_ADAPTER_NON_CLAIMS,
+        }
+    }
+
+    pub fn parse_evidence_index_json(
+        input: &str,
+    ) -> Result<EvidenceIndex, RuntimeControlPlaneAdapterError> {
+        parse_evidence_index_json(input)
+    }
+
+    pub fn parse_evidence_index_file(
+        path: impl AsRef<Path>,
+        policy: &EvidenceIndexAdapterPolicy,
+    ) -> Result<EvidenceIndex, RuntimeControlPlaneAdapterError> {
+        policy.validate()?;
+        parse_evidence_index_file(path, &policy.file_policy)
+    }
+}
+
+impl EvidenceIndexAdapterPolicy {
+    pub fn new(allowed_root: impl Into<PathBuf>) -> Self {
+        Self::from_file_policy(RuntimeControlPlaneFilePolicy::new(allowed_root))
+    }
+
+    pub fn from_file_policy(file_policy: RuntimeControlPlaneFilePolicy) -> Self {
+        Self {
+            file_policy,
+            local_only: true,
+            pointer_only_index: true,
+            storage_provider_enabled: false,
+            generated_report_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn max_bytes(&self) -> u64 {
+        self.file_policy.max_bytes()
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_required_flag("evidence_index_adapter.local_only", self.local_only, true)?;
+        validate_required_flag(
+            "evidence_index_adapter.pointer_only_index",
+            self.pointer_only_index,
+            true,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.storage_provider_enabled",
+            self.storage_provider_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.generated_report_loading_enabled",
+            self.generated_report_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.raw_evidence_payload_loading_enabled",
+            self.raw_evidence_payload_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "evidence_index_adapter.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
     }
 }
 
@@ -3893,6 +4139,43 @@ pub fn parse_model_registry_metadata_file(
     parse_model_registry_metadata_json(&input)
 }
 
+pub fn parse_evidence_index_json(
+    input: &str,
+) -> Result<EvidenceIndex, RuntimeControlPlaneAdapterError> {
+    match input.trim_start().as_bytes().first() {
+        Some(b'{') => {}
+        Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+        None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+    }
+
+    let index: EvidenceIndex =
+        serde_json::from_str(input).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+    validate_schema_version(
+        "schema_version",
+        &index.schema_version,
+        EVIDENCE_INDEX_SCHEMA_VERSION,
+    )?;
+    validate_evidence_index(&index)?;
+    Ok(index)
+}
+
+pub fn parse_evidence_index_file(
+    path: impl AsRef<Path>,
+    policy: &RuntimeControlPlaneFilePolicy,
+) -> Result<EvidenceIndex, RuntimeControlPlaneAdapterError> {
+    let canonical_path = validate_runtime_control_plane_json_file_path(path.as_ref(), policy)?;
+    let bytes =
+        fs::read(&canonical_path).map_err(|_| RuntimeControlPlaneAdapterError::FileReadFailed)?;
+    if bytes.len() as u64 > RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES {
+        return Err(RuntimeControlPlaneAdapterError::OversizedFile {
+            max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+        });
+    }
+    let input =
+        String::from_utf8(bytes).map_err(|_| RuntimeControlPlaneAdapterError::InvalidUtf8)?;
+    parse_evidence_index_json(&input)
+}
+
 pub fn parse_runtime_registry_storage_document_json(
     input: &str,
 ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
@@ -5579,6 +5862,507 @@ fn validate_model_registry_aggregate_summary(
     Ok(())
 }
 
+#[derive(Default)]
+struct EvidenceIndexDerivedSourceStats {
+    entity_windows: BTreeSet<(String, String)>,
+    source_ref_count: u32,
+    evidence_ref_count: u32,
+    feature_names: BTreeSet<String>,
+    model_ids: BTreeSet<String>,
+}
+
+fn validate_evidence_index(index: &EvidenceIndex) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_exact_string(
+        "evidence_index.index_scope",
+        &index.index_scope,
+        EVIDENCE_INDEX_SCOPE,
+    )?;
+    validate_exact_strings(
+        "evidence_index.non_claims",
+        &index.non_claims,
+        EVIDENCE_INDEX_NON_CLAIMS,
+    )?;
+    validate_evidence_index_safety_flags(&index.safety_flags)?;
+    if index.source_summaries.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.source_summaries",
+        });
+    }
+
+    let mut summaries_by_name = BTreeMap::new();
+    let mut previous_source_name: Option<&str> = None;
+    for summary in &index.source_summaries {
+        validate_evidence_index_source_summary(summary)?;
+        if previous_source_name.is_some_and(|previous| previous >= summary.source_name.as_str())
+            || summaries_by_name
+                .insert(summary.source_name.as_str(), summary)
+                .is_some()
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries",
+            });
+        }
+        previous_source_name = Some(summary.source_name.as_str());
+    }
+
+    let mut source_stats = index
+        .source_summaries
+        .iter()
+        .map(|summary| {
+            (
+                summary.source_name.as_str(),
+                EvidenceIndexDerivedSourceStats::default(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut previous_window: Option<(&str, &str)> = None;
+    for row in &index.entity_window_index {
+        validate_evidence_index_entity_window(row, &summaries_by_name, &mut source_stats)?;
+        let current_window = (row.entity_id.as_str(), row.window_start.as_str());
+        if previous_window.is_some_and(|previous| previous >= current_window) {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index",
+            });
+        }
+        previous_window = Some(current_window);
+    }
+
+    for summary in &index.source_summaries {
+        let stats = source_stats.get(summary.source_name.as_str()).ok_or(
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries",
+            },
+        )?;
+        if summary.entity_window_count != stats.entity_windows.len() as u32
+            || summary.source_ref_count != stats.source_ref_count
+            || summary.evidence_ref_count != stats.evidence_ref_count
+            || summary.feature_names != string_set_to_vec(&stats.feature_names)
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries",
+            });
+        }
+        if summary.source_schema != MODEL_REGISTRY_METADATA_SCHEMA_VERSION
+            && summary.model_ids != string_set_to_vec(&stats.model_ids)
+        {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries.model_ids",
+            });
+        }
+    }
+
+    validate_evidence_index_aggregate_summary(&index.aggregate_summary)?;
+    let derived_summary = derive_evidence_index_aggregate_summary(index);
+    if index.aggregate_summary != derived_summary {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.aggregate_summary",
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_evidence_index_source_summary(
+    summary: &EvidenceIndexSourceSummary,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_safe_source_name(
+        "evidence_index.source_summaries.source_name",
+        &summary.source_name,
+    )?;
+    validate_supported_evidence_source_schema(
+        "evidence_index.source_summaries.source_schema",
+        &summary.source_schema,
+    )?;
+    validate_sorted_unique_feature_names(
+        "evidence_index.source_summaries.feature_names",
+        &summary.feature_names,
+    )?;
+    validate_sorted_unique_model_ids(
+        "evidence_index.source_summaries.model_ids",
+        &summary.model_ids,
+    )?;
+    if summary.feature_count != summary.feature_names.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.source_summaries.feature_count",
+        });
+    }
+    if summary.model_count != summary.model_ids.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.source_summaries.model_count",
+        });
+    }
+    Ok(())
+}
+
+fn validate_evidence_index_entity_window(
+    row: &EvidenceIndexEntityWindow,
+    summaries_by_name: &BTreeMap<&str, &EvidenceIndexSourceSummary>,
+    source_stats: &mut BTreeMap<&str, EvidenceIndexDerivedSourceStats>,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_safe_entity_id(
+        "evidence_index.entity_window_index.entity_id",
+        &row.entity_id,
+    )?;
+    validate_safe_window_start(
+        "evidence_index.entity_window_index.window_start",
+        &row.window_start,
+    )?;
+    if row.source_refs.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.entity_window_index.source_refs",
+        });
+    }
+
+    let mut derived_features = BTreeSet::new();
+    let mut derived_models = BTreeSet::new();
+    let mut derived_evidence_ref_count = 0_u32;
+    let mut previous_ref: Option<(&str, &str, u32, &str)> = None;
+    for source_ref in &row.source_refs {
+        validate_evidence_index_source_ref(source_ref)?;
+        let current_ref = (
+            source_ref.source_name.as_str(),
+            source_ref.source_schema.as_str(),
+            source_ref.row_index,
+            source_ref.row_kind.as_str(),
+        );
+        if previous_ref.is_some_and(|previous| previous >= current_ref) {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs",
+            });
+        }
+        previous_ref = Some(current_ref);
+
+        let summary = summaries_by_name
+            .get(source_ref.source_name.as_str())
+            .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.source_name",
+            })?;
+        if summary.source_schema != source_ref.source_schema {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.source_schema",
+            });
+        }
+        if source_ref.row_index >= summary.row_count {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.row_index",
+            });
+        }
+
+        let stats = source_stats
+            .get_mut(source_ref.source_name.as_str())
+            .ok_or(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.source_name",
+            })?;
+        stats
+            .entity_windows
+            .insert((row.entity_id.clone(), row.window_start.clone()));
+        stats.source_ref_count += 1;
+        stats.evidence_ref_count += source_ref.evidence_indexes.len() as u32;
+        stats
+            .feature_names
+            .extend(source_ref.feature_names.iter().cloned());
+        stats.model_ids.extend(source_ref.model_ids.iter().cloned());
+
+        derived_features.extend(source_ref.feature_names.iter().cloned());
+        derived_models.extend(source_ref.model_ids.iter().cloned());
+        derived_evidence_ref_count += source_ref.evidence_indexes.len() as u32;
+    }
+
+    validate_sorted_unique_feature_names(
+        "evidence_index.entity_window_index.feature_names",
+        &row.feature_names,
+    )?;
+    validate_sorted_unique_model_ids(
+        "evidence_index.entity_window_index.model_ids",
+        &row.model_ids,
+    )?;
+    if row.feature_names != string_set_to_vec(&derived_features) {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.entity_window_index.feature_names",
+        });
+    }
+    if row.model_ids != string_set_to_vec(&derived_models) {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.entity_window_index.model_ids",
+        });
+    }
+    if row.source_ref_count != row.source_refs.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.entity_window_index.source_ref_count",
+        });
+    }
+    if row.evidence_ref_count != derived_evidence_ref_count {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.entity_window_index.evidence_ref_count",
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_evidence_index_source_ref(
+    source_ref: &EvidenceIndexSourceRef,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_safe_source_name(
+        "evidence_index.entity_window_index.source_refs.source_name",
+        &source_ref.source_name,
+    )?;
+    validate_supported_evidence_source_schema(
+        "evidence_index.entity_window_index.source_refs.source_schema",
+        &source_ref.source_schema,
+    )?;
+    validate_safe_model_id(
+        "evidence_index.entity_window_index.source_refs.row_kind",
+        &source_ref.row_kind,
+    )?;
+    validate_sorted_unique_feature_names(
+        "evidence_index.entity_window_index.source_refs.feature_names",
+        &source_ref.feature_names,
+    )?;
+    validate_sorted_unique_model_ids(
+        "evidence_index.entity_window_index.source_refs.model_ids",
+        &source_ref.model_ids,
+    )?;
+    let model_ids = source_ref
+        .model_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut previous_evidence_ref: Option<(&str, u32)> = None;
+    for evidence_ref in &source_ref.evidence_indexes {
+        validate_safe_model_id(
+            "evidence_index.entity_window_index.source_refs.evidence_indexes.model_id",
+            &evidence_ref.model_id,
+        )?;
+        if !model_ids.contains(evidence_ref.model_id.as_str()) {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.evidence_indexes.model_id",
+            });
+        }
+        let current_ref = (evidence_ref.model_id.as_str(), evidence_ref.evidence_index);
+        if previous_evidence_ref.is_some_and(|previous| previous >= current_ref) {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.evidence_indexes",
+            });
+        }
+        previous_evidence_ref = Some(current_ref);
+    }
+    Ok(())
+}
+
+fn validate_evidence_index_aggregate_summary(
+    summary: &EvidenceIndexAggregateSummary,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if summary.source_count == 0 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.aggregate_summary.source_count",
+        });
+    }
+    validate_sorted_unique_strings(
+        "evidence_index.aggregate_summary.schemas_present",
+        &summary.schemas_present,
+    )?;
+    for schema in &summary.schemas_present {
+        validate_supported_evidence_source_schema(
+            "evidence_index.aggregate_summary.schemas_present",
+            schema,
+        )?;
+    }
+    validate_evidence_index_count_map(
+        "evidence_index.aggregate_summary.source_count_by_schema",
+        &summary.source_count_by_schema,
+    )?;
+    validate_evidence_index_count_map(
+        "evidence_index.aggregate_summary.row_count_by_schema",
+        &summary.row_count_by_schema,
+    )?;
+    validate_sorted_unique_feature_names(
+        "evidence_index.aggregate_summary.feature_names",
+        &summary.feature_names,
+    )?;
+    validate_sorted_unique_model_ids(
+        "evidence_index.aggregate_summary.model_ids",
+        &summary.model_ids,
+    )?;
+    if summary.feature_count != summary.feature_names.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.aggregate_summary.feature_count",
+        });
+    }
+    if summary.model_count != summary.model_ids.len() as u32 {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "evidence_index.aggregate_summary.model_count",
+        });
+    }
+    Ok(())
+}
+
+fn validate_evidence_index_count_map(
+    field: &'static str,
+    counts: &BTreeMap<String, u32>,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if counts.is_empty() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    for schema in counts.keys() {
+        validate_supported_evidence_source_schema(field, schema)?;
+    }
+    Ok(())
+}
+
+fn validate_evidence_index_safety_flags(
+    flags: &EvidenceIndexSafetyFlags,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_flag(
+        "evidence_index.safety_flags.local_only",
+        flags.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.strict_json_loaded",
+        flags.strict_json_loaded,
+        true,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.pointer_only",
+        flags.pointer_only,
+        true,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.input_paths_copied",
+        flags.input_paths_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.source_filenames_copied",
+        flags.source_filenames_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.raw_evidence_payload_copied",
+        flags.raw_evidence_payload_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.raw_identifiers_copied",
+        flags.raw_identifiers_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.generated_artifact_references_copied",
+        flags.generated_artifact_references_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.secrets_detected",
+        flags.secrets_detected,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.capture_claims_copied",
+        flags.capture_claims_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.live_capture_used",
+        flags.live_capture_used,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.external_service_claims_copied",
+        flags.external_service_claims_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.external_services_used",
+        flags.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "evidence_index.safety_flags.deployment_allowed",
+        flags.deployment_allowed,
+        false,
+    )
+}
+
+fn derive_evidence_index_aggregate_summary(index: &EvidenceIndex) -> EvidenceIndexAggregateSummary {
+    let mut source_count_by_schema = BTreeMap::<String, u32>::new();
+    let mut row_count_by_schema = BTreeMap::<String, u32>::new();
+    let mut entities = BTreeSet::<String>::new();
+    let mut feature_names = BTreeSet::<String>::new();
+    let mut model_ids = BTreeSet::<String>::new();
+    let mut source_ref_count = 0_u32;
+    let mut evidence_ref_count = 0_u32;
+
+    for summary in &index.source_summaries {
+        *source_count_by_schema
+            .entry(summary.source_schema.clone())
+            .or_default() += 1;
+        *row_count_by_schema
+            .entry(summary.source_schema.clone())
+            .or_default() += summary.row_count;
+        feature_names.extend(summary.feature_names.iter().cloned());
+        model_ids.extend(summary.model_ids.iter().cloned());
+    }
+    for row in &index.entity_window_index {
+        entities.insert(row.entity_id.clone());
+        feature_names.extend(row.feature_names.iter().cloned());
+        source_ref_count += row.source_ref_count;
+        evidence_ref_count += row.evidence_ref_count;
+    }
+
+    EvidenceIndexAggregateSummary {
+        source_count: index.source_summaries.len() as u32,
+        schemas_present: source_count_by_schema.keys().cloned().collect(),
+        source_count_by_schema,
+        row_count_by_schema,
+        entity_count: entities.len() as u32,
+        entity_window_count: index.entity_window_index.len() as u32,
+        source_ref_count,
+        evidence_ref_count,
+        feature_count: feature_names.len() as u32,
+        model_count: model_ids.len() as u32,
+        feature_names: string_set_to_vec(&feature_names),
+        model_ids: string_set_to_vec(&model_ids),
+    }
+}
+
+fn validate_supported_evidence_source_schema(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if !EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS.contains(&value) {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_sorted_unique_feature_names(
+    field: &'static str,
+    values: &[String],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_sorted_unique_strings(field, values)?;
+    for value in values {
+        validate_safe_feature_name(field, value)?;
+    }
+    Ok(())
+}
+
+fn validate_sorted_unique_model_ids(
+    field: &'static str,
+    values: &[String],
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_sorted_unique_strings(field, values)?;
+    for value in values {
+        validate_safe_model_id(field, value)?;
+    }
+    Ok(())
+}
+
+fn string_set_to_vec(values: &BTreeSet<String>) -> Vec<String> {
+    values.iter().cloned().collect()
+}
+
 fn validate_schema_version(
     field: &'static str,
     actual: &str,
@@ -5638,10 +6422,82 @@ fn validate_required_flag(
     Ok(())
 }
 
+fn validate_safe_entity_id(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_safe_text(field, value)?;
+    let Some(suffix) = value
+        .strip_prefix("asset-")
+        .or_else(|| value.strip_prefix("entity-"))
+        .or_else(|| value.strip_prefix("fixture-"))
+        .or_else(|| value.strip_prefix("host-"))
+        .or_else(|| value.strip_prefix("sensor-"))
+    else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    };
+    let mut bytes = suffix.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    };
+    if suffix.len() > 63
+        || !first.is_ascii_lowercase() && !first.is_ascii_digit()
+        || !bytes.all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-' || byte == b'_'
+        })
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_safe_window_start(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_safe_text(field, value)?;
+    let Some((_date, time)) = value.split_once('T') else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    };
+    if time.is_empty()
+        || !(value.ends_with('Z')
+            || time.contains('+')
+            || time
+                .char_indices()
+                .skip(1)
+                .any(|(_index, character)| character == '-'))
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'-' | b':' | b'T' | b'Z' | b'+'))
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn validate_safe_feature_name(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_no_unsafe_label_parts(field, value)?;
+    let mut bytes = value.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    };
+    if value.len() > 64
+        || !first.is_ascii_lowercase()
+        || !bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
 fn validate_safe_model_id(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_safe_text(field, value)?;
     validate_no_unsafe_label_parts(field, value)?;
     let mut bytes = value.bytes();
     let Some(first) = bytes.next() else {
@@ -5662,6 +6518,7 @@ fn validate_safe_source_name(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_safe_text(field, value)?;
     validate_no_unsafe_label_parts(field, value)?;
     let bytes = value.as_bytes();
     if bytes.len() < 5
@@ -5676,6 +6533,87 @@ fn validate_safe_source_name(
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
     }
     Ok(())
+}
+
+fn validate_required_safe_text(
+    field: &'static str,
+    value: &str,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if value.trim().is_empty()
+        || value.trim() != value
+        || value.len() > 2048
+        || contains_unsafe_text(value)
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
+    }
+    Ok(())
+}
+
+fn contains_unsafe_text(value: &str) -> bool {
+    let lowered = value.to_ascii_lowercase();
+    lowered.contains("://")
+        || value.contains('@')
+        || contains_blocked_artifact_extension(&lowered)
+        || lowered.contains("password")
+        || lowered.contains("passwd")
+        || lowered.contains("credential")
+        || lowered.contains("secret")
+        || lowered.contains(concat!("api", "_key"))
+        || lowered.contains(concat!("api", "key"))
+        || lowered.contains(concat!("private", "_key"))
+        || lowered.contains(concat!("c", "ur", "l "))
+        || lowered.contains("wget ")
+        || lowered.contains("bash ")
+        || lowered.contains("powershell ")
+        || value.contains("&&")
+        || value.contains("||")
+        || value.contains('`')
+        || contains_path_like_text(value)
+        || contains_ipv4_literal(value)
+}
+
+fn contains_blocked_artifact_extension(value: &str) -> bool {
+    [
+        concat!(".", "p", "cap"),
+        concat!(".", "p", "capng"),
+        ".parquet",
+        concat!(".", "job", "lib"),
+        concat!(".", "p", "kl"),
+        concat!(".", "on", "nx"),
+        concat!(".", "p", "t"),
+        concat!(".", "p", "th"),
+        ".ckpt",
+        concat!(".", "sql", "ite"),
+        concat!(".", "duck", "db"),
+        concat!(".", "json", "l"),
+    ]
+    .iter()
+    .any(|extension| value.contains(extension))
+}
+
+fn contains_path_like_text(value: &str) -> bool {
+    value
+        .split_whitespace()
+        .any(|part| part.matches('/').count() >= 2 || part.contains(":\\"))
+}
+
+fn contains_ipv4_literal(value: &str) -> bool {
+    value
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, ',' | ';' | '|' | '/' | '[' | ']')
+        })
+        .filter(|part| !part.is_empty())
+        .any(|part| {
+            let candidate = part.trim_matches(|character: char| {
+                matches!(character, '(' | ')' | '{' | '}' | '<' | '>' | '.' | ':')
+            });
+            let mut octets = candidate.split('.');
+            let parsed = [octets.next(), octets.next(), octets.next(), octets.next()];
+            octets.next().is_none()
+                && parsed
+                    .iter()
+                    .all(|octet| octet.is_some_and(|value| value.parse::<u8>().is_ok()))
+        })
 }
 
 fn validate_no_unsafe_label_parts(
@@ -6099,6 +7037,47 @@ const MODEL_REGISTRY_METADATA_ADAPTER_NON_CLAIMS: &[&str] = &[
     "not_qt_binding",
     "not_capture_boundary",
     "not_external_service",
+    "not_native_runtime_execution",
+];
+
+const EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "detection_candidate_report.v0",
+    MODEL_REGISTRY_METADATA_SCHEMA_VERSION,
+    "model_disagreement_report.v0",
+    "model_score_rows.v0",
+    "telemetry_feature_window_report.v0",
+    "temporal_security_graph_report.v0",
+    "time_series_residual_report.v0",
+    "traffic_representation_report.v0",
+];
+
+const EVIDENCE_INDEX_NON_CLAIMS: &[&str] = &[
+    "not_durable_evidence_store",
+    "not_database",
+    "not_live_capture",
+    concat!("not_p", "cap_parser"),
+    "not_private_telemetry",
+    "not_external_enrichment",
+    "not_rule_deployment",
+    "not_model_promotion_gate",
+    "not_native_runtime_execution",
+    "not_qt_binding",
+];
+
+const EVIDENCE_INDEX_ADAPTER_NON_CLAIMS: &[&str] = &[
+    "not_durable_evidence_store",
+    "not_database_or_indexing_engine",
+    "not_generated_report_loader",
+    "not_raw_evidence_payload_loader",
+    "not_arbitrary_file_loader",
+    "not_live_capture",
+    concat!("not_p", "cap_parser"),
+    "not_private_telemetry",
+    "not_external_enrichment",
+    "not_rule_deployment",
+    "not_model_promotion_gate",
+    "not_qt_binding",
     "not_native_runtime_execution",
 ];
 
@@ -6553,6 +7532,129 @@ mod tests {
 
     fn patched_json(target: &str, replacement: &str) -> String {
         synthetic_handoff_json().replacen(target, replacement, 1)
+    }
+
+    fn minimal_evidence_index_fixture() -> EvidenceIndex {
+        EvidenceIndex {
+            schema_version: EVIDENCE_INDEX_SCHEMA_VERSION.to_owned(),
+            index_scope: EVIDENCE_INDEX_SCOPE.to_owned(),
+            source_summaries: vec![
+                EvidenceIndexSourceSummary {
+                    source_name: "model_disagreement_report_v0_001".to_owned(),
+                    source_schema: "model_disagreement_report.v0".to_owned(),
+                    row_count: 1,
+                    entity_window_count: 1,
+                    source_ref_count: 1,
+                    evidence_ref_count: 1,
+                    feature_count: 0,
+                    model_count: 1,
+                    feature_names: vec![],
+                    model_ids: strings(&["isolation_forest"]),
+                },
+                EvidenceIndexSourceSummary {
+                    source_name: "model_score_rows_v0_001".to_owned(),
+                    source_schema: "model_score_rows.v0".to_owned(),
+                    row_count: 1,
+                    entity_window_count: 1,
+                    source_ref_count: 1,
+                    evidence_ref_count: 2,
+                    feature_count: 1,
+                    model_count: 2,
+                    feature_names: strings(&["dns_failure_ratio"]),
+                    model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
+                },
+            ],
+            entity_window_index: vec![EvidenceIndexEntityWindow {
+                entity_id: "host-alpha".to_owned(),
+                window_start: "2026-01-01T00:00:00Z".to_owned(),
+                source_refs: vec![
+                    EvidenceIndexSourceRef {
+                        source_name: "model_disagreement_report_v0_001".to_owned(),
+                        source_schema: "model_disagreement_report.v0".to_owned(),
+                        row_index: 0,
+                        row_kind: "model_disagreement_row".to_owned(),
+                        feature_names: vec![],
+                        model_ids: strings(&["isolation_forest"]),
+                        evidence_indexes: vec![EvidenceIndexEvidenceRef {
+                            model_id: "isolation_forest".to_owned(),
+                            evidence_index: 0,
+                        }],
+                    },
+                    EvidenceIndexSourceRef {
+                        source_name: "model_score_rows_v0_001".to_owned(),
+                        source_schema: "model_score_rows.v0".to_owned(),
+                        row_index: 0,
+                        row_kind: "model_score_row".to_owned(),
+                        feature_names: strings(&["dns_failure_ratio"]),
+                        model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
+                        evidence_indexes: vec![
+                            EvidenceIndexEvidenceRef {
+                                model_id: "isolation_forest".to_owned(),
+                                evidence_index: 0,
+                            },
+                            EvidenceIndexEvidenceRef {
+                                model_id: "stdlib_linear_native".to_owned(),
+                                evidence_index: 0,
+                            },
+                        ],
+                    },
+                ],
+                feature_names: strings(&["dns_failure_ratio"]),
+                model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
+                source_ref_count: 2,
+                evidence_ref_count: 3,
+            }],
+            aggregate_summary: EvidenceIndexAggregateSummary {
+                source_count: 2,
+                schemas_present: strings(&["model_disagreement_report.v0", "model_score_rows.v0"]),
+                source_count_by_schema: BTreeMap::from([
+                    ("model_disagreement_report.v0".to_owned(), 1),
+                    ("model_score_rows.v0".to_owned(), 1),
+                ]),
+                row_count_by_schema: BTreeMap::from([
+                    ("model_disagreement_report.v0".to_owned(), 1),
+                    ("model_score_rows.v0".to_owned(), 1),
+                ]),
+                entity_count: 1,
+                entity_window_count: 1,
+                source_ref_count: 2,
+                evidence_ref_count: 3,
+                feature_count: 1,
+                model_count: 2,
+                feature_names: strings(&["dns_failure_ratio"]),
+                model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
+            },
+            safety_flags: EvidenceIndexSafetyFlags {
+                local_only: true,
+                strict_json_loaded: true,
+                pointer_only: true,
+                input_paths_copied: false,
+                source_filenames_copied: false,
+                raw_evidence_payload_copied: false,
+                raw_identifiers_copied: false,
+                generated_artifact_references_copied: false,
+                secrets_detected: false,
+                capture_claims_copied: false,
+                live_capture_used: false,
+                external_service_claims_copied: false,
+                external_services_used: false,
+                deployment_allowed: false,
+            },
+            non_claims: static_str_vec(EVIDENCE_INDEX_NON_CLAIMS),
+        }
+    }
+
+    fn minimal_evidence_index_json() -> String {
+        serde_json::to_string_pretty(&minimal_evidence_index_fixture())
+            .expect("minimal evidence index fixture must serialize")
+    }
+
+    fn evidence_index_json(index: &EvidenceIndex) -> String {
+        serde_json::to_string_pretty(index).expect("evidence index fixture must serialize")
+    }
+
+    fn patched_evidence_index_json(target: &str, replacement: &str) -> String {
+        minimal_evidence_index_json().replacen(target, replacement, 1)
     }
 
     fn synthetic_model_registry_metadata_json() -> String {
@@ -7451,6 +8553,505 @@ mod tests {
         assert_eq!(from_file.entries[2].model_id, "stdlib_linear_native");
 
         remove_temp_root(&root);
+    }
+
+    #[test]
+    fn emits_static_evidence_index_adapter_contract_fixture() {
+        let contract = EvidenceIndexAdapterContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_index_schema,
+            EVIDENCE_INDEX_SCHEMA_VERSION
+        );
+        assert_eq!(contract.accepted_index_scope, EVIDENCE_INDEX_SCOPE);
+        assert_eq!(
+            contract.max_file_bytes,
+            RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES
+        );
+        assert!(contract.local_only);
+        assert!(contract.pointer_only_index);
+        assert!(contract.strict_json_parsing_enabled);
+        assert!(contract.file_io_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.raw_evidence_payload_loading_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            &[
+                "not_durable_evidence_store",
+                "not_database_or_indexing_engine",
+                "not_generated_report_loader",
+                "not_raw_evidence_payload_loader",
+                "not_arbitrary_file_loader",
+                "not_live_capture",
+                concat!("not_p", "cap_parser"),
+                "not_private_telemetry",
+                "not_external_enrichment",
+                "not_rule_deployment",
+                "not_model_promotion_gate",
+                "not_qt_binding",
+                "not_native_runtime_execution"
+            ]
+        );
+    }
+
+    #[test]
+    fn exposes_evidence_index_adapter_policy() {
+        let root = temp_policy_root("evidence-index-adapter-policy");
+        let policy = EvidenceIndexAdapterPolicy::new(root.clone());
+
+        assert_eq!(policy.file_policy.allowed_root, root);
+        assert_eq!(policy.max_bytes(), RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES);
+        assert!(policy.local_only);
+        assert!(policy.pointer_only_index);
+        assert!(!policy.storage_provider_enabled);
+        assert!(!policy.generated_report_loading_enabled);
+        assert!(!policy.raw_evidence_payload_loading_enabled);
+        assert!(!policy.qt_binding_enabled);
+        assert!(!policy.capture_enabled);
+        assert!(!policy.external_services_used);
+        assert!(!policy.deployment_allowed);
+        assert!(!policy.native_inference_execution_enabled);
+        policy.validate().unwrap();
+
+        let mut drifted_policy = policy.clone();
+        drifted_policy.storage_provider_enabled = true;
+        assert_eq!(
+            drifted_policy.validate().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index_adapter.storage_provider_enabled",
+            }
+        );
+
+        remove_temp_root(&policy.file_policy.allowed_root);
+    }
+
+    #[test]
+    fn parses_minimal_evidence_index_json_string() {
+        let json = minimal_evidence_index_json();
+        let index = parse_evidence_index_json(&json).unwrap();
+        let from_contract = EvidenceIndexAdapterContract::parse_evidence_index_json(&json).unwrap();
+
+        assert_eq!(index, minimal_evidence_index_fixture());
+        assert_eq!(from_contract, index);
+        assert_eq!(index.schema_version, EVIDENCE_INDEX_SCHEMA_VERSION);
+        assert_eq!(index.index_scope, EVIDENCE_INDEX_SCOPE);
+        assert_eq!(index.source_summaries.len(), 2);
+        assert_eq!(index.entity_window_index[0].source_ref_count, 2);
+        assert_eq!(index.aggregate_summary.source_ref_count, 2);
+        assert!(index.safety_flags.local_only);
+        assert!(index.safety_flags.pointer_only);
+        assert!(!index.safety_flags.deployment_allowed);
+    }
+
+    #[test]
+    fn parses_evidence_index_file_under_allowed_root() {
+        let root = temp_policy_root("valid-evidence-index-file");
+        let path = write_test_file(&root, "evidence_index.json", minimal_evidence_index_json());
+        let file_policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+        let adapter_policy = EvidenceIndexAdapterPolicy::from_file_policy(file_policy.clone());
+
+        let from_file = parse_evidence_index_file(&path, &file_policy).unwrap();
+        let from_contract =
+            EvidenceIndexAdapterContract::parse_evidence_index_file(&path, &adapter_policy)
+                .unwrap();
+        let from_json = parse_evidence_index_json(&minimal_evidence_index_json()).unwrap();
+
+        assert_eq!(from_file, from_json);
+        assert_eq!(from_contract, from_file);
+        assert_eq!(
+            from_file.aggregate_summary.model_ids,
+            strings(&["isolation_forest", "stdlib_linear_native"])
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn rejects_evidence_index_file_policy_path_violations() {
+        let root = temp_policy_root("evidence-index-path-policy");
+        let outside_root = temp_policy_root("outside-evidence-index-policy");
+        let policy = RuntimeControlPlaneFilePolicy::new(root.clone());
+
+        assert_eq!(
+            parse_evidence_index_file(Path::new("evidence_index.json"), &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeFilePath
+        );
+
+        let relative_root_policy = RuntimeControlPlaneFilePolicy::new("relative-root");
+        let relative_root_path = write_test_file(
+            &root,
+            "relative_root_evidence_index.json",
+            minimal_evidence_index_json(),
+        );
+        assert_eq!(
+            parse_evidence_index_file(&relative_root_path, &relative_root_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::RelativeAllowedRoot
+        );
+
+        let missing_root_policy =
+            RuntimeControlPlaneFilePolicy::new(root.join("missing-policy-root"));
+        let missing_root_path = root.join("missing-policy-root").join("evidence_index.json");
+        assert_eq!(
+            parse_evidence_index_file(&missing_root_path, &missing_root_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingAllowedRoot
+        );
+
+        let file_root = write_test_file(
+            &root,
+            "file_policy_root.json",
+            minimal_evidence_index_json(),
+        );
+        let file_root_policy = RuntimeControlPlaneFilePolicy::new(file_root.clone());
+        assert_eq!(
+            parse_evidence_index_file(&file_root, &file_root_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootNotDirectory
+        );
+
+        let outside_path = write_test_file(
+            &outside_root,
+            "evidence_index.json",
+            minimal_evidence_index_json(),
+        );
+        assert_eq!(
+            parse_evidence_index_file(&outside_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OutsideAllowedRoot
+        );
+
+        let directory_path = root.join("directory.json");
+        std::fs::create_dir_all(&directory_path).expect("test directory path must be created");
+        assert_eq!(
+            parse_evidence_index_file(&directory_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::DirectoryPath
+        );
+
+        let text_path = write_test_file(&root, "evidence_index.txt", "{}");
+        assert_eq!(
+            parse_evidence_index_file(&text_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedFileExtension
+        );
+
+        let missing_path = root.join("missing_evidence_index.json");
+        assert_eq!(
+            parse_evidence_index_file(&missing_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::MissingFile
+        );
+
+        let oversized_path = write_test_file(
+            &root,
+            "oversized_evidence_index.json",
+            vec![b' '; RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES as usize + 1],
+        );
+        assert_eq!(
+            parse_evidence_index_file(&oversized_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::OversizedFile {
+                max_bytes: RUNTIME_CONTROL_PLANE_FILE_MAX_BYTES,
+            }
+        );
+
+        let malformed_path = write_test_file(&root, "malformed_evidence_index.json", "{");
+        assert_eq!(
+            parse_evidence_index_file(&malformed_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        let invalid_utf8_path = write_test_file(&root, "invalid_utf8_evidence_index.json", [0xff]);
+        assert_eq!(
+            parse_evidence_index_file(&invalid_utf8_path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidUtf8
+        );
+
+        remove_temp_root(&outside_root);
+        remove_temp_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_evidence_index_file_boundaries() {
+        let root = temp_policy_root("evidence-index-symlink-policy");
+        let real_root = root.join("real-root");
+        std::fs::create_dir_all(&real_root).expect("test real root must be created");
+        let symlink_root = root.join("symlink-root");
+        std::os::unix::fs::symlink(&real_root, &symlink_root)
+            .expect("test allowed root symlink must be created");
+        let path = write_test_file(
+            &real_root,
+            "evidence_index.json",
+            minimal_evidence_index_json(),
+        );
+        let policy = RuntimeControlPlaneFilePolicy::new(symlink_root);
+
+        assert_eq!(
+            parse_evidence_index_file(&path, &policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::AllowedRootSymlink
+        );
+
+        let file_policy = RuntimeControlPlaneFilePolicy::new(real_root.clone());
+        let symlink_path = real_root.join("linked_evidence_index.json");
+        std::os::unix::fs::symlink(&path, &symlink_path)
+            .expect("test evidence symlink must be created");
+        assert_eq!(
+            parse_evidence_index_file(&symlink_path, &file_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::SymlinkPath
+        );
+
+        let fifo_path = real_root.join("fifo_evidence_index.json");
+        make_fifo(&fifo_path);
+        assert_eq!(
+            parse_evidence_index_file(&fifo_path, &file_policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonRegularFile
+        );
+
+        remove_temp_root(&root);
+    }
+
+    #[test]
+    fn rejects_malformed_or_drifted_evidence_index_json_strings() {
+        assert_eq!(
+            parse_evidence_index_json("{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            parse_evidence_index_json("[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let with_unknown_field =
+            minimal_evidence_index_json().replacen("{\n", "{\n  \"unexpected_field\": true,\n", 1);
+        assert_eq!(
+            parse_evidence_index_json(&with_unknown_field).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""schema_version": "evidence_index.v0""#,
+                r#""schema_version": "evidence_index.v1""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "schema_version",
+                expected: EVIDENCE_INDEX_SCHEMA_VERSION,
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""index_scope": "local_synthetic_evidence_pointer_index""#,
+                r#""index_scope": "private_evidence_index""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.index_scope",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""not_qt_binding""#,
+                r#""not_live_qt_binding""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.non_claims",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_evidence_index_unsafe_flags() {
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""local_only": true"#,
+                r#""local_only": false"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index.safety_flags.local_only",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""raw_evidence_payload_copied": false"#,
+                r#""raw_evidence_payload_copied": true"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index.safety_flags.raw_evidence_payload_copied",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""external_services_used": false"#,
+                r#""external_services_used": true"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index.safety_flags.external_services_used",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                r#""deployment_allowed": false"#,
+                r#""deployment_allowed": true"#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index.safety_flags.deployment_allowed",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_evidence_index_unsafe_strings_and_unsupported_schemas() {
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json("host-alpha", "host-secret",))
+                .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.entity_id",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                "dns_failure_ratio",
+                concat!("dns_failure.", "p", "cap"),
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries.feature_names",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                "model_score_rows.v0",
+                "private_report.v0",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries.source_schema",
+            }
+        );
+        assert_eq!(
+            parse_evidence_index_json(&patched_evidence_index_json(
+                "model_disagreement_report_v0_001",
+                "password_001",
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries.source_name",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unsorted_or_duplicate_evidence_index_rows_and_refs() {
+        let mut unsorted_sources = minimal_evidence_index_fixture();
+        unsorted_sources.source_summaries.swap(0, 1);
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&unsorted_sources)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries",
+            }
+        );
+
+        let mut unsorted_windows = minimal_evidence_index_fixture();
+        let mut earlier_row = unsorted_windows.entity_window_index[0].clone();
+        earlier_row.entity_id = "asset-alpha".to_owned();
+        unsorted_windows.entity_window_index.push(earlier_row);
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&unsorted_windows)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index",
+            }
+        );
+
+        let mut duplicate_source_ref = minimal_evidence_index_fixture();
+        let duplicate_ref = duplicate_source_ref.entity_window_index[0].source_refs[0].clone();
+        duplicate_source_ref.entity_window_index[0]
+            .source_refs
+            .insert(1, duplicate_ref);
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&duplicate_source_ref)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs",
+            }
+        );
+
+        let mut duplicate_evidence_ref = minimal_evidence_index_fixture();
+        let duplicate_ref = duplicate_evidence_ref.entity_window_index[0].source_refs[1]
+            .evidence_indexes[0]
+            .clone();
+        duplicate_evidence_ref.entity_window_index[0].source_refs[1]
+            .evidence_indexes
+            .insert(1, duplicate_ref);
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&duplicate_evidence_ref)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.evidence_indexes",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_evidence_index_aggregate_and_count_drift() {
+        let mut aggregate_drift = minimal_evidence_index_fixture();
+        aggregate_drift.aggregate_summary.source_count = 1;
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&aggregate_drift)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.aggregate_summary",
+            }
+        );
+
+        let mut source_count_drift = minimal_evidence_index_fixture();
+        source_count_drift.source_summaries[0].source_ref_count = 9;
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&source_count_drift)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.source_summaries",
+            }
+        );
+
+        let mut row_feature_drift = minimal_evidence_index_fixture();
+        row_feature_drift.entity_window_index[0]
+            .feature_names
+            .push("z_extra_feature".to_owned());
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&row_feature_drift)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.feature_names",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_evidence_index_pointer_semantic_drift() {
+        let mut row_index_drift = minimal_evidence_index_fixture();
+        row_index_drift.entity_window_index[0].source_refs[0].row_index = 1;
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&row_index_drift)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.row_index",
+            }
+        );
+
+        let mut evidence_model_drift = minimal_evidence_index_fixture();
+        evidence_model_drift.entity_window_index[0].source_refs[1]
+            .model_ids
+            .retain(|model_id| model_id != "stdlib_linear_native");
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&evidence_model_drift)).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.entity_window_index.source_refs.evidence_indexes.model_id",
+            }
+        );
     }
 
     #[test]

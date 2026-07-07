@@ -112,6 +112,28 @@ registry, storage provider, promotion workflow, generated report loader, Qt
 binding, external service, deployment approval path, capture boundary, or
 native inference executor.
 
+The scaffold now also owns a typed `evidence_index_adapter.v0` contract through
+`EvidenceIndex`, `EvidenceIndexSourceSummary`,
+`EvidenceIndexEntityWindow`, `EvidenceIndexSourceRef`,
+`EvidenceIndexEvidenceRef`, `EvidenceIndexAggregateSummary`,
+`EvidenceIndexSafetyFlags`, `EvidenceIndexAdapterContract`, and
+`EvidenceIndexAdapterPolicy`. The adapter accepts a caller-provided
+`evidence_index.v0` JSON string through `parse_evidence_index_json` or a
+bounded local `.json` file through `parse_evidence_index_file` under the same
+explicit `RuntimeControlPlaneFilePolicy` root checks used by the handoff file
+adapter. Both paths deserialize with `serde`/`serde_json`, deny unknown fields,
+validate the exact `local_synthetic_evidence_pointer_index` scope, supported
+source schemas, sorted source summaries, sorted entity-window rows, sorted and
+unique source/evidence refs, sanitized entity/model/feature/source labels,
+derived aggregate counts, pointer-only safety flags, and exact non-claims. The
+adapter contract and policy keep storage, indexing, generated report loading,
+raw evidence payload loading, Qt binding, external services, deployment,
+capture, and native inference execution disabled. This is a typed
+evidence-index handoff adapter only; it is not a durable evidence store,
+database or indexing engine, generated report loader, arbitrary file loader,
+raw evidence payload loader, Qt binding, capture boundary, external service,
+deployment approval path, or native runtime executor.
+
 The scaffold now owns a bounded in-memory `runtime_registry_provider.v0`
 through `RuntimeRegistryProviderContract`, `RuntimeRegistryProviderPolicy`,
 `RuntimeRegistryRecord`, `RuntimeRegistrySnapshot`, and
@@ -393,6 +415,12 @@ loading, not a generated report loader, not a transport, not a listener, not a
 filesystem socket path policy, not a daemon, not a file watcher, not Qt
 data-flow integration, not a capture boundary, not deployment behavior, not an
 external service, and not native inference execution.
+The evidence index adapter parses only caller-provided pointer-only
+`evidence_index.v0` JSON strings or bounded local `.json` files; it is not a
+durable evidence store, database or indexing engine, generated report loader,
+raw evidence payload loader, arbitrary file loader, Qt data-flow integration,
+capture boundary, deployment workflow, external service, or native runtime
+executor.
 
 Expected integration path:
 
@@ -403,6 +431,7 @@ Rust source contract
   -> runtime_summary_provider.v0 over caller-provided local RuntimeEvent slices
   -> static model_registry_metadata.v0 handoff aligned with Python and Qt
   -> typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files
+  -> typed evidence_index_adapter.v0 over supplied pointer-only evidence index JSON/files
   -> static runtime_handoff_snapshot.v0 handoff envelope over both fixtures
   -> static runtime_control_plane_adapter.v0 contract over accepted schemas
   -> typed JSON-string parser and bounded local file adapter for handoff snapshots

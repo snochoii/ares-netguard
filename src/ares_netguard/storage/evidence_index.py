@@ -205,6 +205,7 @@ def generate_evidence_index(sources: Sequence[SourcePayload]) -> JsonMap:
             key = (str(ref.pop("_entity_id")), str(ref.pop("_window_start")))
             source_refs_by_window.setdefault(key, []).append(ref)
 
+    source_summaries.sort(key=lambda summary: str(summary["source_name"]))
     entity_window_index = _entity_window_rows(source_refs_by_window)
     index = {
         "schema_version": EVIDENCE_INDEX_SCHEMA_VERSION,
@@ -273,16 +274,30 @@ def validate_evidence_index(index: Mapping[str, Any]) -> None:
     source_names = [str(summary["source_name"]) for summary in source_summaries]
     if len(source_names) != len(set(source_names)):
         raise ValueError("source_summaries must have unique source_name values")
+    if source_names != sorted(source_names):
+        raise ValueError("source_summaries must be sorted by source_name")
+    summaries_by_name = {str(summary["source_name"]): summary for summary in source_summaries}
+    source_stats = {
+        source_name: {
+            "entity_windows": set(),
+            "source_ref_count": 0,
+            "evidence_ref_count": 0,
+            "feature_names": set(),
+            "model_ids": set(),
+        }
+        for source_name in source_names
+    }
 
     entity_window_index = evaluation_bundle._bounded_list(
         index["entity_window_index"], "entity_window_index"
     )
     previous_key: tuple[str, str] | None = None
     for row in entity_window_index:
-        current_key = _validate_entity_window_row(row)
+        current_key = _validate_entity_window_row(row, summaries_by_name, source_stats)
         if previous_key is not None and current_key <= previous_key:
             raise ValueError("entity_window_index must be sorted by entity_id and window_start")
         previous_key = current_key
+    _validate_source_summaries_match_entity_windows(source_summaries, source_stats)
 
     _validate_aggregate_summary(index["aggregate_summary"])
     if index["aggregate_summary"] != _aggregate_summary(source_summaries, entity_window_index):
@@ -681,7 +696,32 @@ def _validate_source_summary(summary: Any) -> None:
         raise ValueError("model_count must match model_ids")
 
 
-def _validate_entity_window_row(row: Any) -> tuple[str, str]:
+def _validate_source_summaries_match_entity_windows(
+    source_summaries: Sequence[Mapping[str, Any]],
+    source_stats: Mapping[str, Mapping[str, Any]],
+) -> None:
+    for summary in source_summaries:
+        source_name = str(summary["source_name"])
+        stats = source_stats[source_name]
+        if summary["entity_window_count"] != len(stats["entity_windows"]):
+            raise ValueError("source summary entity_window_count must match index rows")
+        if summary["source_ref_count"] != stats["source_ref_count"]:
+            raise ValueError("source summary source_ref_count must match index rows")
+        if summary["evidence_ref_count"] != stats["evidence_ref_count"]:
+            raise ValueError("source summary evidence_ref_count must match index rows")
+        if summary["feature_names"] != sorted(stats["feature_names"]):
+            raise ValueError("source summary feature_names must match index rows")
+        if summary["source_schema"] != registry_metadata.REPORT_SCHEMA_VERSION and summary[
+            "model_ids"
+        ] != sorted(stats["model_ids"]):
+            raise ValueError("source summary model_ids must match index rows")
+
+
+def _validate_entity_window_row(
+    row: Any,
+    summaries_by_name: Mapping[str, Mapping[str, Any]] | None = None,
+    source_stats: Mapping[str, dict[str, Any]] | None = None,
+) -> tuple[str, str]:
     if not isinstance(row, Mapping):
         raise ValueError("entity_window_index row must be an object")
     evaluation_bundle._require_exact_fields(row, ENTITY_WINDOW_FIELDS, "entity window row")
@@ -693,9 +733,24 @@ def _validate_entity_window_row(row: Any) -> tuple[str, str]:
     previous_ref: tuple[str, str, int, str] | None = None
     for ref in refs:
         current_ref = _validate_source_ref(ref)
-        if previous_ref is not None and current_ref < previous_ref:
-            raise ValueError("source_refs must be sorted")
+        if previous_ref is not None and current_ref <= previous_ref:
+            raise ValueError("source_refs must be sorted and unique")
         previous_ref = current_ref
+        if summaries_by_name is not None and source_stats is not None:
+            source_name = current_ref[0]
+            summary = summaries_by_name.get(source_name)
+            if summary is None:
+                raise ValueError("source_ref source_name must reference a source summary")
+            if summary["source_schema"] != ref["source_schema"]:
+                raise ValueError("source_ref source_schema must match source summary")
+            if ref["row_index"] >= summary["row_count"]:
+                raise ValueError("source_ref row_index must be inside source summary row_count")
+            stats = source_stats[source_name]
+            stats["entity_windows"].add((entity_id, window_start))
+            stats["source_ref_count"] += 1
+            stats["evidence_ref_count"] += len(ref["evidence_indexes"])
+            stats["feature_names"].update(ref["feature_names"])
+            stats["model_ids"].update(ref["model_ids"])
     _validate_feature_names(row["feature_names"])
     _validate_model_ids(row["model_ids"])
     if row["feature_names"] != sorted({name for ref in refs for name in ref["feature_names"]}):
@@ -726,6 +781,10 @@ def _validate_source_ref(ref: Any) -> tuple[str, str, int, str]:
     _validate_feature_names(ref["feature_names"])
     _validate_model_ids(ref["model_ids"])
     _validate_evidence_indexes(ref["evidence_indexes"])
+    model_ids = set(ref["model_ids"])
+    for evidence_ref in ref["evidence_indexes"]:
+        if evidence_ref["model_id"] not in model_ids:
+            raise ValueError("evidence index model_id must be present in source_ref model_ids")
     return (source_name, str(ref["source_schema"]), row_index, row_kind)
 
 

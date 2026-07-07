@@ -53,6 +53,9 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION",
         "MODEL_REGISTRY_METADATA_SCOPE",
         "MODEL_REGISTRY_SOURCE_BUNDLE_SCHEMA_VERSION",
+        "EVIDENCE_INDEX_SCHEMA_VERSION",
+        "EVIDENCE_INDEX_SCOPE",
+        "EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
@@ -94,6 +97,15 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "ModelRegistrySafetyFlags",
         "ModelRegistryMetadataAdapterContract",
         "ModelRegistryMetadataAdapterPolicy",
+        "EvidenceIndex",
+        "EvidenceIndexSourceSummary",
+        "EvidenceIndexEntityWindow",
+        "EvidenceIndexSourceRef",
+        "EvidenceIndexEvidenceRef",
+        "EvidenceIndexAggregateSummary",
+        "EvidenceIndexSafetyFlags",
+        "EvidenceIndexAdapterContract",
+        "EvidenceIndexAdapterPolicy",
         "ModelRegistryState",
         "ModelPromotionState",
         "RuntimeHandoffSnapshot",
@@ -202,6 +214,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "default_provider",
         "parse_model_registry_metadata_json",
         "parse_model_registry_metadata_file",
+        "parse_evidence_index_json",
+        "parse_evidence_index_file",
         "execute_local_command",
         "parse_control_plane_message_request_json",
         "execute_control_plane_message_request",
@@ -223,6 +237,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "validate_control_plane_endpoint_path",
         "command_kind",
         "output_snapshot_schema",
+        "evidence_index_adapter.v0",
+        "local_synthetic_evidence_pointer_index",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -250,6 +266,14 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const MODEL_REGISTRY_METADATA_ADAPTER_SCHEMA_VERSION: &str ="
         ' "model_registry_metadata_adapter.v0";' in " ".join(lib_rs.split())
+    )
+    assert 'pub const EVIDENCE_INDEX_SCHEMA_VERSION: &str = "evidence_index.v0";' in lib_rs
+    assert (
+        'pub const EVIDENCE_INDEX_SCOPE: &str = "local_synthetic_evidence_pointer_index";' in lib_rs
+    )
+    assert (
+        'pub const EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION: &str = "evidence_index_adapter.v0";'
+        in lib_rs
     )
     assert (
         "pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "
@@ -683,6 +707,72 @@ def test_rust_core_exposes_model_registry_metadata_adapter_contract_shape() -> N
         '"not_qt_binding"',
         '"not_deployment_approval"',
         '"not_external_service"',
+        '"not_native_runtime_execution"',
+    ]
+    for anchor in expected_anchors:
+        assert anchor in lib_rs
+
+
+def test_rust_core_exposes_evidence_index_adapter_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_fields = [
+        "pub accepted_index_schema: &'static str",
+        "pub accepted_index_scope: &'static str",
+        "pub max_file_bytes: u64",
+        "pub local_only: bool",
+        "pub pointer_only_index: bool",
+        "pub strict_json_parsing_enabled: bool",
+        "pub file_io_enabled: bool",
+        "pub storage_provider_enabled: bool",
+        "pub generated_report_loading_enabled: bool",
+        "pub raw_evidence_payload_loading_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+        "pub non_claims: &'static [&'static str]",
+        "pub file_policy: RuntimeControlPlaneFilePolicy",
+        "pub index_scope: String",
+        "pub source_summaries: Vec<EvidenceIndexSourceSummary>",
+        "pub entity_window_index: Vec<EvidenceIndexEntityWindow>",
+        "pub aggregate_summary: EvidenceIndexAggregateSummary",
+        "pub source_refs: Vec<EvidenceIndexSourceRef>",
+        "pub evidence_indexes: Vec<EvidenceIndexEvidenceRef>",
+        "pub source_count_by_schema: BTreeMap<String, u32>",
+        "pub row_count_by_schema: BTreeMap<String, u32>",
+        "pub pointer_only: bool",
+        "pub raw_evidence_payload_copied: bool",
+        "pub capture_claims_copied: bool",
+        "pub external_service_claims_copied: bool",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_anchors = [
+        "impl EvidenceIndexAdapterContract",
+        "impl EvidenceIndexAdapterPolicy",
+        "EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS",
+        "EVIDENCE_INDEX_NON_CLAIMS",
+        "EVIDENCE_INDEX_ADAPTER_NON_CLAIMS",
+        "pub fn parse_evidence_index_json",
+        "pub fn parse_evidence_index_file",
+        "validate_evidence_index(&index)",
+        "validate_evidence_index_safety_flags",
+        "derive_evidence_index_aggregate_summary",
+        "validate_runtime_control_plane_json_file_path",
+        "evidence_index_adapter.storage_provider_enabled",
+        "evidence_index_adapter.generated_report_loading_enabled",
+        "evidence_index_adapter.raw_evidence_payload_loading_enabled",
+        "evidence_index_adapter.qt_binding_enabled",
+        "evidence_index_adapter.deployment_allowed",
+        "evidence_index_adapter.native_inference_execution_enabled",
+        '"not_durable_evidence_store"',
+        '"not_database_or_indexing_engine"',
+        '"not_generated_report_loader"',
+        '"not_raw_evidence_payload_loader"',
+        '"not_qt_binding"',
         '"not_native_runtime_execution"',
     ]
     for anchor in expected_anchors:
@@ -1722,6 +1812,19 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "ModelRegistryMetadataAdapterPolicy",
         "parse_model_registry_metadata_json",
         "parse_model_registry_metadata_file",
+        "evidence_index.v0",
+        "evidence_index_adapter.v0",
+        "EvidenceIndex",
+        "EvidenceIndexSourceSummary",
+        "EvidenceIndexEntityWindow",
+        "EvidenceIndexSourceRef",
+        "EvidenceIndexEvidenceRef",
+        "EvidenceIndexAggregateSummary",
+        "EvidenceIndexSafetyFlags",
+        "EvidenceIndexAdapterContract",
+        "EvidenceIndexAdapterPolicy",
+        "parse_evidence_index_json",
+        "parse_evidence_index_file",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
         "runtime_registry_provider.v0",
@@ -1790,6 +1893,17 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "bounded local file adapter is now enabled",
         "explicitly supplied synthetic metadata JSON",
         "storage, indexing, generated report loading, model promotion",
+        "typed `evidence_index_adapter.v0` contract",
+        "caller-provided `evidence_index.v0` JSON string",
+        "bounded local `.json` file through `parse_evidence_index_file`",
+        "local_synthetic_evidence_pointer_index",
+        "sorted source summaries",
+        "sorted entity-window rows",
+        "sorted and unique source/evidence refs",
+        "derived aggregate counts",
+        "pointer-only safety flags",
+        "not a durable evidence store",
+        "raw evidence payload loader",
         "typed local command dispatcher",
         "RuntimeControlPlaneCommand",
         "execute_local_command",
@@ -1833,6 +1947,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "real Rust runtime summary provider",
         "typed registry metadata adapter",
         "typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files",
+        "typed evidence_index_adapter.v0 over supplied pointer-only evidence index JSON/files",
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",

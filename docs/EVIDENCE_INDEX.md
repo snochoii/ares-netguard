@@ -47,7 +47,8 @@ the composer.
 The index contains:
 
 - generated `source_name` values derived only from schema and occurrence count;
-- `source_summaries` with schema, counts, feature names, and model IDs;
+- `source_summaries`, sorted by generated source name, with schema, counts,
+  feature names, and model IDs;
 - `entity_window_index` rows keyed by `entity_id` and `window_start`;
 - source row pointers with `source_schema`, `row_index`, feature names, model
   IDs, and optional numeric evidence indexes;
