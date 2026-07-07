@@ -76,10 +76,41 @@ finite numeric risk values on `0.0..1.0`, `percentile` values on `0..100`, or
 `inverted_risk` values on `0.0..1.0`. Boolean, `NaN`, and infinite values are
 rejected so report JSON remains strict and reproducible.
 
+## Score row composer
+
+`src/ares_netguard/models/score_row_composer.py` adds the v0 fixture composer
+for the primary disagreement smoke path. It accepts:
+
+- existing JSON or JSONL `model_score_row.v0` lists;
+- `time_series_residual_report.v0`;
+- `traffic_representation_report.v0`;
+- `temporal_security_graph_report.v0`.
+
+The composer reuses the existing residual, representation, and graph converters,
+then merges rows by `(entity_id, window_start)`. Scores are merged by
+`model_id`, and duplicate `(entity_id, window_start, model_id)` tuples fail
+closed so the disagreement input remains unambiguous.
+
+The CLI writes a bare strict JSON list, not a wrapper object:
+
+```bash
+python -m ares_netguard.models.score_row_composer \
+  /tmp/ares-netguard/composed-model-score-rows.json \
+  --score-rows tests/fixtures/model_disagreement/synthetic_scores.jsonl \
+  --score-rows /tmp/ares-netguard/native-inference-score-rows.json \
+  --residual-report /tmp/ares-netguard/time-series-residual-report.json \
+  --representation-report /tmp/ares-netguard/traffic-representation-report.json \
+  --graph-report /tmp/ares-netguard/temporal-security-graph-report.json
+```
+
+This is synthetic score-row plumbing only. It does not introduce new detector
+semantics, live capture, deployment, durable storage, native runtime execution,
+or external enrichment.
+
 Validation:
 
 ```bash
 make verify
 make fixture-smoke
-pytest -q tests/unit tests/integration -k "model or registry or evaluation or pyod or river or disagreement"
+pytest -q tests/unit tests/integration -k "composer or model or registry or evaluation or pyod or river or disagreement"
 ```

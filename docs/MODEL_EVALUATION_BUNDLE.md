@@ -19,8 +19,11 @@ The v0 bundle accepts local JSON objects for these report schemas:
 - `agentic_investigation_report.v0`
 - `detection_candidate_report.v0`
 
-It also accepts JSON lists of `model_score_row.v0` rows, such as the synthetic
-native-inference score rows produced by `ares_netguard.native_inference.adapters`.
+It also accepts JSON lists of `model_score_row.v0` rows. The fixture-smoke path
+uses the composed score-row list produced by
+`ares_netguard.models.score_row_composer`, which merges the handcrafted base
+score rows, native reference score rows, and report-derived residual,
+representation, and graph score rows before disagreement and bundle generation.
 
 Unknown schemas fail closed.
 
@@ -75,8 +78,11 @@ smoke target writes to `/tmp`.
 `make fixture-smoke` now produces:
 
 ```text
+/tmp/ares-netguard/composed-model-score-rows.json
 /tmp/ares-netguard/model-evaluation-bundle.json
 ```
 
-after the existing synthetic disagreement, residual, representation, graph,
-investigation, detection-candidate, and native-inference score outputs.
+after the existing synthetic residual, representation, graph, native-inference
+score, composed disagreement, investigation, and detection-candidate outputs.
+The composed rows are synthetic score-row plumbing, not new detector semantics,
+live capture, deployment, durable storage, or native runtime execution.

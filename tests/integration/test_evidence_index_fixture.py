@@ -11,6 +11,7 @@ from ares_netguard.models import (
     disagreement,
     evaluation_bundle,
     registry_metadata,
+    score_row_composer,
     self_supervised_representation,
     time_series_residual,
 )
@@ -27,6 +28,7 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
     investigation_path = tmp_path / "agentic-investigation-report.json"
     candidates_path = tmp_path / "detection-candidate-report.json"
     native_scores_path = tmp_path / "native-inference-score-rows.json"
+    composed_scores_path = tmp_path / "composed-model-score-rows.json"
     bundle_path = tmp_path / "model-evaluation-bundle.json"
     metadata_path = tmp_path / "model-registry-metadata.json"
     index_path = tmp_path / "evidence-index.json"
@@ -38,12 +40,6 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
             )
         ),
         telemetry_path,
-    )
-    disagreement.dump_report(
-        disagreement.generate_disagreement_report(
-            disagreement.load_score_rows("tests/fixtures/model_disagreement/synthetic_scores.jsonl")
-        ),
-        disagreement_path,
     )
     time_series_residual.dump_report(
         time_series_residual.generate_residual_report(
@@ -69,6 +65,35 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
         ),
         graph_path,
     )
+    adapters.dump_score_rows(
+        adapters.score_feature_rows(
+            adapters.load_manifest("tests/fixtures/native_inference/manifest.json"),
+            adapters.load_feature_rows("tests/fixtures/native_inference/feature_rows.jsonl"),
+        ),
+        native_scores_path,
+    )
+    score_row_composer.dump_score_rows(
+        score_row_composer.compose_score_rows(
+            score_row_sources=[
+                disagreement.load_score_rows(
+                    "tests/fixtures/model_disagreement/synthetic_scores.jsonl"
+                ),
+                score_row_composer.load_score_rows(native_scores_path),
+            ],
+            residual_reports=[score_row_composer.load_residual_report(residual_path)],
+            representation_reports=[
+                score_row_composer.load_representation_report(representation_path)
+            ],
+            graph_reports=[score_row_composer.load_graph_report(graph_path)],
+        ),
+        composed_scores_path,
+    )
+    disagreement.dump_report(
+        disagreement.generate_disagreement_report(
+            score_row_composer.load_score_rows(composed_scores_path)
+        ),
+        disagreement_path,
+    )
     agentic_layer.dump_report(
         agentic_layer.generate_investigation_report(
             agentic_layer.load_report(disagreement_path),
@@ -84,13 +109,6 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
         candidates.generate_candidate_report(agentic_layer.load_report(disagreement_path)),
         candidates_path,
     )
-    adapters.dump_score_rows(
-        adapters.score_feature_rows(
-            adapters.load_manifest("tests/fixtures/native_inference/manifest.json"),
-            adapters.load_feature_rows("tests/fixtures/native_inference/feature_rows.jsonl"),
-        ),
-        native_scores_path,
-    )
 
     bundle = evaluation_bundle.generate_evaluation_bundle(
         evaluation_bundle.load_bundle_sources(
@@ -101,7 +119,7 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
                 graph_path,
                 investigation_path,
                 candidates_path,
-                native_scores_path,
+                composed_scores_path,
             ]
         )
     )
@@ -121,7 +139,7 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
                 graph_path,
                 investigation_path,
                 candidates_path,
-                native_scores_path,
+                composed_scores_path,
                 metadata_path,
             ]
         )
@@ -144,7 +162,14 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
         "traffic_representation_report.v0",
     ]
     assert persisted["aggregate_summary"]["source_count"] == 9
-    assert persisted["aggregate_summary"]["entity_window_count"] >= 3
+    assert persisted["aggregate_summary"]["entity_window_count"] == 16
+    assert persisted["aggregate_summary"]["source_ref_count"] == 91
+    assert persisted["aggregate_summary"]["evidence_ref_count"] == 67
+    assert (
+        persisted["aggregate_summary"]["row_count_by_schema"]["model_disagreement_report.v0"] == 15
+    )
+    assert persisted["aggregate_summary"]["row_count_by_schema"]["model_score_rows.v0"] == 15
+    assert persisted["aggregate_summary"]["row_count_by_schema"]["model_registry_metadata.v0"] == 10
     assert "dns_failure_ratio" in persisted["aggregate_summary"]["feature_names"]
     assert "stdlib_linear_native" in persisted["aggregate_summary"]["model_ids"]
     assert persisted["safety_flags"]["input_paths_copied"] is False
@@ -166,6 +191,7 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
         ".jsonl",
         "model-disagreement-report.json",
         "native-inference-score-rows.json",
+        "composed-model-score-rows.json",
         "protocol:tcp",
         "DRAFT_DO_NOT_DEPLOY",
         "Review local evidence refs",
