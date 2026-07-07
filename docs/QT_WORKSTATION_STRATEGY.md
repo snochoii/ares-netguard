@@ -107,6 +107,17 @@ paths, manage a filesystem socket path, start or stop endpoint lifecycle,
 run a listener loop, manage daemon lifecycle, supervise a process, bind to
 live runtime state, load generated reports, use external services, allow
 deployment, capture traffic, or execute native inference.
+Rust now also defines a bounded
+`runtime_control_plane_service_lifecycle.v0` service lifecycle state wrapper
+over one endpoint lifecycle execution through
+`execute_control_plane_service_lifecycle_once`, with capped in-memory audit
+events and explicit `Stopped`, `Starting`, `RunningEndpointOnce`, `Stopping`,
+and `Failed` states. Qt still does not call or bind the service lifecycle
+wrapper, own service lifecycle state, open IPC, choose endpoint paths, manage a
+filesystem socket path, start or stop service lifecycle, run a listener loop,
+manage daemon lifecycle, supervise a process, bind to live runtime state, load
+generated reports, use external services, allow deployment, capture traffic, or
+execute native inference.
 Rust now also defines a bounded in-memory `runtime_registry_provider.v0` that
 stores already validated `runtime_handoff_snapshot.v0` values and emits a typed
 `RuntimeRegistrySnapshot` sorted by workspace/session key. Qt still displays
@@ -146,9 +157,10 @@ QML shell scaffold
   -> bounded runtime_control_plane_endpoint_path.v0 path policy in the Rust runtime, not called by Qt
   -> bounded one-shot runtime_control_plane_endpoint_listener.v0 OS-local listener in the Rust runtime, not called by Qt
   -> bounded one-shot runtime_control_plane_endpoint_lifecycle.v0 lifecycle wrapper in the Rust runtime, not called by Qt
+  -> bounded one-shot runtime_control_plane_service_lifecycle.v0 service lifecycle wrapper in the Rust runtime, not called by Qt
   -> bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt
   -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
-  -> future supervised local runtime service lifecycle
+  -> future supervised local runtime service daemon with explicit async start/stop
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
   -> native analyst workstation packaging
