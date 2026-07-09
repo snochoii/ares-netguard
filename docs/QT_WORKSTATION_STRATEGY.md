@@ -17,6 +17,8 @@ The v0 screen is intentionally operational rather than promotional:
 - central model evidence matrix using static synthetic rows;
 - compact Runtime Boundary panel that mirrors the Rust-owned
   `runtime_summary.v0` fields from a static synthetic QML object;
+- compact Evidence Index Snapshot panel that mirrors static `evidence_index.v0`
+  fields from a static synthetic QML object;
 - compact Model Registry Snapshot panel that mirrors
   `model_registry_metadata.v0` fields from a static synthetic QML object;
 - right detail panel for selected entity context, evidence, analyst actions,
@@ -37,6 +39,13 @@ external services, or execute native inference.
 The Model Registry Snapshot panel is also a source-level handoff preview only;
 it is not a persistent registry, does not read generated reports, and does not
 own model promotion or deployment state.
+The Evidence Index Snapshot panel is also a source-level handoff preview only.
+Qt displays its own static Evidence Index preview object with generated source
+names, row pointers, aggregate counts, and pointer-only safety flags; it does
+not call Rust parsers, read generated evidence index files, copy raw evidence
+payloads, bind to live runtime state, use a database or indexing engine, allow
+deployment, capture traffic, use external services, or execute native
+inference.
 The Rust runtime now also defines a typed `model_registry_metadata_adapter.v0`
 for caller-provided `model_registry_metadata.v0` JSON strings and bounded local
 metadata `.json` files. Qt still displays its own static Model Registry
@@ -138,11 +147,12 @@ path, spawn a process, use external services, allow deployment, capture
 traffic, or execute native inference.
 Rust now also defines a typed `evidence_index_adapter.v0` for caller-provided
 pointer-only `evidence_index.v0` JSON strings and bounded local `.json` files.
-Qt still does not call `parse_evidence_index_json`, call
-`parse_evidence_index_file`, read evidence index files, bind to live runtime
-state, use a database or indexing engine, load generated reports, copy raw
-evidence payloads, perform file I/O, open transport, use external services,
-allow deployment, capture traffic, or execute native inference.
+Qt still displays its own static Evidence Index preview object; it does not
+call `parse_evidence_index_json`, call `parse_evidence_index_file`, read
+evidence index files, bind to live runtime state, use a database or indexing
+engine, load generated reports, copy raw evidence payloads, perform file I/O,
+open transport, use external services, allow deployment, capture traffic, or
+execute native inference.
 
 Expected integration path:
 
@@ -168,6 +178,7 @@ QML shell scaffold
   -> bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt
   -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
   -> typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt
+  -> static evidence_index.v0 handoff preview in QML
   -> future supervised local runtime service daemon with explicit async start/stop
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
