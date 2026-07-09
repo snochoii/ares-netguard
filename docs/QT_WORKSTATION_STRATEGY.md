@@ -167,6 +167,18 @@ read generated evidence files, does not open transport, does not start a
 listener, does not manage a filesystem socket path, does not spawn a process,
 does not use external services, does not allow deployment, does not capture
 traffic, and does not execute native inference.
+Rust now also defines a bounded in-memory
+`runtime_workstation_snapshot_service.v0` supervisor over validated workstation
+snapshots through `RuntimeWorkstationSnapshotServiceSupervisor` and
+`RuntimeWorkstationSnapshotServiceStatus`, with deterministic local execution
+available through `execute_runtime_workstation_snapshot_service_once`. Qt still
+does not call or bind the workstation snapshot service, does not call
+`execute_runtime_workstation_snapshot_service_once`, does not own service
+state, does not bind to live runtime state, does not open transport, does not
+start a listener, does not run a listener loop, does not manage a daemon
+lifecycle, does not spawn a process, does not read generated evidence files,
+does not use external services, does not allow deployment, does not capture
+traffic, and does not execute native inference.
 
 Expected integration path:
 
@@ -194,6 +206,7 @@ QML shell scaffold
   -> typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt
   -> static evidence_index.v0 handoff preview in QML
   -> runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only evidence index snapshots
+  -> bounded in-memory runtime_workstation_snapshot_service.v0 supervisor in the Rust runtime, not called by Qt
   -> future supervised local runtime service daemon with explicit async start/stop
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration

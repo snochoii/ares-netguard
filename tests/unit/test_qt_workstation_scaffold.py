@@ -459,6 +459,13 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
             "runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only "
             "evidence index snapshots"
         ),
+        "runtime_workstation_snapshot_service.v0",
+        "RuntimeWorkstationSnapshotServiceSupervisor",
+        "RuntimeWorkstationSnapshotServiceStatus",
+        "execute_runtime_workstation_snapshot_service_once",
+        "Qt still does not call or bind the workstation snapshot service",
+        "does not call `execute_runtime_workstation_snapshot_service_once`",
+        "bounded in-memory runtime_workstation_snapshot_service.v0 supervisor",
         "future supervised local runtime service daemon with explicit async start/stop",
         "perform file I/O",
         "open IPC",
@@ -521,6 +528,9 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "does not call `build_runtime_workstation_snapshot`",
         "does not call `parse_runtime_workstation_snapshot_json`",
         "read `RuntimeWorkstationSnapshot`",
+        "runtime_workstation_snapshot_service.v0",
+        "does not call `execute_runtime_workstation_snapshot_service_once`",
+        "RuntimeWorkstationSnapshotServiceSupervisor",
         "not called by Qt",
         "future supervised local runtime service daemon with explicit async start/stop",
     ]
