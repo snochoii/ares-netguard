@@ -30,6 +30,9 @@ pub const EVIDENCE_INDEX_SCHEMA_VERSION: &str = "evidence_index.v0";
 pub const EVIDENCE_INDEX_SCOPE: &str = "local_synthetic_evidence_pointer_index";
 pub const EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION: &str = "evidence_index_adapter.v0";
 pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snapshot.v0";
+pub const RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_workstation_snapshot.v0";
+pub const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION: &str =
+    "runtime_workstation_snapshot_provider.v0";
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str = "runtime_control_plane_endpoint.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION: &str =
@@ -518,6 +521,130 @@ pub struct RuntimeHandoffSnapshot {
     pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeWorkstationSnapshot {
+    pub schema_version: String,
+    pub runtime_handoff_snapshot: RuntimeHandoffSnapshot,
+    pub evidence_index: EvidenceIndex,
+    pub aggregate_summary: RuntimeWorkstationSnapshotAggregateSummary,
+    pub safety_flags: RuntimeWorkstationSnapshotSafetyFlags,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeWorkstationSnapshotAggregateSummary {
+    pub workspace_id: WorkspaceId,
+    pub session_id: SessionId,
+    pub runtime_total_job_count: u32,
+    pub runtime_queued_job_count: u32,
+    pub runtime_running_job_count: u32,
+    pub runtime_failed_job_count: u32,
+    pub registry_model_count: u32,
+    pub registry_models_with_score_rows_count: u32,
+    pub evidence_source_count: u32,
+    pub evidence_entity_count: u32,
+    pub evidence_entity_window_count: u32,
+    pub evidence_source_ref_count: u32,
+    pub evidence_ref_count: u32,
+    pub source_schema_count: u32,
+    pub feature_count: u32,
+    pub evidence_model_count: u32,
+    pub model_count: u32,
+    pub source_schemas: Vec<String>,
+    pub feature_names: Vec<String>,
+    pub model_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeWorkstationSnapshotSafetyFlags {
+    pub local_only: bool,
+    pub strict_json_loaded: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub validated_runtime_handoff_snapshot: bool,
+    pub validated_evidence_index: bool,
+    pub pointer_only_evidence: bool,
+    pub generated_json_loaded: bool,
+    pub raw_evidence_payload_copied: bool,
+    pub live_runtime_connection: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotProviderContract {
+    pub schema_version: &'static str,
+    pub output_snapshot_schema: &'static str,
+    pub accepted_handoff_snapshot_schema: &'static str,
+    pub accepted_evidence_index_schema: &'static str,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub strict_runtime_handoff_validation_enabled: bool,
+    pub strict_evidence_index_validation_enabled: bool,
+    pub derived_aggregate_validation_enabled: bool,
+    pub pointer_only_evidence_required: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotProviderPolicy {
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub strict_runtime_handoff_validation_enabled: bool,
+    pub strict_evidence_index_validation_enabled: bool,
+    pub derived_aggregate_validation_enabled: bool,
+    pub pointer_only_evidence_required: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1953,6 +2080,121 @@ impl ModelRegistryMetadata {
     }
 }
 
+impl EvidenceIndex {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: EVIDENCE_INDEX_SCHEMA_VERSION.to_owned(),
+            index_scope: EVIDENCE_INDEX_SCOPE.to_owned(),
+            source_summaries: vec![
+                EvidenceIndexSourceSummary {
+                    source_name: "model_disagreement_report_v0_001".to_owned(),
+                    source_schema: "model_disagreement_report.v0".to_owned(),
+                    row_count: 1,
+                    entity_window_count: 1,
+                    source_ref_count: 1,
+                    evidence_ref_count: 1,
+                    feature_count: 0,
+                    model_count: 1,
+                    feature_names: vec![],
+                    model_ids: static_str_vec(&["isolation_forest"]),
+                },
+                EvidenceIndexSourceSummary {
+                    source_name: "model_score_rows_v0_001".to_owned(),
+                    source_schema: "model_score_rows.v0".to_owned(),
+                    row_count: 1,
+                    entity_window_count: 1,
+                    source_ref_count: 1,
+                    evidence_ref_count: 2,
+                    feature_count: 1,
+                    model_count: 2,
+                    feature_names: static_str_vec(&["dns_failure_ratio"]),
+                    model_ids: static_str_vec(&["isolation_forest", "stdlib_linear_native"]),
+                },
+            ],
+            entity_window_index: vec![EvidenceIndexEntityWindow {
+                entity_id: "host-alpha".to_owned(),
+                window_start: "2026-01-01T00:00:00Z".to_owned(),
+                source_refs: vec![
+                    EvidenceIndexSourceRef {
+                        source_name: "model_disagreement_report_v0_001".to_owned(),
+                        source_schema: "model_disagreement_report.v0".to_owned(),
+                        row_index: 0,
+                        row_kind: "model_disagreement_row".to_owned(),
+                        feature_names: vec![],
+                        model_ids: static_str_vec(&["isolation_forest"]),
+                        evidence_indexes: vec![EvidenceIndexEvidenceRef {
+                            model_id: "isolation_forest".to_owned(),
+                            evidence_index: 0,
+                        }],
+                    },
+                    EvidenceIndexSourceRef {
+                        source_name: "model_score_rows_v0_001".to_owned(),
+                        source_schema: "model_score_rows.v0".to_owned(),
+                        row_index: 0,
+                        row_kind: "model_score_row".to_owned(),
+                        feature_names: static_str_vec(&["dns_failure_ratio"]),
+                        model_ids: static_str_vec(&["isolation_forest", "stdlib_linear_native"]),
+                        evidence_indexes: vec![
+                            EvidenceIndexEvidenceRef {
+                                model_id: "isolation_forest".to_owned(),
+                                evidence_index: 0,
+                            },
+                            EvidenceIndexEvidenceRef {
+                                model_id: "stdlib_linear_native".to_owned(),
+                                evidence_index: 0,
+                            },
+                        ],
+                    },
+                ],
+                feature_names: static_str_vec(&["dns_failure_ratio"]),
+                model_ids: static_str_vec(&["isolation_forest", "stdlib_linear_native"]),
+                source_ref_count: 2,
+                evidence_ref_count: 3,
+            }],
+            aggregate_summary: EvidenceIndexAggregateSummary {
+                source_count: 2,
+                schemas_present: static_str_vec(&[
+                    "model_disagreement_report.v0",
+                    "model_score_rows.v0",
+                ]),
+                source_count_by_schema: BTreeMap::from([
+                    ("model_disagreement_report.v0".to_owned(), 1),
+                    ("model_score_rows.v0".to_owned(), 1),
+                ]),
+                row_count_by_schema: BTreeMap::from([
+                    ("model_disagreement_report.v0".to_owned(), 1),
+                    ("model_score_rows.v0".to_owned(), 1),
+                ]),
+                entity_count: 1,
+                entity_window_count: 1,
+                source_ref_count: 2,
+                evidence_ref_count: 3,
+                feature_count: 1,
+                model_count: 2,
+                feature_names: static_str_vec(&["dns_failure_ratio"]),
+                model_ids: static_str_vec(&["isolation_forest", "stdlib_linear_native"]),
+            },
+            safety_flags: EvidenceIndexSafetyFlags {
+                local_only: true,
+                strict_json_loaded: true,
+                pointer_only: true,
+                input_paths_copied: false,
+                source_filenames_copied: false,
+                raw_evidence_payload_copied: false,
+                raw_identifiers_copied: false,
+                generated_artifact_references_copied: false,
+                secrets_detected: false,
+                capture_claims_copied: false,
+                live_capture_used: false,
+                external_service_claims_copied: false,
+                external_services_used: false,
+                deployment_allowed: false,
+            },
+            non_claims: static_str_vec(EVIDENCE_INDEX_NON_CLAIMS),
+        }
+    }
+}
+
 impl EvidenceIndexAdapterContract {
     pub fn synthetic_fixture() -> Self {
         Self {
@@ -2192,6 +2434,227 @@ impl RuntimeHandoffSnapshot {
             deployment_allowed: false,
             non_claims: static_str_vec(RUNTIME_HANDOFF_NON_CLAIMS),
         }
+    }
+}
+
+impl RuntimeWorkstationSnapshot {
+    pub fn synthetic_fixture() -> Self {
+        build_runtime_workstation_snapshot(
+            RuntimeHandoffSnapshot::synthetic_fixture(),
+            EvidenceIndex::synthetic_fixture(),
+            &RuntimeWorkstationSnapshotProviderPolicy::new(),
+        )
+        .expect("static runtime workstation snapshot fixture must validate")
+    }
+}
+
+impl RuntimeWorkstationSnapshotProviderContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION,
+            output_snapshot_schema: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+            accepted_handoff_snapshot_schema: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            accepted_evidence_index_schema: EVIDENCE_INDEX_SCHEMA_VERSION,
+            local_only: true,
+            in_memory_only: true,
+            caller_provided_snapshots_only: true,
+            strict_runtime_handoff_validation_enabled: true,
+            strict_evidence_index_validation_enabled: true,
+            derived_aggregate_validation_enabled: true,
+            pointer_only_evidence_required: true,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_NON_CLAIMS,
+        }
+    }
+
+    pub fn build_runtime_workstation_snapshot(
+        handoff_snapshot: RuntimeHandoffSnapshot,
+        evidence_index: EvidenceIndex,
+        policy: &RuntimeWorkstationSnapshotProviderPolicy,
+    ) -> Result<RuntimeWorkstationSnapshot, RuntimeControlPlaneAdapterError> {
+        build_runtime_workstation_snapshot(handoff_snapshot, evidence_index, policy)
+    }
+
+    pub fn parse_runtime_workstation_snapshot_json(
+        input: &str,
+    ) -> Result<RuntimeWorkstationSnapshot, RuntimeControlPlaneAdapterError> {
+        parse_runtime_workstation_snapshot_json(input)
+    }
+}
+
+impl RuntimeWorkstationSnapshotProviderPolicy {
+    pub fn new() -> Self {
+        Self {
+            local_only: true,
+            in_memory_only: true,
+            caller_provided_snapshots_only: true,
+            strict_runtime_handoff_validation_enabled: true,
+            strict_evidence_index_validation_enabled: true,
+            derived_aggregate_validation_enabled: true,
+            pointer_only_evidence_required: true,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.local_only",
+            self.local_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.in_memory_only",
+            self.in_memory_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.caller_provided_snapshots_only",
+            self.caller_provided_snapshots_only,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.strict_runtime_handoff_validation_enabled",
+            self.strict_runtime_handoff_validation_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.strict_evidence_index_validation_enabled",
+            self.strict_evidence_index_validation_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.derived_aggregate_validation_enabled",
+            self.derived_aggregate_validation_enabled,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.pointer_only_evidence_required",
+            self.pointer_only_evidence_required,
+            true,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.file_io_enabled",
+            self.file_io_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.storage_provider_enabled",
+            self.storage_provider_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.database_or_indexing_enabled",
+            self.database_or_indexing_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.generated_report_loading_enabled",
+            self.generated_report_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.generated_json_loading_enabled",
+            self.generated_json_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.raw_evidence_payload_loading_enabled",
+            self.raw_evidence_payload_loading_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.live_transport_enabled",
+            self.live_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.public_network_transport_enabled",
+            self.public_network_transport_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.socket_listener_enabled",
+            self.socket_listener_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.daemon_lifecycle_enabled",
+            self.daemon_lifecycle_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.process_spawning_enabled",
+            self.process_spawning_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.file_watching_enabled",
+            self.file_watching_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.qt_binding_enabled",
+            self.qt_binding_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.capture_enabled",
+            self.capture_enabled,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.external_services_used",
+            self.external_services_used,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.deployment_allowed",
+            self.deployment_allowed,
+            false,
+        )?;
+        validate_required_flag(
+            "runtime_workstation_snapshot_provider.native_inference_execution_enabled",
+            self.native_inference_execution_enabled,
+            false,
+        )
+    }
+}
+
+impl Default for RuntimeWorkstationSnapshotProviderPolicy {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -4176,6 +4639,68 @@ pub fn parse_evidence_index_file(
     parse_evidence_index_json(&input)
 }
 
+pub fn build_runtime_workstation_snapshot(
+    handoff_snapshot: RuntimeHandoffSnapshot,
+    evidence_index: EvidenceIndex,
+    policy: &RuntimeWorkstationSnapshotProviderPolicy,
+) -> Result<RuntimeWorkstationSnapshot, RuntimeControlPlaneAdapterError> {
+    policy.validate()?;
+    validate_runtime_handoff_snapshot(&handoff_snapshot)?;
+    validate_evidence_index(&evidence_index)?;
+
+    let snapshot = RuntimeWorkstationSnapshot {
+        schema_version: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION.to_owned(),
+        aggregate_summary: derive_runtime_workstation_snapshot_aggregate_summary(
+            &handoff_snapshot,
+            &evidence_index,
+        ),
+        runtime_handoff_snapshot: handoff_snapshot,
+        evidence_index,
+        safety_flags: RuntimeWorkstationSnapshotSafetyFlags {
+            local_only: true,
+            strict_json_loaded: true,
+            caller_provided_snapshots_only: true,
+            validated_runtime_handoff_snapshot: true,
+            validated_evidence_index: true,
+            pointer_only_evidence: true,
+            generated_json_loaded: false,
+            raw_evidence_payload_copied: false,
+            live_runtime_connection: false,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            daemon_lifecycle_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        },
+        non_claims: static_str_vec(RUNTIME_WORKSTATION_SNAPSHOT_NON_CLAIMS),
+    };
+    validate_runtime_workstation_snapshot(&snapshot)?;
+    Ok(snapshot)
+}
+
+pub fn parse_runtime_workstation_snapshot_json(
+    input: &str,
+) -> Result<RuntimeWorkstationSnapshot, RuntimeControlPlaneAdapterError> {
+    match input.trim_start().as_bytes().first() {
+        Some(b'{') => {}
+        Some(_) => return Err(RuntimeControlPlaneAdapterError::NonObjectRoot),
+        None => return Err(RuntimeControlPlaneAdapterError::InvalidJson),
+    }
+
+    let snapshot: RuntimeWorkstationSnapshot =
+        serde_json::from_str(input).map_err(|_| RuntimeControlPlaneAdapterError::InvalidJson)?;
+    validate_runtime_workstation_snapshot(&snapshot)?;
+    Ok(snapshot)
+}
+
 pub fn parse_runtime_registry_storage_document_json(
     input: &str,
 ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
@@ -5610,6 +6135,215 @@ fn validate_runtime_handoff_snapshot(
     Ok(())
 }
 
+fn validate_runtime_workstation_snapshot(
+    snapshot: &RuntimeWorkstationSnapshot,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_workstation_snapshot.schema_version",
+        &snapshot.schema_version,
+        RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_workstation_snapshot.runtime_handoff_snapshot.schema_version",
+        &snapshot.runtime_handoff_snapshot.schema_version,
+        RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_workstation_snapshot.evidence_index.schema_version",
+        &snapshot.evidence_index.schema_version,
+        EVIDENCE_INDEX_SCHEMA_VERSION,
+    )?;
+    validate_runtime_workstation_snapshot_safety_flags(&snapshot.safety_flags)?;
+    validate_exact_strings(
+        "runtime_workstation_snapshot.non_claims",
+        &snapshot.non_claims,
+        RUNTIME_WORKSTATION_SNAPSHOT_NON_CLAIMS,
+    )?;
+    validate_runtime_handoff_snapshot(&snapshot.runtime_handoff_snapshot)?;
+    validate_evidence_index(&snapshot.evidence_index)?;
+    validate_runtime_workstation_snapshot_aggregate_summary(&snapshot.aggregate_summary)?;
+    let derived_summary = derive_runtime_workstation_snapshot_aggregate_summary(
+        &snapshot.runtime_handoff_snapshot,
+        &snapshot.evidence_index,
+    );
+    if snapshot.aggregate_summary != derived_summary {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot.aggregate_summary",
+        });
+    }
+    Ok(())
+}
+
+fn validate_runtime_workstation_snapshot_aggregate_summary(
+    summary: &RuntimeWorkstationSnapshotAggregateSummary,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if summary.runtime_total_job_count < summary.runtime_queued_job_count
+        || summary.runtime_total_job_count < summary.runtime_running_job_count
+        || summary.runtime_total_job_count < summary.runtime_failed_job_count
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot.aggregate_summary.runtime_job_counts",
+        });
+    }
+    if summary.registry_model_count == 0
+        || summary.registry_models_with_score_rows_count > summary.registry_model_count
+        || summary.evidence_source_count == 0
+        || summary.evidence_entity_count == 0
+        || summary.evidence_entity_window_count == 0
+        || summary.evidence_source_ref_count == 0
+        || summary.evidence_ref_count == 0
+        || summary.source_schema_count == 0
+        || summary.evidence_model_count == 0
+        || summary.model_count == 0
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot.aggregate_summary.counts",
+        });
+    }
+    validate_sorted_unique_strings(
+        "runtime_workstation_snapshot.aggregate_summary.source_schemas",
+        &summary.source_schemas,
+    )?;
+    for schema in &summary.source_schemas {
+        validate_supported_evidence_source_schema(
+            "runtime_workstation_snapshot.aggregate_summary.source_schemas",
+            schema,
+        )?;
+    }
+    validate_sorted_unique_feature_names(
+        "runtime_workstation_snapshot.aggregate_summary.feature_names",
+        &summary.feature_names,
+    )?;
+    validate_sorted_unique_model_ids(
+        "runtime_workstation_snapshot.aggregate_summary.model_ids",
+        &summary.model_ids,
+    )?;
+    if summary.source_schema_count != summary.source_schemas.len() as u32
+        || summary.feature_count != summary.feature_names.len() as u32
+        || summary.model_count != summary.model_ids.len() as u32
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot.aggregate_summary.counts",
+        });
+    }
+    Ok(())
+}
+
+fn validate_runtime_workstation_snapshot_safety_flags(
+    flags: &RuntimeWorkstationSnapshotSafetyFlags,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.local_only",
+        flags.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.strict_json_loaded",
+        flags.strict_json_loaded,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.caller_provided_snapshots_only",
+        flags.caller_provided_snapshots_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.validated_runtime_handoff_snapshot",
+        flags.validated_runtime_handoff_snapshot,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.validated_evidence_index",
+        flags.validated_evidence_index,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.pointer_only_evidence",
+        flags.pointer_only_evidence,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.generated_json_loaded",
+        flags.generated_json_loaded,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.raw_evidence_payload_copied",
+        flags.raw_evidence_payload_copied,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.live_runtime_connection",
+        flags.live_runtime_connection,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.file_io_enabled",
+        flags.file_io_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.storage_provider_enabled",
+        flags.storage_provider_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.database_or_indexing_enabled",
+        flags.database_or_indexing_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.public_network_transport_enabled",
+        flags.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.socket_listener_enabled",
+        flags.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.daemon_lifecycle_enabled",
+        flags.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.process_spawning_enabled",
+        flags.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.file_watching_enabled",
+        flags.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.qt_binding_enabled",
+        flags.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.capture_enabled",
+        flags.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.external_services_used",
+        flags.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.deployment_allowed",
+        flags.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot.safety_flags.native_inference_execution_enabled",
+        flags.native_inference_execution_enabled,
+        false,
+    )
+}
+
 fn validate_runtime_summary(
     summary: &RuntimeSummary,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
@@ -6327,6 +7061,70 @@ fn derive_evidence_index_aggregate_summary(index: &EvidenceIndex) -> EvidenceInd
     }
 }
 
+fn derive_runtime_workstation_snapshot_aggregate_summary(
+    handoff_snapshot: &RuntimeHandoffSnapshot,
+    evidence_index: &EvidenceIndex,
+) -> RuntimeWorkstationSnapshotAggregateSummary {
+    let mut source_schemas = BTreeSet::<String>::new();
+    source_schemas.extend(
+        handoff_snapshot
+            .model_registry_metadata
+            .aggregate_summary
+            .schemas_present
+            .iter()
+            .cloned(),
+    );
+    source_schemas.extend(
+        evidence_index
+            .aggregate_summary
+            .schemas_present
+            .iter()
+            .cloned(),
+    );
+
+    let mut model_ids = BTreeSet::<String>::new();
+    model_ids.extend(
+        handoff_snapshot
+            .model_registry_metadata
+            .entries
+            .iter()
+            .map(|entry| entry.model_id.clone()),
+    );
+    model_ids.extend(evidence_index.aggregate_summary.model_ids.iter().cloned());
+    let model_ids = string_set_to_vec(&model_ids);
+    let source_schemas = string_set_to_vec(&source_schemas);
+
+    RuntimeWorkstationSnapshotAggregateSummary {
+        workspace_id: handoff_snapshot.runtime_summary.workspace_id.clone(),
+        session_id: handoff_snapshot.runtime_summary.session_id.clone(),
+        runtime_total_job_count: handoff_snapshot.runtime_summary.total_job_count,
+        runtime_queued_job_count: handoff_snapshot.runtime_summary.queued_job_count,
+        runtime_running_job_count: handoff_snapshot.runtime_summary.running_job_count,
+        runtime_failed_job_count: handoff_snapshot.runtime_summary.failed_job_count,
+        registry_model_count: handoff_snapshot
+            .model_registry_metadata
+            .aggregate_summary
+            .model_count,
+        registry_models_with_score_rows_count: handoff_snapshot
+            .model_registry_metadata
+            .aggregate_summary
+            .models_with_score_rows
+            .len() as u32,
+        evidence_source_count: evidence_index.aggregate_summary.source_count,
+        evidence_entity_count: evidence_index.aggregate_summary.entity_count,
+        evidence_entity_window_count: evidence_index.aggregate_summary.entity_window_count,
+        evidence_source_ref_count: evidence_index.aggregate_summary.source_ref_count,
+        evidence_ref_count: evidence_index.aggregate_summary.evidence_ref_count,
+        source_schema_count: source_schemas.len() as u32,
+        feature_count: evidence_index.aggregate_summary.feature_count,
+        evidence_model_count: evidence_index.aggregate_summary.model_count,
+        model_count: model_ids.len() as u32,
+        source_schemas,
+        feature_names: evidence_index.aggregate_summary.feature_names.clone(),
+        model_ids,
+    }
+}
+
 fn validate_supported_evidence_source_schema(
     field: &'static str,
     value: &str,
@@ -6894,6 +7692,47 @@ const RUNTIME_HANDOFF_NON_CLAIMS: &[&str] = &[
     "not_persistent_storage",
     "not_qt_runtime_integration",
     "not_model_promotion_gate",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_WORKSTATION_SNAPSHOT_NON_CLAIMS: &[&str] = &[
+    "not_live_runtime_connection",
+    "not_generated_json_loader",
+    "not_file_loader",
+    "not_storage_provider",
+    "not_database_or_indexing_engine",
+    "not_raw_evidence_payload_loader",
+    "not_control_plane_transport",
+    "not_socket_listener",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_model_promotion_gate",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_NON_CLAIMS: &[&str] = &[
+    "not_runtime_service",
+    "not_file_loader",
+    "not_storage_provider",
+    "not_database_or_indexing_engine",
+    "not_generated_report_loader",
+    "not_generated_json_loader",
+    "not_raw_evidence_payload_loader",
+    "not_control_plane_transport",
+    "not_public_network_transport",
+    "not_socket_listener",
+    "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
     "not_deployment_approval",
     "not_native_runtime_execution",
 ];
@@ -7535,113 +8374,7 @@ mod tests {
     }
 
     fn minimal_evidence_index_fixture() -> EvidenceIndex {
-        EvidenceIndex {
-            schema_version: EVIDENCE_INDEX_SCHEMA_VERSION.to_owned(),
-            index_scope: EVIDENCE_INDEX_SCOPE.to_owned(),
-            source_summaries: vec![
-                EvidenceIndexSourceSummary {
-                    source_name: "model_disagreement_report_v0_001".to_owned(),
-                    source_schema: "model_disagreement_report.v0".to_owned(),
-                    row_count: 1,
-                    entity_window_count: 1,
-                    source_ref_count: 1,
-                    evidence_ref_count: 1,
-                    feature_count: 0,
-                    model_count: 1,
-                    feature_names: vec![],
-                    model_ids: strings(&["isolation_forest"]),
-                },
-                EvidenceIndexSourceSummary {
-                    source_name: "model_score_rows_v0_001".to_owned(),
-                    source_schema: "model_score_rows.v0".to_owned(),
-                    row_count: 1,
-                    entity_window_count: 1,
-                    source_ref_count: 1,
-                    evidence_ref_count: 2,
-                    feature_count: 1,
-                    model_count: 2,
-                    feature_names: strings(&["dns_failure_ratio"]),
-                    model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
-                },
-            ],
-            entity_window_index: vec![EvidenceIndexEntityWindow {
-                entity_id: "host-alpha".to_owned(),
-                window_start: "2026-01-01T00:00:00Z".to_owned(),
-                source_refs: vec![
-                    EvidenceIndexSourceRef {
-                        source_name: "model_disagreement_report_v0_001".to_owned(),
-                        source_schema: "model_disagreement_report.v0".to_owned(),
-                        row_index: 0,
-                        row_kind: "model_disagreement_row".to_owned(),
-                        feature_names: vec![],
-                        model_ids: strings(&["isolation_forest"]),
-                        evidence_indexes: vec![EvidenceIndexEvidenceRef {
-                            model_id: "isolation_forest".to_owned(),
-                            evidence_index: 0,
-                        }],
-                    },
-                    EvidenceIndexSourceRef {
-                        source_name: "model_score_rows_v0_001".to_owned(),
-                        source_schema: "model_score_rows.v0".to_owned(),
-                        row_index: 0,
-                        row_kind: "model_score_row".to_owned(),
-                        feature_names: strings(&["dns_failure_ratio"]),
-                        model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
-                        evidence_indexes: vec![
-                            EvidenceIndexEvidenceRef {
-                                model_id: "isolation_forest".to_owned(),
-                                evidence_index: 0,
-                            },
-                            EvidenceIndexEvidenceRef {
-                                model_id: "stdlib_linear_native".to_owned(),
-                                evidence_index: 0,
-                            },
-                        ],
-                    },
-                ],
-                feature_names: strings(&["dns_failure_ratio"]),
-                model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
-                source_ref_count: 2,
-                evidence_ref_count: 3,
-            }],
-            aggregate_summary: EvidenceIndexAggregateSummary {
-                source_count: 2,
-                schemas_present: strings(&["model_disagreement_report.v0", "model_score_rows.v0"]),
-                source_count_by_schema: BTreeMap::from([
-                    ("model_disagreement_report.v0".to_owned(), 1),
-                    ("model_score_rows.v0".to_owned(), 1),
-                ]),
-                row_count_by_schema: BTreeMap::from([
-                    ("model_disagreement_report.v0".to_owned(), 1),
-                    ("model_score_rows.v0".to_owned(), 1),
-                ]),
-                entity_count: 1,
-                entity_window_count: 1,
-                source_ref_count: 2,
-                evidence_ref_count: 3,
-                feature_count: 1,
-                model_count: 2,
-                feature_names: strings(&["dns_failure_ratio"]),
-                model_ids: strings(&["isolation_forest", "stdlib_linear_native"]),
-            },
-            safety_flags: EvidenceIndexSafetyFlags {
-                local_only: true,
-                strict_json_loaded: true,
-                pointer_only: true,
-                input_paths_copied: false,
-                source_filenames_copied: false,
-                raw_evidence_payload_copied: false,
-                raw_identifiers_copied: false,
-                generated_artifact_references_copied: false,
-                secrets_detected: false,
-                capture_claims_copied: false,
-                live_capture_used: false,
-                external_service_claims_copied: false,
-                external_services_used: false,
-                deployment_allowed: false,
-            },
-            non_claims: static_str_vec(EVIDENCE_INDEX_NON_CLAIMS),
-        }
+        EvidenceIndex::synthetic_fixture()
     }
 
     fn minimal_evidence_index_json() -> String {
@@ -7655,6 +8388,19 @@ mod tests {
 
     fn patched_evidence_index_json(target: &str, replacement: &str) -> String {
         minimal_evidence_index_json().replacen(target, replacement, 1)
+    }
+
+    fn runtime_workstation_snapshot_json(snapshot: &RuntimeWorkstationSnapshot) -> String {
+        serde_json::to_string_pretty(snapshot)
+            .expect("runtime workstation snapshot fixture must serialize")
+    }
+
+    fn synthetic_runtime_workstation_snapshot_json() -> String {
+        runtime_workstation_snapshot_json(&RuntimeWorkstationSnapshot::synthetic_fixture())
+    }
+
+    fn patched_runtime_workstation_snapshot_json(target: &str, replacement: &str) -> String {
+        synthetic_runtime_workstation_snapshot_json().replacen(target, replacement, 1)
     }
 
     fn synthetic_model_registry_metadata_json() -> String {
@@ -9050,6 +9796,332 @@ mod tests {
             parse_evidence_index_json(&evidence_index_json(&evidence_model_drift)).unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
                 field: "evidence_index.entity_window_index.source_refs.evidence_indexes.model_id",
+            }
+        );
+    }
+
+    #[test]
+    fn validates_public_evidence_index_synthetic_fixture() {
+        let fixture = EvidenceIndex::synthetic_fixture();
+
+        validate_evidence_index(&fixture).unwrap();
+        assert_eq!(fixture, minimal_evidence_index_fixture());
+        assert_eq!(
+            parse_evidence_index_json(&evidence_index_json(&fixture)).unwrap(),
+            fixture
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_workstation_snapshot_provider_contract_fixture() {
+        let contract = RuntimeWorkstationSnapshotProviderContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.output_snapshot_schema,
+            RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_handoff_snapshot_schema,
+            RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_evidence_index_schema,
+            EVIDENCE_INDEX_SCHEMA_VERSION
+        );
+        assert!(contract.local_only);
+        assert!(contract.in_memory_only);
+        assert!(contract.caller_provided_snapshots_only);
+        assert!(contract.strict_runtime_handoff_validation_enabled);
+        assert!(contract.strict_evidence_index_validation_enabled);
+        assert!(contract.derived_aggregate_validation_enabled);
+        assert!(contract.pointer_only_evidence_required);
+        assert!(!contract.file_io_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.database_or_indexing_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.generated_json_loading_enabled);
+        assert!(!contract.raw_evidence_payload_loading_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_NON_CLAIMS
+        );
+    }
+
+    #[test]
+    fn builds_static_runtime_workstation_snapshot_fixture() {
+        let snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+
+        validate_runtime_workstation_snapshot(&snapshot).unwrap();
+        assert_eq!(
+            snapshot.schema_version,
+            RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            snapshot.runtime_handoff_snapshot,
+            RuntimeHandoffSnapshot::synthetic_fixture()
+        );
+        assert_eq!(snapshot.evidence_index, EvidenceIndex::synthetic_fixture());
+        assert_eq!(
+            snapshot.aggregate_summary.workspace_id.as_str(),
+            "fixture-workspace-alpha"
+        );
+        assert_eq!(
+            snapshot.aggregate_summary.session_id.as_str(),
+            "fixture-session-runtime-summary"
+        );
+        assert_eq!(snapshot.aggregate_summary.runtime_total_job_count, 4);
+        assert_eq!(snapshot.aggregate_summary.registry_model_count, 10);
+        assert_eq!(
+            snapshot
+                .aggregate_summary
+                .registry_models_with_score_rows_count,
+            8
+        );
+        assert_eq!(snapshot.aggregate_summary.evidence_source_count, 2);
+        assert_eq!(snapshot.aggregate_summary.evidence_entity_count, 1);
+        assert_eq!(snapshot.aggregate_summary.evidence_entity_window_count, 1);
+        assert_eq!(snapshot.aggregate_summary.evidence_source_ref_count, 2);
+        assert_eq!(snapshot.aggregate_summary.evidence_ref_count, 3);
+        assert_eq!(
+            snapshot.aggregate_summary.feature_names,
+            strings(&["dns_failure_ratio"])
+        );
+        assert!(snapshot
+            .aggregate_summary
+            .model_ids
+            .contains(&"isolation_forest".to_owned()));
+        assert!(snapshot
+            .aggregate_summary
+            .model_ids
+            .contains(&"stdlib_linear_native".to_owned()));
+        assert_eq!(
+            snapshot.aggregate_summary.model_count,
+            snapshot.aggregate_summary.model_ids.len() as u32
+        );
+        assert!(snapshot.safety_flags.local_only);
+        assert!(snapshot.safety_flags.strict_json_loaded);
+        assert!(snapshot.safety_flags.pointer_only_evidence);
+        assert!(!snapshot.safety_flags.generated_json_loaded);
+        assert!(!snapshot.safety_flags.file_io_enabled);
+        assert!(!snapshot.safety_flags.qt_binding_enabled);
+        assert!(!snapshot.safety_flags.capture_enabled);
+        assert!(!snapshot.safety_flags.external_services_used);
+        assert!(!snapshot.safety_flags.deployment_allowed);
+        assert_eq!(
+            snapshot.non_claims,
+            static_str_vec(RUNTIME_WORKSTATION_SNAPSHOT_NON_CLAIMS)
+        );
+    }
+
+    #[test]
+    fn builds_runtime_workstation_snapshot_from_contract_api() {
+        let policy = RuntimeWorkstationSnapshotProviderPolicy::new();
+        let snapshot =
+            RuntimeWorkstationSnapshotProviderContract::build_runtime_workstation_snapshot(
+                RuntimeHandoffSnapshot::synthetic_fixture(),
+                EvidenceIndex::synthetic_fixture(),
+                &policy,
+            )
+            .unwrap();
+
+        assert_eq!(snapshot, RuntimeWorkstationSnapshot::synthetic_fixture());
+    }
+
+    #[test]
+    fn parses_runtime_workstation_snapshot_json_string() {
+        let json = synthetic_runtime_workstation_snapshot_json();
+        let snapshot = parse_runtime_workstation_snapshot_json(&json).unwrap();
+        let from_contract =
+            RuntimeWorkstationSnapshotProviderContract::parse_runtime_workstation_snapshot_json(
+                &json,
+            )
+            .unwrap();
+
+        assert_eq!(snapshot, RuntimeWorkstationSnapshot::synthetic_fixture());
+        assert_eq!(from_contract, snapshot);
+    }
+
+    #[test]
+    fn rejects_runtime_workstation_snapshot_provider_unsafe_flags() {
+        let mut file_io_policy = RuntimeWorkstationSnapshotProviderPolicy::new();
+        file_io_policy.file_io_enabled = true;
+        assert_eq!(
+            build_runtime_workstation_snapshot(
+                RuntimeHandoffSnapshot::synthetic_fixture(),
+                EvidenceIndex::synthetic_fixture(),
+                &file_io_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot_provider.file_io_enabled",
+            }
+        );
+
+        let mut non_local_policy = RuntimeWorkstationSnapshotProviderPolicy::new();
+        non_local_policy.local_only = false;
+        assert_eq!(
+            RuntimeWorkstationSnapshotProviderContract::build_runtime_workstation_snapshot(
+                RuntimeHandoffSnapshot::synthetic_fixture(),
+                EvidenceIndex::synthetic_fixture(),
+                &non_local_policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot_provider.local_only",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_or_drifted_runtime_workstation_snapshot_json_strings() {
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json("{").unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json("[]").unwrap_err(),
+            RuntimeControlPlaneAdapterError::NonObjectRoot
+        );
+
+        let with_unknown_field = synthetic_runtime_workstation_snapshot_json().replacen(
+            "{\n",
+            "{\n  \"unexpected_field\": true,\n",
+            1,
+        );
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&with_unknown_field).unwrap_err(),
+            RuntimeControlPlaneAdapterError::InvalidJson
+        );
+
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&patched_runtime_workstation_snapshot_json(
+                r#""schema_version": "runtime_workstation_snapshot.v0""#,
+                r#""schema_version": "runtime_workstation_snapshot.v1""#,
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "runtime_workstation_snapshot.schema_version",
+                expected: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+            }
+        );
+
+        let mut non_claim_drift = RuntimeWorkstationSnapshot::synthetic_fixture();
+        non_claim_drift.non_claims[0] = "not_real_workstation_snapshot".to_owned();
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &non_claim_drift
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot.non_claims",
+            }
+        );
+
+        let mut aggregate_drift = RuntimeWorkstationSnapshot::synthetic_fixture();
+        aggregate_drift.aggregate_summary.evidence_ref_count += 1;
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &aggregate_drift
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot.aggregate_summary",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_runtime_workstation_snapshot_unsafe_flags_and_nested_drift() {
+        let mut unsafe_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        unsafe_snapshot.safety_flags.file_io_enabled = true;
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &unsafe_snapshot
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot.safety_flags.file_io_enabled",
+            }
+        );
+
+        let mut handoff_schema_drift = RuntimeWorkstationSnapshot::synthetic_fixture();
+        handoff_schema_drift.runtime_handoff_snapshot.schema_version =
+            "runtime_handoff_snapshot.v1".to_owned();
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &handoff_schema_drift
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "runtime_workstation_snapshot.runtime_handoff_snapshot.schema_version",
+                expected: RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION,
+            }
+        );
+
+        let mut unsafe_handoff = RuntimeWorkstationSnapshot::synthetic_fixture();
+        unsafe_handoff.runtime_handoff_snapshot.local_only = false;
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &unsafe_handoff
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "local_only",
+            }
+        );
+
+        let mut evidence_schema_drift = RuntimeWorkstationSnapshot::synthetic_fixture();
+        evidence_schema_drift.evidence_index.schema_version = "evidence_index.v1".to_owned();
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &evidence_schema_drift
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedSchemaVersion {
+                field: "runtime_workstation_snapshot.evidence_index.schema_version",
+                expected: EVIDENCE_INDEX_SCHEMA_VERSION,
+            }
+        );
+
+        let mut unsafe_evidence = RuntimeWorkstationSnapshot::synthetic_fixture();
+        unsafe_evidence.evidence_index.safety_flags.pointer_only = false;
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &unsafe_evidence
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "evidence_index.safety_flags.pointer_only",
+            }
+        );
+
+        let mut evidence_aggregate_drift = RuntimeWorkstationSnapshot::synthetic_fixture();
+        evidence_aggregate_drift
+            .evidence_index
+            .aggregate_summary
+            .source_count = 1;
+        assert_eq!(
+            parse_runtime_workstation_snapshot_json(&runtime_workstation_snapshot_json(
+                &evidence_aggregate_drift
+            ))
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "evidence_index.aggregate_summary",
             }
         );
     }

@@ -57,6 +57,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "EVIDENCE_INDEX_SCOPE",
         "EVIDENCE_INDEX_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
+        "RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION",
+        "RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
@@ -109,6 +111,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "ModelRegistryState",
         "ModelPromotionState",
         "RuntimeHandoffSnapshot",
+        "RuntimeWorkstationSnapshot",
+        "RuntimeWorkstationSnapshotAggregateSummary",
+        "RuntimeWorkstationSnapshotSafetyFlags",
+        "RuntimeWorkstationSnapshotProviderContract",
+        "RuntimeWorkstationSnapshotProviderPolicy",
         "RuntimeHandoffSourceKind",
         "RuntimeHandoffTransportState",
         "RuntimeControlPlaneState",
@@ -216,6 +223,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "parse_model_registry_metadata_file",
         "parse_evidence_index_json",
         "parse_evidence_index_file",
+        "build_runtime_workstation_snapshot",
+        "parse_runtime_workstation_snapshot_json",
         "execute_local_command",
         "parse_control_plane_message_request_json",
         "execute_control_plane_message_request",
@@ -239,6 +248,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "output_snapshot_schema",
         "evidence_index_adapter.v0",
         "local_synthetic_evidence_pointer_index",
+        "runtime_workstation_snapshot.v0",
+        "runtime_workstation_snapshot_provider.v0",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -278,6 +289,14 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
     assert (
         "pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "
         '"runtime_handoff_snapshot.v0";' in lib_rs
+    )
+    assert (
+        "pub const RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION: &str = "
+        '"runtime_workstation_snapshot.v0";' in " ".join(lib_rs.split())
+    )
+    assert (
+        "pub const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION: &str = "
+        '"runtime_workstation_snapshot_provider.v0";' in " ".join(lib_rs.split())
     )
     assert (
         "pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str ="
@@ -807,6 +826,103 @@ def test_rust_core_exposes_runtime_handoff_snapshot_contract_shape() -> None:
     assert "RuntimeSummary::synthetic_fixture()" in lib_rs
     assert "ModelRegistryMetadata::synthetic_fixture()" in lib_rs
     assert "RUNTIME_HANDOFF_NON_CLAIMS" in lib_rs
+
+
+def test_rust_core_exposes_runtime_workstation_snapshot_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_snapshot_fields = [
+        "pub struct RuntimeWorkstationSnapshot",
+        "pub schema_version: String",
+        "pub runtime_handoff_snapshot: RuntimeHandoffSnapshot",
+        "pub evidence_index: EvidenceIndex",
+        "pub aggregate_summary: RuntimeWorkstationSnapshotAggregateSummary",
+        "pub safety_flags: RuntimeWorkstationSnapshotSafetyFlags",
+        "pub non_claims: Vec<String>",
+    ]
+    for field in expected_snapshot_fields:
+        assert field in lib_rs
+
+    expected_aggregate_fields = [
+        "pub struct RuntimeWorkstationSnapshotAggregateSummary",
+        "pub workspace_id: WorkspaceId",
+        "pub session_id: SessionId",
+        "pub runtime_total_job_count: u32",
+        "pub runtime_queued_job_count: u32",
+        "pub runtime_running_job_count: u32",
+        "pub runtime_failed_job_count: u32",
+        "pub registry_model_count: u32",
+        "pub registry_models_with_score_rows_count: u32",
+        "pub evidence_source_count: u32",
+        "pub evidence_entity_count: u32",
+        "pub evidence_entity_window_count: u32",
+        "pub evidence_source_ref_count: u32",
+        "pub evidence_ref_count: u32",
+        "pub source_schema_count: u32",
+        "pub feature_count: u32",
+        "pub evidence_model_count: u32",
+        "pub model_count: u32",
+        "pub source_schemas: Vec<String>",
+        "pub feature_names: Vec<String>",
+        "pub model_ids: Vec<String>",
+    ]
+    for field in expected_aggregate_fields:
+        assert field in lib_rs
+
+    expected_safety_fields = [
+        "pub struct RuntimeWorkstationSnapshotSafetyFlags",
+        "pub local_only: bool",
+        "pub strict_json_loaded: bool",
+        "pub caller_provided_snapshots_only: bool",
+        "pub validated_runtime_handoff_snapshot: bool",
+        "pub validated_evidence_index: bool",
+        "pub pointer_only_evidence: bool",
+        "pub generated_json_loaded: bool",
+        "pub raw_evidence_payload_copied: bool",
+        "pub live_runtime_connection: bool",
+        "pub file_io_enabled: bool",
+        "pub storage_provider_enabled: bool",
+        "pub database_or_indexing_enabled: bool",
+        "pub public_network_transport_enabled: bool",
+        "pub socket_listener_enabled: bool",
+        "pub daemon_lifecycle_enabled: bool",
+        "pub process_spawning_enabled: bool",
+        "pub file_watching_enabled: bool",
+        "pub qt_binding_enabled: bool",
+        "pub capture_enabled: bool",
+        "pub external_services_used: bool",
+        "pub deployment_allowed: bool",
+        "pub native_inference_execution_enabled: bool",
+    ]
+    for field in expected_safety_fields:
+        assert field in lib_rs
+
+    expected_provider_anchors = [
+        "pub struct RuntimeWorkstationSnapshotProviderContract",
+        "pub struct RuntimeWorkstationSnapshotProviderPolicy",
+        "pub accepted_handoff_snapshot_schema: &'static str",
+        "pub accepted_evidence_index_schema: &'static str",
+        "pub strict_runtime_handoff_validation_enabled: bool",
+        "pub strict_evidence_index_validation_enabled: bool",
+        "pub derived_aggregate_validation_enabled: bool",
+        "pub pointer_only_evidence_required: bool",
+        "pub raw_evidence_payload_loading_enabled: bool",
+        "RuntimeWorkstationSnapshot::synthetic_fixture()",
+        "RuntimeHandoffSnapshot::synthetic_fixture()",
+        "EvidenceIndex::synthetic_fixture()",
+        "build_runtime_workstation_snapshot",
+        "parse_runtime_workstation_snapshot_json",
+        "validate_runtime_workstation_snapshot(&snapshot)",
+        "derive_runtime_workstation_snapshot_aggregate_summary",
+        "validate_runtime_workstation_snapshot_safety_flags",
+        "RUNTIME_WORKSTATION_SNAPSHOT_NON_CLAIMS",
+        "RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_NON_CLAIMS",
+        "runtime_workstation_snapshot_provider.file_io_enabled",
+        "runtime_workstation_snapshot.safety_flags.file_io_enabled",
+        "runtime_workstation_snapshot.aggregate_summary",
+    ]
+    for anchor in expected_provider_anchors:
+        assert anchor in lib_rs
 
 
 def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
@@ -1825,6 +1941,16 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "EvidenceIndexAdapterPolicy",
         "parse_evidence_index_json",
         "parse_evidence_index_file",
+        "runtime_workstation_snapshot.v0",
+        "runtime_workstation_snapshot_provider.v0",
+        "RuntimeWorkstationSnapshot",
+        "RuntimeWorkstationSnapshotAggregateSummary",
+        "RuntimeWorkstationSnapshotSafetyFlags",
+        "RuntimeWorkstationSnapshotProviderContract",
+        "RuntimeWorkstationSnapshotProviderPolicy",
+        "EvidenceIndex::synthetic_fixture()",
+        "build_runtime_workstation_snapshot",
+        "parse_runtime_workstation_snapshot_json",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
         "runtime_registry_provider.v0",
@@ -1904,6 +2030,23 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "pointer-only safety flags",
         "not a durable evidence store",
         "raw evidence payload loader",
+        "Rust-owned `runtime_workstation_snapshot.v0` handoff",
+        "composes the existing `runtime_handoff_snapshot.v0` and `evidence_index.v0`",
+        "RuntimeWorkstationSnapshot",
+        "RuntimeWorkstationSnapshotAggregateSummary",
+        "RuntimeWorkstationSnapshotSafetyFlags",
+        "RuntimeWorkstationSnapshotProviderContract",
+        "RuntimeWorkstationSnapshotProviderPolicy",
+        "public `EvidenceIndex::synthetic_fixture()`",
+        "build_runtime_workstation_snapshot",
+        "parse_runtime_workstation_snapshot_json",
+        (
+            "recomputes aggregate workspace, session, model, source, window, reference, "
+            "feature, and model-id fields"
+        ),
+        "pointer-only evidence and local-only false-claim guards",
+        "not a storage provider",
+        "not a Qt binding",
         "typed local command dispatcher",
         "RuntimeControlPlaneCommand",
         "execute_local_command",
@@ -1948,6 +2091,10 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "typed registry metadata adapter",
         "typed model_registry_metadata_adapter.v0 over supplied metadata JSON/files",
         "typed evidence_index_adapter.v0 over supplied pointer-only evidence index JSON/files",
+        (
+            "runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only "
+            "evidence index snapshots"
+        ),
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",

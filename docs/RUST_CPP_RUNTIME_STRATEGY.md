@@ -134,6 +134,30 @@ database or indexing engine, generated report loader, arbitrary file loader,
 raw evidence payload loader, Qt binding, capture boundary, external service,
 deployment approval path, or native runtime executor.
 
+The scaffold now also owns a Rust-owned `runtime_workstation_snapshot.v0`
+handoff that composes the existing `runtime_handoff_snapshot.v0` and
+`evidence_index.v0` into one validated local workstation snapshot through
+`RuntimeWorkstationSnapshot`, `RuntimeWorkstationSnapshotAggregateSummary`,
+and `RuntimeWorkstationSnapshotSafetyFlags`. The matching
+`runtime_workstation_snapshot_provider.v0` contract is represented by
+`RuntimeWorkstationSnapshotProviderContract` and
+`RuntimeWorkstationSnapshotProviderPolicy`. The provider accepts only
+caller-provided, already typed `RuntimeHandoffSnapshot` and `EvidenceIndex`
+values, re-runs strict nested validation, uses the public
+`EvidenceIndex::synthetic_fixture()` for the static source fixture, and exposes
+`build_runtime_workstation_snapshot` plus
+`parse_runtime_workstation_snapshot_json` for strict JSON-string parsing. It
+recomputes aggregate workspace, session, model, source, window, reference,
+feature, and model-id fields from the nested handoff and pointer-only evidence
+index, rejects aggregate drift and non-claim drift, and preserves
+pointer-only evidence and local-only false-claim guards. This is a typed
+composition handoff only: it is not a storage provider, not a database or
+indexing engine, not a generated report loader, not a raw evidence payload
+loader, not file I/O, not a control-plane transport, not a listener, not a
+daemon lifecycle, not process spawning, not file watching, not a Qt binding,
+not capture behavior, not an external service, not deployment behavior, and
+not native inference execution.
+
 The scaffold now owns a bounded in-memory `runtime_registry_provider.v0`
 through `RuntimeRegistryProviderContract`, `RuntimeRegistryProviderPolicy`,
 `RuntimeRegistryRecord`, `RuntimeRegistrySnapshot`, and
@@ -421,6 +445,11 @@ durable evidence store, database or indexing engine, generated report loader,
 raw evidence payload loader, arbitrary file loader, Qt data-flow integration,
 capture boundary, deployment workflow, external service, or native runtime
 executor.
+The runtime workstation snapshot composes only validated runtime handoff and
+pointer-only evidence snapshots in memory; it is not a storage provider, Qt
+binding, generated report loader, raw evidence payload loader, control-plane
+transport, runtime service, capture boundary, deployment workflow, external
+service, or native inference executor.
 
 Expected integration path:
 
@@ -446,6 +475,7 @@ Rust source contract
   -> bounded one-shot runtime_control_plane_service_lifecycle.v0 service lifecycle wrapper
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
   -> bounded runtime_registry_storage_provider.v0 local JSON persistence
+  -> runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only evidence index snapshots
   -> future supervised local runtime service daemon with explicit async start/stop
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models

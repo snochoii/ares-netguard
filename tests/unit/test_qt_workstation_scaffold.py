@@ -444,6 +444,21 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "read evidence index files",
         "copy raw evidence payloads",
         "typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt",
+        "runtime_workstation_snapshot.v0",
+        "RuntimeWorkstationSnapshot",
+        "RuntimeWorkstationSnapshotAggregateSummary",
+        "RuntimeWorkstationSnapshotSafetyFlags",
+        "RuntimeWorkstationSnapshotProviderContract",
+        "RuntimeWorkstationSnapshotProviderPolicy",
+        "composes the existing `runtime_handoff_snapshot.v0` and `evidence_index.v0`",
+        "Qt still displays its own static preview objects",
+        "does not call `build_runtime_workstation_snapshot`",
+        "does not call `parse_runtime_workstation_snapshot_json`",
+        "does not read `RuntimeWorkstationSnapshot`",
+        (
+            "runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only "
+            "evidence index snapshots"
+        ),
         "future supervised local runtime service daemon with explicit async start/stop",
         "perform file I/O",
         "open IPC",
@@ -502,6 +517,10 @@ def test_qt_strategy_documents_registry_metadata_static_handoff() -> None:
         "does not call `parse_evidence_index_json`",
         "call `parse_evidence_index_file`",
         "typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt",
+        "runtime_workstation_snapshot.v0",
+        "does not call `build_runtime_workstation_snapshot`",
+        "does not call `parse_runtime_workstation_snapshot_json`",
+        "read `RuntimeWorkstationSnapshot`",
         "not called by Qt",
         "future supervised local runtime service daemon with explicit async start/stop",
     ]
