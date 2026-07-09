@@ -153,6 +153,20 @@ evidence index files, bind to live runtime state, use a database or indexing
 engine, load generated reports, copy raw evidence payloads, perform file I/O,
 open transport, use external services, allow deployment, capture traffic, or
 execute native inference.
+Rust now also defines `runtime_workstation_snapshot.v0` through
+`RuntimeWorkstationSnapshot`, `RuntimeWorkstationSnapshotAggregateSummary`,
+and `RuntimeWorkstationSnapshotSafetyFlags`, with
+`RuntimeWorkstationSnapshotProviderContract` and
+`RuntimeWorkstationSnapshotProviderPolicy`. The provider composes the existing
+`runtime_handoff_snapshot.v0` and `evidence_index.v0` into one local typed
+snapshot. Qt still displays its own static preview objects; it does not call
+`build_runtime_workstation_snapshot`, does not call
+`parse_runtime_workstation_snapshot_json`, does not read
+`RuntimeWorkstationSnapshot`, does not bind to live runtime state, does not
+read generated evidence files, does not open transport, does not start a
+listener, does not manage a filesystem socket path, does not spawn a process,
+does not use external services, does not allow deployment, does not capture
+traffic, and does not execute native inference.
 
 Expected integration path:
 
@@ -179,6 +193,7 @@ QML shell scaffold
   -> bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt
   -> typed evidence_index_adapter.v0 in the Rust runtime, not called by Qt
   -> static evidence_index.v0 handoff preview in QML
+  -> runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only evidence index snapshots
   -> future supervised local runtime service daemon with explicit async start/stop
   -> typed model/evidence data adapters
   -> Rust/C++ runtime workspace/session integration
