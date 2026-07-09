@@ -280,6 +280,156 @@ ApplicationWindow {
         ]
     })
 
+    readonly property var evidenceIndex: ({
+        "schema_version": "evidence_index.v0",
+        "index_scope": "local_synthetic_evidence_pointer_index",
+        "source_summaries": [
+            {
+                "source_name": "model_disagreement_report_v0_001",
+                "source_schema": "model_disagreement_report.v0",
+                "row_count": 1,
+                "entity_window_count": 1,
+                "source_ref_count": 1,
+                "evidence_ref_count": 1,
+                "feature_count": 0,
+                "model_count": 1,
+                "feature_names": [],
+                "model_ids": [
+                    "isolation_forest"
+                ]
+            },
+            {
+                "source_name": "model_score_rows_v0_001",
+                "source_schema": "model_score_rows.v0",
+                "row_count": 1,
+                "entity_window_count": 1,
+                "source_ref_count": 1,
+                "evidence_ref_count": 2,
+                "feature_count": 1,
+                "model_count": 2,
+                "feature_names": [
+                    "dns_failure_ratio"
+                ],
+                "model_ids": [
+                    "isolation_forest",
+                    "stdlib_linear_native"
+                ]
+            }
+        ],
+        "entity_window_index": [
+            {
+                "entity_id": "host-alpha",
+                "window_start": "2026-01-01T00:00:00Z",
+                "source_refs": [
+                    {
+                        "source_name": "model_disagreement_report_v0_001",
+                        "source_schema": "model_disagreement_report.v0",
+                        "row_index": 0,
+                        "row_kind": "model_disagreement_row",
+                        "feature_names": [],
+                        "model_ids": [
+                            "isolation_forest"
+                        ],
+                        "evidence_indexes": [
+                            {
+                                "model_id": "isolation_forest",
+                                "evidence_index": 0
+                            }
+                        ]
+                    },
+                    {
+                        "source_name": "model_score_rows_v0_001",
+                        "source_schema": "model_score_rows.v0",
+                        "row_index": 0,
+                        "row_kind": "model_score_row",
+                        "feature_names": [
+                            "dns_failure_ratio"
+                        ],
+                        "model_ids": [
+                            "isolation_forest",
+                            "stdlib_linear_native"
+                        ],
+                        "evidence_indexes": [
+                            {
+                                "model_id": "isolation_forest",
+                                "evidence_index": 0
+                            },
+                            {
+                                "model_id": "stdlib_linear_native",
+                                "evidence_index": 0
+                            }
+                        ]
+                    }
+                ],
+                "feature_names": [
+                    "dns_failure_ratio"
+                ],
+                "model_ids": [
+                    "isolation_forest",
+                    "stdlib_linear_native"
+                ],
+                "source_ref_count": 2,
+                "evidence_ref_count": 3
+            }
+        ],
+        "aggregate_summary": {
+            "source_count": 2,
+            "schemas_present": [
+                "model_disagreement_report.v0",
+                "model_score_rows.v0"
+            ],
+            "source_count_by_schema": {
+                "model_disagreement_report.v0": 1,
+                "model_score_rows.v0": 1
+            },
+            "row_count_by_schema": {
+                "model_disagreement_report.v0": 1,
+                "model_score_rows.v0": 1
+            },
+            "entity_count": 1,
+            "entity_window_count": 1,
+            "source_ref_count": 2,
+            "evidence_ref_count": 3,
+            "feature_count": 1,
+            "model_count": 2,
+            "feature_names": [
+                "dns_failure_ratio"
+            ],
+            "model_ids": [
+                "isolation_forest",
+                "stdlib_linear_native"
+            ]
+        },
+        "safety_flags": {
+            "local_only": true,
+            "strict_json_loaded": true,
+            "pointer_only": true,
+            "input_paths_copied": false,
+            "source_filenames_copied": false,
+            "raw_evidence_payload_copied": false,
+            "raw_identifiers_copied": false,
+            "generated_artifact_references_copied": false,
+            "secrets_detected": false,
+            "capture_claims_copied": false,
+            "live_capture_used": false,
+            "external_service_claims_copied": false,
+            "external_services_used": false,
+            "deployment_allowed": false
+        },
+        "non_claims": [
+            "not_durable_evidence_store",
+            "not_database",
+            "not_live_capture",
+            "not_pcap_parser",
+            "not_private_telemetry",
+            "not_external_enrichment",
+            "not_rule_deployment",
+            "not_model_promotion_gate",
+            "not_native_runtime_execution",
+            "not_qt_binding"
+        ]
+    })
+
     readonly property var evidenceRows: [
         {
             "entity": "asset-alpha",
@@ -874,31 +1024,130 @@ ApplicationWindow {
                         border.color: root.borderColor
 
                         ColumnLayout {
+                            objectName: "evidenceIndexSnapshotPanel"
                             anchors.fill: parent
                             anchors.margins: 14
-                            spacing: 10
+                            spacing: 8
 
-                            Label {
-                                text: "Evidence"
-                                color: root.primaryTextColor
-                                font.pixelSize: 15
-                                font.bold: true
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: "Evidence Index"
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    text: root.evidenceIndex.schema_version
+                                    color: root.accentColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
                             }
 
-                            Repeater {
-                                model: [
-                                    "Consensus risk supported by three detectors",
-                                    "Dissent remains below triage threshold",
-                                    "Evidence refs are coarse and synthetic",
-                                    "No raw packet payload displayed"
-                                ]
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.evidenceIndex.index_scope
+                                color: root.mutedTextColor
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
 
-                                delegate: Label {
-                                    Layout.fillWidth: true
-                                    text: "- " + modelData
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                columnSpacing: 10
+                                rowSpacing: 5
+
+                                Label {
+                                    text: "Entity"
                                     color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.evidenceIndex.entity_window_index[0].entity_id
+                                        + " / "
+                                        + root.evidenceIndex.entity_window_index[0].window_start
+                                    color: root.primaryTextColor
                                     font.pixelSize: 12
-                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Refs"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.evidenceIndex.aggregate_summary.source_ref_count
+                                        + " source / "
+                                        + root.evidenceIndex.aggregate_summary.evidence_ref_count
+                                        + " evidence"
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Pointer"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.evidenceIndex.entity_window_index[0].source_refs[0].source_name
+                                        + " / row "
+                                        + root.evidenceIndex.entity_window_index[0].source_refs[0].row_index
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Schema"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.evidenceIndex.entity_window_index[0].source_refs[0].source_schema
+                                        + " / "
+                                        + root.evidenceIndex.entity_window_index[0].source_refs[0].row_kind
+                                    color: root.primaryTextColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: "Safety"
+                                    color: root.mutedTextColor
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.evidenceIndex.safety_flags.local_only
+                                        && root.evidenceIndex.safety_flags.pointer_only
+                                        && !root.evidenceIndex.safety_flags.deployment_allowed
+                                        ? "Pointer-only local handoff"
+                                        : "Review handoff state"
+                                    color: root.amberColor
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
                                 }
                             }
                         }

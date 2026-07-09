@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from ares_netguard.models import registry_metadata
+from ares_netguard.storage import evidence_index
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = ROOT / "apps" / "qt-workstation"
@@ -94,6 +95,7 @@ def test_qml_imports_and_workstation_areas() -> None:
         "selectedEntityDetail",
         "runtimeBoundaryPanel",
         "evidenceDetailPanel",
+        "evidenceIndexSnapshotPanel",
         "analystActionPanel",
         "modelRegistrySnapshot",
     ]
@@ -108,6 +110,8 @@ def test_qml_imports_and_workstation_areas() -> None:
         "Detection Candidates",
         "Model Registry",
         "Entity Evidence Matrix",
+        "Evidence Index",
+        "evidence_index.v0",
         "Next Analyst Actions",
         "Runtime Boundary",
         "no live runtime connection",
@@ -224,6 +228,80 @@ def test_qml_registry_metadata_fields_mirror_registry_contract() -> None:
         assert value in qml
 
     assert "4 detectors / 1 disagreement report / 0 exported artifacts" not in qml
+
+
+def test_qml_evidence_index_fields_mirror_evidence_contract() -> None:
+    qml = _read("qml/Main.qml")
+
+    expected_fields = [
+        "schema_version",
+        "index_scope",
+        "source_summaries",
+        "entity_window_index",
+        "source_name",
+        "source_schema",
+        "row_count",
+        "entity_window_count",
+        "source_ref_count",
+        "evidence_ref_count",
+        "feature_count",
+        "model_count",
+        "feature_names",
+        "model_ids",
+        "source_refs",
+        "row_index",
+        "row_kind",
+        "evidence_indexes",
+        "evidence_index",
+        "aggregate_summary",
+        "safety_flags",
+        "non_claims",
+    ]
+    for field in expected_fields:
+        assert f'"{field}"' in qml
+
+    index = _extract_qml_json_property(qml, "evidenceIndex")
+    evidence_index.validate_evidence_index(index)
+
+    assert index["schema_version"] == evidence_index.EVIDENCE_INDEX_SCHEMA_VERSION
+    assert index["index_scope"] == evidence_index.INDEX_SCOPE
+    assert [summary["source_name"] for summary in index["source_summaries"]] == [
+        "model_disagreement_report_v0_001",
+        "model_score_rows_v0_001",
+    ]
+    assert index["entity_window_index"][0]["entity_id"] == "host-alpha"
+    assert index["entity_window_index"][0]["window_start"] == "2026-01-01T00:00:00Z"
+    assert index["entity_window_index"][0]["source_ref_count"] == 2
+    assert index["entity_window_index"][0]["evidence_ref_count"] == 3
+    assert index["aggregate_summary"]["source_count"] == 2
+    assert index["aggregate_summary"]["source_ref_count"] == 2
+    assert index["aggregate_summary"]["evidence_ref_count"] == 3
+    assert index["aggregate_summary"]["feature_names"] == ["dns_failure_ratio"]
+    assert index["aggregate_summary"]["model_ids"] == [
+        "isolation_forest",
+        "stdlib_linear_native",
+    ]
+    assert index["safety_flags"]["local_only"] is True
+    assert index["safety_flags"]["pointer_only"] is True
+    assert index["safety_flags"]["deployment_allowed"] is False
+
+    expected_references = [
+        "root.evidenceIndex.schema_version",
+        "root.evidenceIndex.index_scope",
+        "root.evidenceIndex.entity_window_index[0].entity_id",
+        "root.evidenceIndex.entity_window_index[0].window_start",
+        "root.evidenceIndex.aggregate_summary.source_ref_count",
+        "root.evidenceIndex.aggregate_summary.evidence_ref_count",
+        "root.evidenceIndex.entity_window_index[0].source_refs[0].source_name",
+        "root.evidenceIndex.entity_window_index[0].source_refs[0].source_schema",
+        "root.evidenceIndex.entity_window_index[0].source_refs[0].row_index",
+        "root.evidenceIndex.entity_window_index[0].source_refs[0].row_kind",
+        "root.evidenceIndex.safety_flags.local_only",
+        "root.evidenceIndex.safety_flags.pointer_only",
+        "root.evidenceIndex.safety_flags.deployment_allowed",
+    ]
+    for reference in expected_references:
+        assert reference in qml
 
 
 def test_qml_uses_static_synthetic_local_content_only() -> None:
@@ -355,7 +433,12 @@ def test_qt_strategy_documents_runtime_summary_static_handoff() -> None:
         "bounded in-memory runtime_registry_provider.v0 in the Rust runtime, not called by Qt",
         "bounded runtime_registry_storage_provider.v0 in the Rust runtime, not called by Qt",
         "evidence_index_adapter.v0",
+        "Evidence Index Snapshot panel",
+        "static `evidence_index.v0` fields",
+        "static synthetic QML object",
+        "source-level handoff preview",
         "pointer-only `evidence_index.v0` JSON strings",
+        "Qt displays its own static Evidence Index preview object",
         "does not call `parse_evidence_index_json`",
         "call `parse_evidence_index_file`",
         "read evidence index files",
