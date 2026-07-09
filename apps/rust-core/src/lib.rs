@@ -33,6 +33,9 @@ pub const RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_handoff_snaps
 pub const RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION: &str = "runtime_workstation_snapshot.v0";
 pub const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION: &str =
     "runtime_workstation_snapshot_provider.v0";
+pub const RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION: &str =
+    "runtime_workstation_snapshot_service.v0";
+pub const RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP: usize = 16;
 pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str = "runtime_control_plane_adapter.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION: &str = "runtime_control_plane_endpoint.v0";
 pub const RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION: &str =
@@ -645,6 +648,159 @@ pub struct RuntimeWorkstationSnapshotProviderPolicy {
     pub external_services_used: bool,
     pub deployment_allowed: bool,
     pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeWorkstationSnapshotServiceState {
+    Stopped,
+    Starting,
+    Running,
+    RefreshingSnapshot,
+    Stopping,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeWorkstationSnapshotServiceEventKind {
+    StartRequested,
+    SnapshotAccepted,
+    RefreshRequested,
+    SnapshotRefreshed,
+    StopRequested,
+    Stopped,
+    Failed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotServiceEvent {
+    pub schema_version: String,
+    pub event_index: u32,
+    pub state: RuntimeWorkstationSnapshotServiceState,
+    pub event_kind: RuntimeWorkstationSnapshotServiceEventKind,
+    pub event_label: &'static str,
+    pub snapshot_schema_version: String,
+    pub local_only: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotServiceStatus {
+    pub schema_version: String,
+    pub accepted_snapshot_schema: String,
+    pub final_state: RuntimeWorkstationSnapshotServiceState,
+    pub latest_snapshot: Option<RuntimeWorkstationSnapshot>,
+    pub accepted_snapshot_count: u32,
+    pub event_cap: usize,
+    pub events: Vec<RuntimeWorkstationSnapshotServiceEvent>,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub service_state_enabled: bool,
+    pub explicit_start_stop_enabled: bool,
+    pub snapshot_refresh_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub capped_in_memory_events_enabled: bool,
+    pub validates_snapshot_before_accept: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub async_stop_api_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotServiceContract {
+    pub schema_version: &'static str,
+    pub accepted_snapshot_schema: &'static str,
+    pub default_event_cap: usize,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub service_state_enabled: bool,
+    pub explicit_start_stop_enabled: bool,
+    pub snapshot_refresh_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub capped_in_memory_events_enabled: bool,
+    pub validates_snapshot_before_accept: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub async_stop_api_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+    pub non_claims: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotServicePolicy {
+    pub event_cap: usize,
+    pub local_only: bool,
+    pub in_memory_only: bool,
+    pub service_state_enabled: bool,
+    pub explicit_start_stop_enabled: bool,
+    pub snapshot_refresh_enabled: bool,
+    pub audit_events_enabled: bool,
+    pub capped_in_memory_events_enabled: bool,
+    pub validates_snapshot_before_accept: bool,
+    pub caller_provided_snapshots_only: bool,
+    pub file_io_enabled: bool,
+    pub storage_provider_enabled: bool,
+    pub database_or_indexing_enabled: bool,
+    pub generated_report_loading_enabled: bool,
+    pub generated_json_loading_enabled: bool,
+    pub raw_evidence_payload_loading_enabled: bool,
+    pub live_transport_enabled: bool,
+    pub public_network_transport_enabled: bool,
+    pub socket_listener_enabled: bool,
+    pub listener_loop_enabled: bool,
+    pub daemon_lifecycle_enabled: bool,
+    pub async_stop_api_enabled: bool,
+    pub process_spawning_enabled: bool,
+    pub file_watching_enabled: bool,
+    pub qt_binding_enabled: bool,
+    pub capture_enabled: bool,
+    pub external_services_used: bool,
+    pub deployment_allowed: bool,
+    pub native_inference_execution_enabled: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeWorkstationSnapshotServiceSupervisor {
+    state: RuntimeWorkstationSnapshotServiceState,
+    event_cap: usize,
+    latest_snapshot: Option<RuntimeWorkstationSnapshot>,
+    accepted_snapshot_count: u32,
+    events: Vec<RuntimeWorkstationSnapshotServiceEvent>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1819,6 +1975,33 @@ impl RuntimeControlPlaneServiceLifecycleEventKind {
     }
 }
 
+impl RuntimeWorkstationSnapshotServiceState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stopped => "stopped",
+            Self::Starting => "starting",
+            Self::Running => "running",
+            Self::RefreshingSnapshot => "refreshing_snapshot",
+            Self::Stopping => "stopping",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl RuntimeWorkstationSnapshotServiceEventKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::StartRequested => "start_requested",
+            Self::SnapshotAccepted => "snapshot_accepted",
+            Self::RefreshRequested => "refresh_requested",
+            Self::SnapshotRefreshed => "snapshot_refreshed",
+            Self::StopRequested => "stop_requested",
+            Self::Stopped => "stopped",
+            Self::Failed => "failed",
+        }
+    }
+}
+
 impl RuntimeControlPlaneOutputSnapshotSchema {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -2655,6 +2838,270 @@ impl RuntimeWorkstationSnapshotProviderPolicy {
 impl Default for RuntimeWorkstationSnapshotProviderPolicy {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl RuntimeWorkstationSnapshotServiceContract {
+    pub fn synthetic_fixture() -> Self {
+        Self {
+            schema_version: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION,
+            accepted_snapshot_schema: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+            default_event_cap: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP,
+            local_only: true,
+            in_memory_only: true,
+            service_state_enabled: true,
+            explicit_start_stop_enabled: true,
+            snapshot_refresh_enabled: true,
+            audit_events_enabled: true,
+            capped_in_memory_events_enabled: true,
+            validates_snapshot_before_accept: true,
+            caller_provided_snapshots_only: true,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            listener_loop_enabled: false,
+            daemon_lifecycle_enabled: false,
+            async_stop_api_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS,
+        }
+    }
+
+    pub fn execute_once(
+        initial_snapshot: RuntimeWorkstationSnapshot,
+        refresh_snapshots: &[RuntimeWorkstationSnapshot],
+        policy: &RuntimeWorkstationSnapshotServicePolicy,
+    ) -> Result<RuntimeWorkstationSnapshotServiceStatus, RuntimeControlPlaneAdapterError> {
+        execute_runtime_workstation_snapshot_service_once(
+            initial_snapshot,
+            refresh_snapshots,
+            policy,
+        )
+    }
+}
+
+impl RuntimeWorkstationSnapshotServicePolicy {
+    pub fn new() -> Self {
+        Self {
+            event_cap: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP,
+            local_only: true,
+            in_memory_only: true,
+            service_state_enabled: true,
+            explicit_start_stop_enabled: true,
+            snapshot_refresh_enabled: true,
+            audit_events_enabled: true,
+            capped_in_memory_events_enabled: true,
+            validates_snapshot_before_accept: true,
+            caller_provided_snapshots_only: true,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            listener_loop_enabled: false,
+            daemon_lifecycle_enabled: false,
+            async_stop_api_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+        }
+    }
+
+    pub fn bounded(event_cap: usize) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        if event_cap == 0 || event_cap > RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.event_cap",
+            });
+        }
+        let mut policy = Self::new();
+        policy.event_cap = event_cap;
+        Ok(policy)
+    }
+
+    pub fn validate(&self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        validate_runtime_workstation_snapshot_service_policy(self)
+    }
+}
+
+impl Default for RuntimeWorkstationSnapshotServicePolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RuntimeWorkstationSnapshotServiceSupervisor {
+    pub fn new(
+        policy: &RuntimeWorkstationSnapshotServicePolicy,
+    ) -> Result<Self, RuntimeControlPlaneAdapterError> {
+        policy.validate()?;
+        Ok(Self {
+            state: RuntimeWorkstationSnapshotServiceState::Stopped,
+            event_cap: policy.event_cap,
+            latest_snapshot: None,
+            accepted_snapshot_count: 0,
+            events: Vec::new(),
+        })
+    }
+
+    pub fn state(&self) -> RuntimeWorkstationSnapshotServiceState {
+        self.state
+    }
+
+    pub fn events(&self) -> &[RuntimeWorkstationSnapshotServiceEvent] {
+        &self.events
+    }
+
+    pub fn latest_snapshot(&self) -> Option<&RuntimeWorkstationSnapshot> {
+        self.latest_snapshot.as_ref()
+    }
+
+    pub fn accepted_snapshot_count(&self) -> u32 {
+        self.accepted_snapshot_count
+    }
+
+    pub fn start(
+        &mut self,
+        snapshot: RuntimeWorkstationSnapshot,
+    ) -> Result<(), RuntimeControlPlaneAdapterError> {
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::StartRequested)?;
+        if let Err(error) = validate_runtime_workstation_snapshot(&snapshot) {
+            self.record_event(RuntimeWorkstationSnapshotServiceEventKind::Failed)?;
+            return Err(error);
+        }
+        self.latest_snapshot = Some(snapshot);
+        self.accepted_snapshot_count += 1;
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::SnapshotAccepted)
+    }
+
+    pub fn refresh_snapshot(
+        &mut self,
+        snapshot: RuntimeWorkstationSnapshot,
+    ) -> Result<(), RuntimeControlPlaneAdapterError> {
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::RefreshRequested)?;
+        if let Err(error) = validate_runtime_workstation_snapshot(&snapshot) {
+            self.record_event(RuntimeWorkstationSnapshotServiceEventKind::Failed)?;
+            return Err(error);
+        }
+        self.latest_snapshot = Some(snapshot);
+        self.accepted_snapshot_count += 1;
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::SnapshotRefreshed)
+    }
+
+    pub fn stop(&mut self) -> Result<(), RuntimeControlPlaneAdapterError> {
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::StopRequested)?;
+        self.record_event(RuntimeWorkstationSnapshotServiceEventKind::Stopped)
+    }
+
+    pub fn status(&self) -> RuntimeWorkstationSnapshotServiceStatus {
+        RuntimeWorkstationSnapshotServiceStatus {
+            schema_version: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION.to_owned(),
+            accepted_snapshot_schema: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION.to_owned(),
+            final_state: self.state,
+            latest_snapshot: self.latest_snapshot.clone(),
+            accepted_snapshot_count: self.accepted_snapshot_count,
+            event_cap: self.event_cap,
+            events: self.events.clone(),
+            local_only: true,
+            in_memory_only: true,
+            service_state_enabled: true,
+            explicit_start_stop_enabled: true,
+            snapshot_refresh_enabled: true,
+            audit_events_enabled: true,
+            capped_in_memory_events_enabled: true,
+            validates_snapshot_before_accept: true,
+            caller_provided_snapshots_only: true,
+            file_io_enabled: false,
+            storage_provider_enabled: false,
+            database_or_indexing_enabled: false,
+            generated_report_loading_enabled: false,
+            generated_json_loading_enabled: false,
+            raw_evidence_payload_loading_enabled: false,
+            live_transport_enabled: false,
+            public_network_transport_enabled: false,
+            socket_listener_enabled: false,
+            listener_loop_enabled: false,
+            daemon_lifecycle_enabled: false,
+            async_stop_api_enabled: false,
+            process_spawning_enabled: false,
+            file_watching_enabled: false,
+            qt_binding_enabled: false,
+            capture_enabled: false,
+            external_services_used: false,
+            deployment_allowed: false,
+            native_inference_execution_enabled: false,
+            non_claims: static_str_vec(RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS),
+        }
+    }
+
+    fn record_event(
+        &mut self,
+        event_kind: RuntimeWorkstationSnapshotServiceEventKind,
+    ) -> Result<(), RuntimeControlPlaneAdapterError> {
+        let next_state = match (self.state, event_kind) {
+            (
+                RuntimeWorkstationSnapshotServiceState::Stopped,
+                RuntimeWorkstationSnapshotServiceEventKind::StartRequested,
+            ) => RuntimeWorkstationSnapshotServiceState::Starting,
+            (
+                RuntimeWorkstationSnapshotServiceState::Starting,
+                RuntimeWorkstationSnapshotServiceEventKind::SnapshotAccepted,
+            ) => RuntimeWorkstationSnapshotServiceState::Running,
+            (
+                RuntimeWorkstationSnapshotServiceState::Running,
+                RuntimeWorkstationSnapshotServiceEventKind::RefreshRequested,
+            ) => RuntimeWorkstationSnapshotServiceState::RefreshingSnapshot,
+            (
+                RuntimeWorkstationSnapshotServiceState::RefreshingSnapshot,
+                RuntimeWorkstationSnapshotServiceEventKind::SnapshotRefreshed,
+            ) => RuntimeWorkstationSnapshotServiceState::Running,
+            (
+                RuntimeWorkstationSnapshotServiceState::Running,
+                RuntimeWorkstationSnapshotServiceEventKind::StopRequested,
+            ) => RuntimeWorkstationSnapshotServiceState::Stopping,
+            (
+                RuntimeWorkstationSnapshotServiceState::Stopping,
+                RuntimeWorkstationSnapshotServiceEventKind::Stopped,
+            ) => RuntimeWorkstationSnapshotServiceState::Stopped,
+            (
+                RuntimeWorkstationSnapshotServiceState::Starting
+                | RuntimeWorkstationSnapshotServiceState::RefreshingSnapshot
+                | RuntimeWorkstationSnapshotServiceState::Stopping,
+                RuntimeWorkstationSnapshotServiceEventKind::Failed,
+            ) => RuntimeWorkstationSnapshotServiceState::Failed,
+            _ => {
+                return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                    field: "runtime_workstation_snapshot_service.transition",
+                });
+            }
+        };
+        self.state = next_state;
+        push_runtime_workstation_snapshot_service_event(
+            &mut self.events,
+            self.event_cap,
+            self.state,
+            event_kind,
+        );
+        Ok(())
     }
 }
 
@@ -4701,6 +5148,22 @@ pub fn parse_runtime_workstation_snapshot_json(
     Ok(snapshot)
 }
 
+pub fn execute_runtime_workstation_snapshot_service_once(
+    initial_snapshot: RuntimeWorkstationSnapshot,
+    refresh_snapshots: &[RuntimeWorkstationSnapshot],
+    policy: &RuntimeWorkstationSnapshotServicePolicy,
+) -> Result<RuntimeWorkstationSnapshotServiceStatus, RuntimeControlPlaneAdapterError> {
+    let mut supervisor = RuntimeWorkstationSnapshotServiceSupervisor::new(policy)?;
+    supervisor.start(initial_snapshot)?;
+    for snapshot in refresh_snapshots {
+        supervisor.refresh_snapshot(snapshot.clone())?;
+    }
+    supervisor.stop()?;
+    let status = supervisor.status();
+    validate_runtime_workstation_snapshot_service_status(&status)?;
+    Ok(status)
+}
+
 pub fn parse_runtime_registry_storage_document_json(
     input: &str,
 ) -> Result<RuntimeRegistryStorageDocument, RuntimeControlPlaneAdapterError> {
@@ -5525,6 +5988,414 @@ fn control_plane_service_lifecycle_outcome(
         native_inference_execution_enabled: policy.native_inference_execution_enabled,
         non_claims: static_str_vec(RUNTIME_CONTROL_PLANE_SERVICE_LIFECYCLE_NON_CLAIMS),
     }
+}
+
+fn validate_runtime_workstation_snapshot_service_policy(
+    policy: &RuntimeWorkstationSnapshotServicePolicy,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    if policy.event_cap == 0
+        || policy.event_cap > RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot_service.event_cap",
+        });
+    }
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.local_only",
+        policy.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.in_memory_only",
+        policy.in_memory_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.service_state_enabled",
+        policy.service_state_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.explicit_start_stop_enabled",
+        policy.explicit_start_stop_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.snapshot_refresh_enabled",
+        policy.snapshot_refresh_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.audit_events_enabled",
+        policy.audit_events_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.capped_in_memory_events_enabled",
+        policy.capped_in_memory_events_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.validates_snapshot_before_accept",
+        policy.validates_snapshot_before_accept,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.caller_provided_snapshots_only",
+        policy.caller_provided_snapshots_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.file_io_enabled",
+        policy.file_io_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.storage_provider_enabled",
+        policy.storage_provider_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.database_or_indexing_enabled",
+        policy.database_or_indexing_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.generated_report_loading_enabled",
+        policy.generated_report_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.generated_json_loading_enabled",
+        policy.generated_json_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.raw_evidence_payload_loading_enabled",
+        policy.raw_evidence_payload_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.live_transport_enabled",
+        policy.live_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.public_network_transport_enabled",
+        policy.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.socket_listener_enabled",
+        policy.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.listener_loop_enabled",
+        policy.listener_loop_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.daemon_lifecycle_enabled",
+        policy.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.async_stop_api_enabled",
+        policy.async_stop_api_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.process_spawning_enabled",
+        policy.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.file_watching_enabled",
+        policy.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.qt_binding_enabled",
+        policy.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.capture_enabled",
+        policy.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.external_services_used",
+        policy.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.deployment_allowed",
+        policy.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.native_inference_execution_enabled",
+        policy.native_inference_execution_enabled,
+        false,
+    )
+}
+
+fn push_runtime_workstation_snapshot_service_event(
+    events: &mut Vec<RuntimeWorkstationSnapshotServiceEvent>,
+    event_cap: usize,
+    state: RuntimeWorkstationSnapshotServiceState,
+    event_kind: RuntimeWorkstationSnapshotServiceEventKind,
+) {
+    if events.len() >= event_cap {
+        return;
+    }
+    events.push(RuntimeWorkstationSnapshotServiceEvent {
+        schema_version: RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION.to_owned(),
+        event_index: u32::try_from(events.len()).unwrap_or(u32::MAX),
+        state,
+        event_kind,
+        event_label: event_kind.as_str(),
+        snapshot_schema_version: RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION.to_owned(),
+        local_only: true,
+        external_services_used: false,
+        deployment_allowed: false,
+        native_inference_execution_enabled: false,
+    });
+}
+
+fn validate_runtime_workstation_snapshot_service_status(
+    status: &RuntimeWorkstationSnapshotServiceStatus,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_workstation_snapshot_service.schema_version",
+        &status.schema_version,
+        RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION,
+    )?;
+    validate_schema_version(
+        "runtime_workstation_snapshot_service.accepted_snapshot_schema",
+        &status.accepted_snapshot_schema,
+        RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    if status.event_cap == 0
+        || status.event_cap > RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP
+        || status.events.len() > status.event_cap
+    {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot_service.event_cap",
+        });
+    }
+    if (status.accepted_snapshot_count == 0) != status.latest_snapshot.is_none() {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot_service.accepted_snapshot_count",
+        });
+    }
+    if let Some(snapshot) = &status.latest_snapshot {
+        validate_runtime_workstation_snapshot(snapshot)?;
+    }
+    if let Some(last_event) = status.events.last() {
+        if status.final_state != last_event.state && status.events.len() < status.event_cap {
+            return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.final_state",
+            });
+        }
+    }
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.local_only",
+        status.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.in_memory_only",
+        status.in_memory_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.service_state_enabled",
+        status.service_state_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.explicit_start_stop_enabled",
+        status.explicit_start_stop_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.snapshot_refresh_enabled",
+        status.snapshot_refresh_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.audit_events_enabled",
+        status.audit_events_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.capped_in_memory_events_enabled",
+        status.capped_in_memory_events_enabled,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.validates_snapshot_before_accept",
+        status.validates_snapshot_before_accept,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.caller_provided_snapshots_only",
+        status.caller_provided_snapshots_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.file_io_enabled",
+        status.file_io_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.storage_provider_enabled",
+        status.storage_provider_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.database_or_indexing_enabled",
+        status.database_or_indexing_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.generated_report_loading_enabled",
+        status.generated_report_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.generated_json_loading_enabled",
+        status.generated_json_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.raw_evidence_payload_loading_enabled",
+        status.raw_evidence_payload_loading_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.live_transport_enabled",
+        status.live_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.public_network_transport_enabled",
+        status.public_network_transport_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.socket_listener_enabled",
+        status.socket_listener_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.listener_loop_enabled",
+        status.listener_loop_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.daemon_lifecycle_enabled",
+        status.daemon_lifecycle_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.async_stop_api_enabled",
+        status.async_stop_api_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.process_spawning_enabled",
+        status.process_spawning_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.file_watching_enabled",
+        status.file_watching_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.qt_binding_enabled",
+        status.qt_binding_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.capture_enabled",
+        status.capture_enabled,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.external_services_used",
+        status.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.deployment_allowed",
+        status.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.native_inference_execution_enabled",
+        status.native_inference_execution_enabled,
+        false,
+    )?;
+    validate_exact_strings(
+        "runtime_workstation_snapshot_service.non_claims",
+        &status.non_claims,
+        RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS,
+    )?;
+    for (index, event) in status.events.iter().enumerate() {
+        validate_runtime_workstation_snapshot_service_event(event, index as u32)?;
+    }
+    Ok(())
+}
+
+fn validate_runtime_workstation_snapshot_service_event(
+    event: &RuntimeWorkstationSnapshotServiceEvent,
+    expected_index: u32,
+) -> Result<(), RuntimeControlPlaneAdapterError> {
+    validate_schema_version(
+        "runtime_workstation_snapshot_service.events.schema_version",
+        &event.schema_version,
+        RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION,
+    )?;
+    if event.event_index != expected_index {
+        return Err(RuntimeControlPlaneAdapterError::UnsupportedValue {
+            field: "runtime_workstation_snapshot_service.events.event_index",
+        });
+    }
+    validate_schema_version(
+        "runtime_workstation_snapshot_service.events.snapshot_schema_version",
+        &event.snapshot_schema_version,
+        RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION,
+    )?;
+    validate_exact_string(
+        "runtime_workstation_snapshot_service.events.event_label",
+        event.event_label,
+        event.event_kind.as_str(),
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.events.local_only",
+        event.local_only,
+        true,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.events.external_services_used",
+        event.external_services_used,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.events.deployment_allowed",
+        event.deployment_allowed,
+        false,
+    )?;
+    validate_required_flag(
+        "runtime_workstation_snapshot_service.events.native_inference_execution_enabled",
+        event.native_inference_execution_enabled,
+        false,
+    )
 }
 
 fn read_exact_control_plane_ipc<R: Read>(
@@ -7728,6 +8599,28 @@ const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_NON_CLAIMS: &[&str] = &[
     "not_public_network_transport",
     "not_socket_listener",
     "not_daemon_lifecycle",
+    "not_process_spawner",
+    "not_file_watcher",
+    "not_qt_binding",
+    "not_capture_boundary",
+    "not_external_service",
+    "not_deployment_approval",
+    "not_native_runtime_execution",
+];
+
+const RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS: &[&str] = &[
+    "not_daemon_service",
+    "not_async_runtime_service",
+    "not_listener_loop",
+    "not_socket_listener",
+    "not_control_plane_transport",
+    "not_file_loader",
+    "not_storage_provider",
+    "not_database_or_indexing_engine",
+    "not_persistent_event_store",
+    "not_generated_report_loader",
+    "not_generated_json_loader",
+    "not_raw_evidence_payload_loader",
     "not_process_spawner",
     "not_file_watcher",
     "not_qt_binding",
@@ -10122,6 +11015,286 @@ mod tests {
             .unwrap_err(),
             RuntimeControlPlaneAdapterError::UnsupportedValue {
                 field: "evidence_index.aggregate_summary",
+            }
+        );
+    }
+
+    #[test]
+    fn emits_static_runtime_workstation_snapshot_service_contract_fixture() {
+        let contract = RuntimeWorkstationSnapshotServiceContract::synthetic_fixture();
+
+        assert_eq!(
+            contract.schema_version,
+            RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.accepted_snapshot_schema,
+            RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            contract.default_event_cap,
+            RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP
+        );
+        assert!(contract.local_only);
+        assert!(contract.in_memory_only);
+        assert!(contract.service_state_enabled);
+        assert!(contract.explicit_start_stop_enabled);
+        assert!(contract.snapshot_refresh_enabled);
+        assert!(contract.audit_events_enabled);
+        assert!(contract.capped_in_memory_events_enabled);
+        assert!(contract.validates_snapshot_before_accept);
+        assert!(contract.caller_provided_snapshots_only);
+        assert!(!contract.file_io_enabled);
+        assert!(!contract.storage_provider_enabled);
+        assert!(!contract.database_or_indexing_enabled);
+        assert!(!contract.generated_report_loading_enabled);
+        assert!(!contract.generated_json_loading_enabled);
+        assert!(!contract.raw_evidence_payload_loading_enabled);
+        assert!(!contract.live_transport_enabled);
+        assert!(!contract.public_network_transport_enabled);
+        assert!(!contract.socket_listener_enabled);
+        assert!(!contract.listener_loop_enabled);
+        assert!(!contract.daemon_lifecycle_enabled);
+        assert!(!contract.async_stop_api_enabled);
+        assert!(!contract.process_spawning_enabled);
+        assert!(!contract.file_watching_enabled);
+        assert!(!contract.qt_binding_enabled);
+        assert!(!contract.capture_enabled);
+        assert!(!contract.external_services_used);
+        assert!(!contract.deployment_allowed);
+        assert!(!contract.native_inference_execution_enabled);
+        assert_eq!(
+            contract.non_claims,
+            RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS
+        );
+    }
+
+    #[test]
+    fn supervises_runtime_workstation_snapshot_service_start_refresh_stop() {
+        let policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        let mut supervisor = RuntimeWorkstationSnapshotServiceSupervisor::new(&policy).unwrap();
+        let initial_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        let mut refresh_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        refresh_snapshot.aggregate_summary.runtime_total_job_count = 5;
+        refresh_snapshot
+            .runtime_handoff_snapshot
+            .runtime_summary
+            .total_job_count = 5;
+
+        supervisor.start(initial_snapshot.clone()).unwrap();
+        assert_eq!(
+            supervisor.state(),
+            RuntimeWorkstationSnapshotServiceState::Running
+        );
+        assert_eq!(supervisor.accepted_snapshot_count(), 1);
+        assert_eq!(supervisor.latest_snapshot(), Some(&initial_snapshot));
+
+        supervisor
+            .refresh_snapshot(refresh_snapshot.clone())
+            .unwrap();
+        assert_eq!(
+            supervisor.state(),
+            RuntimeWorkstationSnapshotServiceState::Running
+        );
+        assert_eq!(supervisor.accepted_snapshot_count(), 2);
+        assert_eq!(supervisor.latest_snapshot(), Some(&refresh_snapshot));
+
+        supervisor.stop().unwrap();
+        let status = supervisor.status();
+        validate_runtime_workstation_snapshot_service_status(&status).unwrap();
+        assert_eq!(
+            status.final_state,
+            RuntimeWorkstationSnapshotServiceState::Stopped
+        );
+        assert_eq!(status.accepted_snapshot_count, 2);
+        assert_eq!(status.latest_snapshot, Some(refresh_snapshot));
+        assert_eq!(
+            status
+                .events
+                .iter()
+                .map(|event| event.event_kind.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "start_requested",
+                "snapshot_accepted",
+                "refresh_requested",
+                "snapshot_refreshed",
+                "stop_requested",
+                "stopped"
+            ]
+        );
+        assert!(status.local_only);
+        assert!(status.in_memory_only);
+        assert!(!status.file_io_enabled);
+        assert!(!status.storage_provider_enabled);
+        assert!(!status.socket_listener_enabled);
+        assert!(!status.daemon_lifecycle_enabled);
+        assert!(!status.qt_binding_enabled);
+        assert!(!status.capture_enabled);
+        assert!(!status.external_services_used);
+        assert!(!status.deployment_allowed);
+        assert!(!status.native_inference_execution_enabled);
+    }
+
+    #[test]
+    fn executes_runtime_workstation_snapshot_service_once_from_contract_api() {
+        let policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        let refresh_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        let status = RuntimeWorkstationSnapshotServiceContract::execute_once(
+            RuntimeWorkstationSnapshot::synthetic_fixture(),
+            &[refresh_snapshot.clone()],
+            &policy,
+        )
+        .unwrap();
+
+        validate_runtime_workstation_snapshot_service_status(&status).unwrap();
+        assert_eq!(
+            status.final_state,
+            RuntimeWorkstationSnapshotServiceState::Stopped
+        );
+        assert_eq!(status.accepted_snapshot_count, 2);
+        assert_eq!(status.latest_snapshot, Some(refresh_snapshot));
+        assert_eq!(
+            status.event_cap,
+            RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP
+        );
+        assert_eq!(status.events.len(), 6);
+    }
+
+    #[test]
+    fn caps_runtime_workstation_snapshot_service_events_in_memory() {
+        let policy = RuntimeWorkstationSnapshotServicePolicy::bounded(3).unwrap();
+        let refresh_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        let status = execute_runtime_workstation_snapshot_service_once(
+            RuntimeWorkstationSnapshot::synthetic_fixture(),
+            &[refresh_snapshot.clone()],
+            &policy,
+        )
+        .unwrap();
+
+        validate_runtime_workstation_snapshot_service_status(&status).unwrap();
+        assert_eq!(
+            status.final_state,
+            RuntimeWorkstationSnapshotServiceState::Stopped
+        );
+        assert_eq!(status.event_cap, 3);
+        assert_eq!(status.events.len(), 3);
+        assert_eq!(status.accepted_snapshot_count, 2);
+        assert_eq!(status.latest_snapshot, Some(refresh_snapshot));
+    }
+
+    #[test]
+    fn rejects_runtime_workstation_snapshot_service_policy_drift() {
+        assert_eq!(
+            RuntimeWorkstationSnapshotServicePolicy::bounded(0).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.event_cap",
+            }
+        );
+        assert_eq!(
+            RuntimeWorkstationSnapshotServicePolicy::bounded(
+                RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP + 1,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.event_cap",
+            }
+        );
+
+        let mut policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        policy.file_io_enabled = true;
+        assert_eq!(
+            RuntimeWorkstationSnapshotServiceSupervisor::new(&policy).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot_service.file_io_enabled",
+            }
+        );
+
+        let mut policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        policy.daemon_lifecycle_enabled = true;
+        assert_eq!(
+            execute_runtime_workstation_snapshot_service_once(
+                RuntimeWorkstationSnapshot::synthetic_fixture(),
+                &[],
+                &policy,
+            )
+            .unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot_service.daemon_lifecycle_enabled",
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_runtime_workstation_snapshot_service_invalid_transitions_and_snapshot_drift() {
+        let policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        let mut supervisor = RuntimeWorkstationSnapshotServiceSupervisor::new(&policy).unwrap();
+        assert_eq!(
+            supervisor.stop().unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.transition",
+            }
+        );
+
+        let mut drifted_snapshot = RuntimeWorkstationSnapshot::synthetic_fixture();
+        drifted_snapshot.safety_flags.local_only = false;
+        let mut supervisor = RuntimeWorkstationSnapshotServiceSupervisor::new(&policy).unwrap();
+        assert_eq!(
+            supervisor.start(drifted_snapshot).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot.safety_flags.local_only",
+            }
+        );
+        assert_eq!(
+            supervisor.state(),
+            RuntimeWorkstationSnapshotServiceState::Failed
+        );
+        assert_eq!(
+            supervisor
+                .events()
+                .iter()
+                .map(|event| event.event_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                RuntimeWorkstationSnapshotServiceEventKind::StartRequested,
+                RuntimeWorkstationSnapshotServiceEventKind::Failed,
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_runtime_workstation_snapshot_service_status_drift() {
+        let policy = RuntimeWorkstationSnapshotServicePolicy::new();
+        let mut supervisor = RuntimeWorkstationSnapshotServiceSupervisor::new(&policy).unwrap();
+        supervisor
+            .start(RuntimeWorkstationSnapshot::synthetic_fixture())
+            .unwrap();
+        supervisor.stop().unwrap();
+
+        let mut unsafe_status = supervisor.status();
+        unsafe_status.deployment_allowed = true;
+        assert_eq!(
+            validate_runtime_workstation_snapshot_service_status(&unsafe_status).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsafeFlag {
+                field: "runtime_workstation_snapshot_service.deployment_allowed",
+            }
+        );
+
+        let mut non_claim_drift = supervisor.status();
+        non_claim_drift.non_claims[0] = "not_real_service_guard".to_owned();
+        assert_eq!(
+            validate_runtime_workstation_snapshot_service_status(&non_claim_drift).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.non_claims",
+            }
+        );
+
+        let mut event_drift = supervisor.status();
+        event_drift.events[0].event_label = "started";
+        assert_eq!(
+            validate_runtime_workstation_snapshot_service_status(&event_drift).unwrap_err(),
+            RuntimeControlPlaneAdapterError::UnsupportedValue {
+                field: "runtime_workstation_snapshot_service.events.event_label",
             }
         );
     }

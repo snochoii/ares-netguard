@@ -59,6 +59,8 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RUNTIME_HANDOFF_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_WORKSTATION_SNAPSHOT_SCHEMA_VERSION",
         "RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION",
+        "RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION",
+        "RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP",
         "RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_SCHEMA_VERSION",
         "RUNTIME_CONTROL_PLANE_ENDPOINT_PATH_SCHEMA_VERSION",
@@ -116,6 +118,13 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "RuntimeWorkstationSnapshotSafetyFlags",
         "RuntimeWorkstationSnapshotProviderContract",
         "RuntimeWorkstationSnapshotProviderPolicy",
+        "RuntimeWorkstationSnapshotServiceContract",
+        "RuntimeWorkstationSnapshotServicePolicy",
+        "RuntimeWorkstationSnapshotServiceState",
+        "RuntimeWorkstationSnapshotServiceEventKind",
+        "RuntimeWorkstationSnapshotServiceEvent",
+        "RuntimeWorkstationSnapshotServiceStatus",
+        "RuntimeWorkstationSnapshotServiceSupervisor",
         "RuntimeHandoffSourceKind",
         "RuntimeHandoffTransportState",
         "RuntimeControlPlaneState",
@@ -225,6 +234,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "parse_evidence_index_file",
         "build_runtime_workstation_snapshot",
         "parse_runtime_workstation_snapshot_json",
+        "execute_runtime_workstation_snapshot_service_once",
         "execute_local_command",
         "parse_control_plane_message_request_json",
         "execute_control_plane_message_request",
@@ -250,6 +260,7 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "local_synthetic_evidence_pointer_index",
         "runtime_workstation_snapshot.v0",
         "runtime_workstation_snapshot_provider.v0",
+        "runtime_workstation_snapshot_service.v0",
     ]
     for anchor in expected_anchors:
         assert anchor in lib_rs
@@ -298,6 +309,11 @@ def test_rust_core_exposes_expected_runtime_contract_anchors() -> None:
         "pub const RUNTIME_WORKSTATION_SNAPSHOT_PROVIDER_SCHEMA_VERSION: &str = "
         '"runtime_workstation_snapshot_provider.v0";' in " ".join(lib_rs.split())
     )
+    assert (
+        "pub const RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_SCHEMA_VERSION: &str = "
+        '"runtime_workstation_snapshot_service.v0";' in " ".join(lib_rs.split())
+    )
+    assert "pub const RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_DEFAULT_EVENT_CAP: usize = 16;" in lib_rs
     assert (
         "pub const RUNTIME_CONTROL_PLANE_ADAPTER_SCHEMA_VERSION: &str ="
         ' "runtime_control_plane_adapter.v0";' in " ".join(lib_rs.split())
@@ -923,6 +939,96 @@ def test_rust_core_exposes_runtime_workstation_snapshot_contract_shape() -> None
     ]
     for anchor in expected_provider_anchors:
         assert anchor in lib_rs
+
+
+def test_rust_core_exposes_runtime_workstation_snapshot_service_contract_shape() -> None:
+    lib_rs = _read("src/lib.rs")
+
+    expected_types = [
+        "pub enum RuntimeWorkstationSnapshotServiceState",
+        "pub enum RuntimeWorkstationSnapshotServiceEventKind",
+        "pub struct RuntimeWorkstationSnapshotServiceEvent",
+        "pub struct RuntimeWorkstationSnapshotServiceStatus",
+        "pub struct RuntimeWorkstationSnapshotServiceContract",
+        "pub struct RuntimeWorkstationSnapshotServicePolicy",
+        "pub struct RuntimeWorkstationSnapshotServiceSupervisor",
+        "impl RuntimeWorkstationSnapshotServiceState",
+        "impl RuntimeWorkstationSnapshotServiceEventKind",
+        "impl RuntimeWorkstationSnapshotServiceContract",
+        "impl RuntimeWorkstationSnapshotServicePolicy",
+        "impl Default for RuntimeWorkstationSnapshotServicePolicy",
+        "impl RuntimeWorkstationSnapshotServiceSupervisor",
+    ]
+    for type_anchor in expected_types:
+        assert type_anchor in lib_rs
+
+    expected_state_and_event_values = [
+        "Stopped",
+        "Starting",
+        "Running",
+        "RefreshingSnapshot",
+        "Stopping",
+        "Failed",
+        "StartRequested",
+        "SnapshotAccepted",
+        "RefreshRequested",
+        "SnapshotRefreshed",
+        "StopRequested",
+        '=> "refreshing_snapshot"',
+        '=> "snapshot_refreshed"',
+    ]
+    for value in expected_state_and_event_values:
+        assert value in lib_rs
+
+    expected_fields = [
+        "pub accepted_snapshot_schema: &'static str",
+        "pub default_event_cap: usize",
+        "pub service_state_enabled: bool",
+        "pub explicit_start_stop_enabled: bool",
+        "pub snapshot_refresh_enabled: bool",
+        "pub audit_events_enabled: bool",
+        "pub capped_in_memory_events_enabled: bool",
+        "pub validates_snapshot_before_accept: bool",
+        "pub caller_provided_snapshots_only: bool",
+        "pub raw_evidence_payload_loading_enabled: bool",
+        "pub listener_loop_enabled: bool",
+        "pub daemon_lifecycle_enabled: bool",
+        "pub async_stop_api_enabled: bool",
+        "pub final_state: RuntimeWorkstationSnapshotServiceState",
+        "pub latest_snapshot: Option<RuntimeWorkstationSnapshot>",
+        "pub accepted_snapshot_count: u32",
+        "pub events: Vec<RuntimeWorkstationSnapshotServiceEvent>",
+        "pub snapshot_schema_version: String",
+        "state: RuntimeWorkstationSnapshotServiceState",
+        "event_cap: usize",
+        "latest_snapshot: Option<RuntimeWorkstationSnapshot>",
+        "accepted_snapshot_count: u32",
+    ]
+    for field in expected_fields:
+        assert field in lib_rs
+
+    expected_functions = [
+        "RuntimeWorkstationSnapshotServiceContract::synthetic_fixture()",
+        "pub fn execute_once(",
+        "pub fn bounded(event_cap: usize)",
+        "pub fn validate(&self)",
+        "pub fn start(",
+        "pub fn refresh_snapshot(",
+        "pub fn stop(&mut self)",
+        "pub fn status(&self) -> RuntimeWorkstationSnapshotServiceStatus",
+        "pub fn execute_runtime_workstation_snapshot_service_once",
+        "fn validate_runtime_workstation_snapshot_service_policy",
+        "fn validate_runtime_workstation_snapshot_service_status",
+        "fn validate_runtime_workstation_snapshot_service_event",
+        "fn push_runtime_workstation_snapshot_service_event",
+        "validate_runtime_workstation_snapshot(&snapshot)",
+        "runtime_workstation_snapshot_service.file_io_enabled",
+        "runtime_workstation_snapshot_service.daemon_lifecycle_enabled",
+        "runtime_workstation_snapshot_service.transition",
+        "RUNTIME_WORKSTATION_SNAPSHOT_SERVICE_NON_CLAIMS",
+    ]
+    for function_anchor in expected_functions:
+        assert function_anchor in lib_rs
 
 
 def test_rust_core_exposes_control_plane_adapter_contract_shape() -> None:
@@ -1951,6 +2057,15 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "EvidenceIndex::synthetic_fixture()",
         "build_runtime_workstation_snapshot",
         "parse_runtime_workstation_snapshot_json",
+        "runtime_workstation_snapshot_service.v0",
+        "RuntimeWorkstationSnapshotServiceContract",
+        "RuntimeWorkstationSnapshotServicePolicy",
+        "RuntimeWorkstationSnapshotServiceState",
+        "RuntimeWorkstationSnapshotServiceEventKind",
+        "RuntimeWorkstationSnapshotServiceEvent",
+        "RuntimeWorkstationSnapshotServiceStatus",
+        "RuntimeWorkstationSnapshotServiceSupervisor",
+        "execute_runtime_workstation_snapshot_service_once",
         "runtime_handoff_snapshot.v0",
         "RuntimeHandoffSnapshot",
         "runtime_registry_provider.v0",
@@ -2047,6 +2162,15 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
         "pointer-only evidence and local-only false-claim guards",
         "not a storage provider",
         "not a Qt binding",
+        "bounded in-memory `runtime_workstation_snapshot_service.v0` wrapper",
+        "validated `RuntimeWorkstationSnapshot` values",
+        "explicit start, refresh, and stop state",
+        "capped deterministic in-memory audit events",
+        "RuntimeWorkstationSnapshotServiceSupervisor",
+        "RuntimeWorkstationSnapshotServiceStatus",
+        "execute_runtime_workstation_snapshot_service_once",
+        "not a daemon service",
+        "not an async runtime service",
         "typed local command dispatcher",
         "RuntimeControlPlaneCommand",
         "execute_local_command",
@@ -2095,6 +2219,7 @@ def test_runtime_strategy_documents_v0_limits_and_migration() -> None:
             "runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only "
             "evidence index snapshots"
         ),
+        "bounded in-memory runtime_workstation_snapshot_service.v0 supervisor",
         "typed local control-plane command dispatcher over JSON/file parsers",
         "strict runtime_control_plane_message.v0 local request/response envelope",
         "bounded runtime_control_plane_frame.v0 local byte-frame adapter",

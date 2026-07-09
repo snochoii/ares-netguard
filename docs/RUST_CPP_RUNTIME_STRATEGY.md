@@ -158,6 +158,28 @@ daemon lifecycle, not process spawning, not file watching, not a Qt binding,
 not capture behavior, not an external service, not deployment behavior, and
 not native inference execution.
 
+The scaffold now also owns a bounded in-memory
+`runtime_workstation_snapshot_service.v0` wrapper around validated
+`RuntimeWorkstationSnapshot` values through
+`RuntimeWorkstationSnapshotServiceContract`,
+`RuntimeWorkstationSnapshotServicePolicy`,
+`RuntimeWorkstationSnapshotServiceState`,
+`RuntimeWorkstationSnapshotServiceEventKind`,
+`RuntimeWorkstationSnapshotServiceEvent`,
+`RuntimeWorkstationSnapshotServiceStatus`, and
+`RuntimeWorkstationSnapshotServiceSupervisor`. The supervisor exposes explicit
+start, refresh, and stop state, validates each caller-provided snapshot before
+accepting it, retains only the latest snapshot in memory, records capped
+deterministic in-memory audit events, and exposes
+`execute_runtime_workstation_snapshot_service_once` for deterministic local
+execution. This is a local supervisor contract only: it is not a daemon
+service, not an async runtime service, not a listener loop, not a socket
+listener, not a control-plane transport, not file I/O, not a storage provider,
+not a database or indexing engine, not a persistent event store, not a
+generated report loader, not a raw evidence payload loader, not process
+spawning, not file watching, not a Qt binding, not capture behavior, not an
+external service, not deployment behavior, and not native inference execution.
+
 The scaffold now owns a bounded in-memory `runtime_registry_provider.v0`
 through `RuntimeRegistryProviderContract`, `RuntimeRegistryProviderPolicy`,
 `RuntimeRegistryRecord`, `RuntimeRegistrySnapshot`, and
@@ -450,6 +472,12 @@ pointer-only evidence snapshots in memory; it is not a storage provider, Qt
 binding, generated report loader, raw evidence payload loader, control-plane
 transport, runtime service, capture boundary, deployment workflow, external
 service, or native inference executor.
+The runtime workstation snapshot service supervises only validated workstation
+snapshots in memory with explicit start, refresh, and stop state; it is not a
+daemon service, async runtime service, listener loop, socket listener,
+control-plane transport, storage provider, persistent event store, Qt binding,
+capture boundary, deployment workflow, external service, or native inference
+executor.
 
 Expected integration path:
 
@@ -476,6 +504,7 @@ Rust source contract
   -> bounded in-memory runtime_registry_provider.v0 over validated handoff snapshots
   -> bounded runtime_registry_storage_provider.v0 local JSON persistence
   -> runtime_workstation_snapshot.v0 over validated runtime handoff and pointer-only evidence index snapshots
+  -> bounded in-memory runtime_workstation_snapshot_service.v0 supervisor
   -> future supervised local runtime service daemon with explicit async start/stop
   -> Qt workstation data-flow integration
   -> Python ML Lab report handoff for experimental models
