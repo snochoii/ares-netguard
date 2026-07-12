@@ -1,41 +1,88 @@
 # Time-Series Foundation Residual Anomaly
 
-## Idea
+## Current status
 
-Use forecasting residuals to produce temporal anomaly evidence for network or
-host feature windows. A single feature row may look normal, while its change
-relative to an expected sequence is anomalous.
+`time_series_residual_report.v1` is an offline, stdlib-only research contract
+for leakage-resistant forecast-residual evidence. It introduces an explicit
+forecast backend seam and frozen split-conformal calibration. It is not a real
+TimesFM, Chronos, Moirai, PatchTST, iTransformer, TimeMixer, or other pretrained
+foundation model execution path.
 
-## v0 status
+The former `time_series_residual_report.v0` contract remains accepted as a
+strict read-only input by score conversion, composition, evaluation, agentic
+investigation, evidence indexing, and Rust schema allowlists. New reports are
+always v1.
 
-`src/ares_netguard/models/time_series_residual.py` is a deterministic
-stdlib-only residual proxy. It is not a real TimesFM, Chronos, Moirai, PatchTST,
-iTransformer, TimeMixer, or other pretrained foundation model adapter.
+## Forecast backend seam
 
-The v0 producer:
+`src/ares_netguard/models/time_series_forecast.py` defines:
 
-- reads tiny synthetic feature-window JSON/JSONL rows;
-- forecasts the next value from a fixed previous-window mean and interval;
-- emits residual, residual z-score, conformal-style score, and bounded
-  residual risk evidence;
-- converts residual evidence into existing `model_score_row.v0` rows using
-  `time_series_residual` as the model id;
-- writes smoke output only to `/tmp/ares-netguard/`.
+- `ForecastRequest(context: tuple[float, ...], interval_z: float)`;
+- `ForecastEstimate(mean, lower, upper, scale)`;
+- a fixed-identity `ForecastBackend` protocol with immutable settings and one
+  `forecast_one()` operation;
+- an immutable `ForecastBackendSafety` contract from which report safety flags
+  are derived and validated before execution;
+- a closed resolver whose only CLI name is `rolling_mean_proxy`.
 
-## Product approach
+The built-in backend identity is `rolling_mean_proxy_v1`, version `1`, kind
+`deterministic_proxy`. It calculates the arithmetic mean and population
+standard deviation of the supplied context, with a `1e-6` minimum scale.
+
+The backend request deliberately excludes entity IDs, feature names,
+timestamps, file paths, telemetry payloads, the current target, and future
+values. Selectors that look like URLs, paths, dotted imports, model-hub IDs, or
+unknown names are rejected without fallback. The adapter contains no dynamic
+imports, sockets, subprocesses, cache discovery, weight lookup, or downloads.
+Programmatic mock adapters must explicitly attest the same offline,
+synthetic-only, no-pretrained-model, no-artifact, no-network, no-download,
+no-external-service, and no-deployment contract. Missing or false safety claims
+fail before the first forecast; custom adapter code remains trusted local code
+and is not sandboxed by this seam.
+
+## Frozen calibration flow
+
+Defaults are `history_window=3`, `calibration_window=8`, and `interval_z=2.0`.
+Each entity/feature series is processed independently:
+
+1. The first three values form forecast context.
+2. The next eight targets are forecast before observation, producing
+   standardized absolute residuals.
+3. Those eight calibration scores are frozen.
+4. Later targets are scored against only that frozen cohort.
+5. With target score `s`, the p-value is
+   `(1 + count(calibration_score >= s)) / 9` and the conformal anomaly score is
+   `1 - p`.
+6. Residual risk remains the maximum of conformal score, bounded z-risk, and a
+   `0.75` interval-breach floor.
+7. A current actual value enters history only after its forecast and score are
+   complete.
+
+The first evidence row is therefore emitted on observation 12. Every input
+series must contain at least 12 observations. Conservative `>=` ties,
+finite-sample correction, score-before-observe ordering, and no-future-data
+behavior are explicit v1 metadata.
+
+## Report contract
+
+The top-level v1 report contains:
 
 ```text
-host/entity feature sequence
-  -> deterministic forecast proxy
-  -> compare actual value with forecast interval
-  -> residual and conformal-style scoring
-  -> anomaly evidence
-  -> model disagreement input row
+schema_version
+model_id
+model_family
+history_window
+calibration_window
+interval_z
+forecast_backend
+calibration
+safety_flags
+rows
 ```
 
-## v0 residual evidence row schema
-
-Each row in `time_series_residual_report.v0` uses exactly these fields:
+The strict nested metadata records backend identity/version/kind/settings,
+calibration method/count/frozen state/tie rule, and local synthetic safety
+non-claims. Residual row fields remain unchanged from v0:
 
 ```text
 entity_id
@@ -53,22 +100,54 @@ model_id
 model_family
 ```
 
-`model_id` is `time_series_residual`. `model_family` is
-`experimental_time_series`.
+Conversion still emits `model_score_row.v0` with model ID
+`time_series_residual`. V1 score evidence preserves every feature row and adds
+one structured backend/calibration provenance object per entity/window score.
 
-## Future adapters
+## Input, output, and safety boundaries
 
-Future research milestones may add optional TimesFM, Chronos, Moirai,
-PatchTST/iTransformer/TimeMixer-style, or conformal forecast adapters behind
-the same evidence schema. Those adapters must remain optional and must not
-download models in CI.
+- Inputs are bounded strict JSON/JSONL with exact fields, coarse synthetic
+  entity IDs, snake_case feature names, finite values, UTC timestamps, and
+  duplicate/order checks.
+- Backend estimates must be finite, use positive scale, and satisfy
+  `lower <= mean <= upper`; failures do not select a fallback.
+- A complete report is validated before atomic replacement of an output;
+  lexical and resolved repository locations are checked, and symlink outputs
+  are rejected.
+- Repository outputs are limited to ignored `data/reports/`, `.runtime/`, or
+  `artifacts/` roots. Fixture smoke writes to `/tmp/ares-netguard/`.
+- Tests use synthetic fixtures only. No live capture, raw packet payloads,
+  private telemetry, external service, pretrained weights, artifact
+  persistence, download, or deployment is involved.
 
-## Safety
+Fixture smoke invocation:
 
-- No raw packet payloads.
-- No private absolute paths.
-- No live capture or external probing.
-- No network calls or model downloads in tests or CI.
-- External pretrained model use must be optional and documented.
-- Tests use tiny synthetic sequences or mocked model outputs.
-- v0 residual evidence is research-only and is not a production detector claim.
+```bash
+python -m ares_netguard.models.time_series_residual \
+  tests/fixtures/time_series_residual/synthetic_windows.jsonl \
+  /tmp/ares-netguard/time-series-residual-report.json \
+  --backend rolling_mean_proxy \
+  --history-window 3 \
+  --calibration-window 8
+```
+
+## Technology and migration
+
+Selected technology is Python stdlib for the experimental forecast/calibration
+adapter, with a minimal Rust source-schema allowlist update for typed handoff
+compatibility. Rust does not implement this unstable research backend; C++ and
+Qt/QML add no behavior to this milestone, and the static QML/v0 snapshot stays
+unchanged.
+
+Migration path:
+
+```text
+offline deterministic proxy or mock
+  -> optional locally provisioned backend with immutable revision/digest
+  -> reproducible held-out evaluation
+  -> stable export contract
+  -> ONNX or selected native-runtime candidate
+```
+
+V1 improves reproducibility and leakage resistance, but remains synthetic,
+in-memory, download-disabled, non-persistent, and deployment-disabled.

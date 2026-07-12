@@ -1863,6 +1863,26 @@ def test_rust_core_static_registry_fixture_matches_validated_metadata_snapshot()
     ]
 
 
+def test_rust_core_allows_residual_v1_while_retaining_static_v0_snapshot() -> None:
+    lib_rs = _read("src/lib.rs")
+    registry_allowlist = lib_rs.split("const MODEL_REGISTRY_SUPPORTED_SOURCE_SCHEMAS", maxsplit=1)[
+        1
+    ].split("];", maxsplit=1)[0]
+    static_registry_schemas = lib_rs.split("const MODEL_REGISTRY_AGGREGATE_SCHEMAS", maxsplit=1)[
+        1
+    ].split("];", maxsplit=1)[0]
+    evidence_allowlist = lib_rs.split("const EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS", maxsplit=1)[
+        1
+    ].split("];", maxsplit=1)[0]
+
+    assert '"time_series_residual_report.v1"' in registry_allowlist
+    assert '"time_series_residual_report.v1"' in evidence_allowlist
+    assert '"time_series_residual_report.v0"' in registry_allowlist
+    assert '"time_series_residual_report.v1"' not in static_registry_schemas
+    assert '"time_series_residual_report_v0_001"' in lib_rs
+    assert '"time_series_residual_report_v1_001"' not in lib_rs
+
+
 def test_rust_core_source_stays_local_contract_only() -> None:
     rust_source = "\n".join(
         [

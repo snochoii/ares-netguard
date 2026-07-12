@@ -36,7 +36,7 @@ SUPPORTED_REPORT_SCHEMAS = frozenset(
     {
         evidence_windows.REPORT_SCHEMA_VERSION,
         DISAGREEMENT_SCHEMA_VERSION,
-        time_series_residual.REPORT_SCHEMA_VERSION,
+        *time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS,
         self_supervised_representation.REPORT_SCHEMA_VERSION,
         temporal_security_graph.REPORT_SCHEMA_VERSION,
         agentic_layer.REPORT_SCHEMA_VERSION,
@@ -348,7 +348,7 @@ def _source_refs(source: SourcePayload, *, schema: str, source_name: str) -> lis
         return _telemetry_refs(source, source_name=source_name)
     if schema == DISAGREEMENT_SCHEMA_VERSION:
         return _disagreement_refs(source, source_name=source_name)
-    if schema == time_series_residual.REPORT_SCHEMA_VERSION:
+    if schema in time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS:
         return _evidence_report_refs(
             source,
             source_name=source_name,

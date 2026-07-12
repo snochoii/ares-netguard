@@ -30,8 +30,15 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
    - Emit disagreement report.
 
 5. **Time-Series Foundation Residual Prototype**
-   - Forecast-residual anomaly using mocked or optional foundation model backend.
-   - Conformal/residual risk contract.
+   - Implemented `time_series_residual_report.v1` with a closed, numeric-only
+     offline forecast backend seam.
+   - Uses three history observations, a frozen eight-score split-conformal
+     calibration cohort, finite-sample correction, conservative ties, and
+     score-before-observe ordering.
+   - Retains strict read-only v0 compatibility; no pretrained foundation model
+     executes yet.
+   - Next: an optional locally provisioned backend with pinned dependencies,
+     immutable revision/digest, `local_files_only`, and no remote code.
 
 6. **Self-Supervised Traffic Representation Prototype**
    - Tokenization/embedding experiment over sanitized synthetic telemetry.
