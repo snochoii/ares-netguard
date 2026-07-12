@@ -31,7 +31,7 @@ SCORE_ROWS_SCHEMA_VERSION = "model_score_rows.v0"
 SUPPORTED_REPORT_SCHEMAS = frozenset(
     {
         DISAGREEMENT_SCHEMA_VERSION,
-        time_series_residual.REPORT_SCHEMA_VERSION,
+        *time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS,
         self_supervised_representation.REPORT_SCHEMA_VERSION,
         temporal_security_graph.REPORT_SCHEMA_VERSION,
         agentic_layer.REPORT_SCHEMA_VERSION,
@@ -165,16 +165,6 @@ DISAGREEMENT_ROW_FIELDS = frozenset(
         "outlier_model",
         "outlier_models",
         "evidence_by_model",
-    }
-)
-RESIDUAL_REPORT_FIELDS = frozenset(
-    {
-        "schema_version",
-        "model_id",
-        "model_family",
-        "history_window",
-        "interval_z",
-        "rows",
     }
 )
 REPRESENTATION_REPORT_FIELDS = frozenset(
@@ -339,7 +329,7 @@ def _source_schema(source: SourcePayload) -> str:
 def _validate_report_source(report: Mapping[str, Any], schema: str) -> None:
     if schema == DISAGREEMENT_SCHEMA_VERSION:
         _validate_disagreement_report(report)
-    elif schema == time_series_residual.REPORT_SCHEMA_VERSION:
+    elif schema in time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS:
         _validate_residual_report(report)
     elif schema == self_supervised_representation.REPORT_SCHEMA_VERSION:
         _validate_representation_report(report)
@@ -407,14 +397,7 @@ def _validate_disagreement_row(row: Any) -> None:
 
 
 def _validate_residual_report(report: Mapping[str, Any]) -> None:
-    _require_exact_fields(report, RESIDUAL_REPORT_FIELDS, "residual report")
-    if report["schema_version"] != time_series_residual.REPORT_SCHEMA_VERSION:
-        raise ValueError("residual report schema_version is invalid")
-    _required_model_id(report["model_id"], "model_id")
-    _positive_int(report["history_window"], "history_window")
-    _bounded_number(report["interval_z"], "interval_z", 0.0, 1000.0)
-    for row in _bounded_list(report["rows"], "rows"):
-        time_series_residual.validate_residual_evidence_row(row)
+    time_series_residual.validate_residual_report(report)
 
 
 def _validate_representation_report(report: Mapping[str, Any]) -> None:
@@ -504,7 +487,7 @@ def _summarize_source(source: SourcePayload, *, schema: str, source_name: str) -
 
     if schema == DISAGREEMENT_SCHEMA_VERSION:
         _collect_disagreement_stats(source, stats)
-    elif schema == time_series_residual.REPORT_SCHEMA_VERSION:
+    elif schema in time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS:
         _collect_evidence_report_stats(source, stats, risk_feature_field="feature_name")
     elif schema == self_supervised_representation.REPORT_SCHEMA_VERSION:
         _collect_evidence_report_stats(source, stats, sequence_field="sequence_id")

@@ -86,7 +86,7 @@ def test_fixture_composes_current_score_producers_for_disagreement(tmp_path: Pat
     assert len(persisted_disagreement["row_reports"]) == 15
     assert persisted_disagreement["model_agreement_score"] == 0.875287
     assert persisted_disagreement["model_disagreement_score"] == 0.124713
-    assert persisted_disagreement["consensus_risk"] == 0.459949
+    assert persisted_disagreement["consensus_risk"] == 0.439578
     assert persisted_disagreement["outlier_model"] == "stdlib_linear_native"
     assert sorted(persisted_disagreement["evidence_by_model"]) == [
         "graph_novelty",

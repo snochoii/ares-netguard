@@ -27,7 +27,8 @@ python -m ares_netguard.storage.evidence_index \
 
 - `telemetry_feature_window_report.v0`
 - `model_disagreement_report.v0`
-- `time_series_residual_report.v0`
+- `time_series_residual_report.v0` (strict legacy input)
+- `time_series_residual_report.v1`
 - `traffic_representation_report.v0`
 - `temporal_security_graph_report.v0`
 - `agentic_investigation_report.v0`

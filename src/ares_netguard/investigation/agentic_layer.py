@@ -22,6 +22,7 @@ PRIMARY_REPORT_SCHEMA_VERSION = "model_disagreement_report.v0"
 SUPPORTED_EVIDENCE_REPORT_SCHEMAS = frozenset(
     {
         "time_series_residual_report.v0",
+        "time_series_residual_report.v1",
         "traffic_representation_report.v0",
         "temporal_security_graph_report.v0",
     }
@@ -110,6 +111,7 @@ FORBIDDEN_KEY_PARTS = (
 
 RISK_FIELD_BY_SCHEMA = {
     "time_series_residual_report.v0": "residual_risk",
+    "time_series_residual_report.v1": "residual_risk",
     "traffic_representation_report.v0": "representation_risk",
     "temporal_security_graph_report.v0": "graph_novelty_risk",
 }

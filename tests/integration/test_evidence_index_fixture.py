@@ -158,13 +158,13 @@ def test_fixture_generates_evidence_index(tmp_path: Path) -> None:
         "model_score_rows.v0",
         "telemetry_feature_window_report.v0",
         "temporal_security_graph_report.v0",
-        "time_series_residual_report.v0",
+        "time_series_residual_report.v1",
         "traffic_representation_report.v0",
     ]
     assert persisted["aggregate_summary"]["source_count"] == 9
     assert persisted["aggregate_summary"]["entity_window_count"] == 16
     assert persisted["aggregate_summary"]["source_ref_count"] == 91
-    assert persisted["aggregate_summary"]["evidence_ref_count"] == 67
+    assert persisted["aggregate_summary"]["evidence_ref_count"] == 71
     assert (
         persisted["aggregate_summary"]["row_count_by_schema"]["model_disagreement_report.v0"] == 15
     )

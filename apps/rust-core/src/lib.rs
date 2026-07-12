@@ -8308,7 +8308,7 @@ fn validate_supported_model_registry_source_schema(
     field: &'static str,
     value: &str,
 ) -> Result<(), RuntimeControlPlaneAdapterError> {
-    if !MODEL_REGISTRY_AGGREGATE_SCHEMAS.contains(&value) {
+    if !MODEL_REGISTRY_SUPPORTED_SOURCE_SCHEMAS.contains(&value) {
         return Err(RuntimeControlPlaneAdapterError::UnsupportedValue { field });
     }
     Ok(())
@@ -8737,6 +8737,16 @@ const MODEL_REGISTRY_AGGREGATE_SCHEMAS: &[&str] = &[
     "time_series_residual_report.v0",
     "traffic_representation_report.v0",
 ];
+const MODEL_REGISTRY_SUPPORTED_SOURCE_SCHEMAS: &[&str] = &[
+    "agentic_investigation_report.v0",
+    "detection_candidate_report.v0",
+    "model_disagreement_report.v0",
+    "model_score_rows.v0",
+    "temporal_security_graph_report.v0",
+    "time_series_residual_report.v0",
+    "time_series_residual_report.v1",
+    "traffic_representation_report.v0",
+];
 const MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS: &[&str] = &[
     "graph_novelty",
     "isolation_forest",
@@ -8781,6 +8791,7 @@ const EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS: &[&str] = &[
     "telemetry_feature_window_report.v0",
     "temporal_security_graph_report.v0",
     "time_series_residual_report.v0",
+    "time_series_residual_report.v1",
     "traffic_representation_report.v0",
 ];
 
@@ -8989,6 +9000,20 @@ mod tests {
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn accepts_time_series_residual_v1_source_schema_allowlists() {
+        assert!(validate_supported_model_registry_source_schema(
+            "model_registry_metadata.entries.observed_source_schemas",
+            "time_series_residual_report.v1",
+        )
+        .is_ok());
+        assert!(validate_supported_evidence_source_schema(
+            "evidence_index.source_summaries.source_schema",
+            "time_series_residual_report.v1",
+        )
+        .is_ok());
     }
 
     fn synthetic_handoff_json() -> &'static str {

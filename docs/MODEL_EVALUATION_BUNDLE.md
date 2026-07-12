@@ -14,7 +14,8 @@ or runtime handoff work.
 The v0 bundle accepts local JSON objects for these report schemas:
 
 - `model_disagreement_report.v0`
-- `time_series_residual_report.v0`
+- `time_series_residual_report.v0` (strict legacy input)
+- `time_series_residual_report.v1`
 - `traffic_representation_report.v0`
 - `temporal_security_graph_report.v0`
 - `agentic_investigation_report.v0`

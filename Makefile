@@ -38,7 +38,10 @@ fixture-smoke:
 	$(PYTHON) -m json.tool /tmp/ares-netguard/detector-zoo-score-rows.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.time_series_residual \
 		tests/fixtures/time_series_residual/synthetic_windows.jsonl \
-		/tmp/ares-netguard/time-series-residual-report.json
+		/tmp/ares-netguard/time-series-residual-report.json \
+		--backend rolling_mean_proxy \
+		--history-window 3 \
+		--calibration-window 8
 	$(PYTHON) -m json.tool /tmp/ares-netguard/time-series-residual-report.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.self_supervised_representation \
 		tests/fixtures/self_supervised_representation/synthetic_sequences.jsonl \

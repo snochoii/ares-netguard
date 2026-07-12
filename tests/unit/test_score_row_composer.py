@@ -119,11 +119,11 @@ def test_non_strict_json_constants_are_rejected(tmp_path: Path) -> None:
 def test_invalid_report_schema_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "residual-report.json"
     source.write_text(
-        json.dumps({"schema_version": "time_series_residual_report.v1", "rows": []}),
+        json.dumps({"schema_version": "time_series_residual_report.v2", "rows": []}),
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="time_series_residual_report.v0"):
+    with pytest.raises(ValueError, match="schema_version must be one of"):
         score_row_composer.load_residual_report(source)
 
 

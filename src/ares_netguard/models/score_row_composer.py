@@ -51,8 +51,9 @@ def load_score_rows(path: str | Path) -> list[JsonMap]:
 
 
 def load_residual_report(path: str | Path) -> JsonMap:
-    """Load and validate a time_series_residual_report.v0 source."""
+    """Load and validate a strict time_series_residual_report.v0/v1 source."""
     report = _load_report_object(path, "residual report")
+    time_series_residual.validate_residual_report(report)
     time_series_residual.residual_evidence_to_score_rows(report)
     return report
 
@@ -277,7 +278,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--residual-report",
         action="append",
         default=[],
-        help="time_series_residual_report.v0 JSON source; may be repeated",
+        help="time_series_residual_report.v0/v1 JSON source; may be repeated",
     )
     parser.add_argument(
         "--representation-report",

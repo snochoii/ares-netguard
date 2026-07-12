@@ -135,7 +135,7 @@ def test_fixture_generates_model_evaluation_bundle(tmp_path: Path) -> None:
         "model_disagreement_report.v0",
         "model_score_rows.v0",
         "temporal_security_graph_report.v0",
-        "time_series_residual_report.v0",
+        "time_series_residual_report.v1",
         "traffic_representation_report.v0",
     ]
     assert persisted["aggregate_summary"]["candidate_count"] == 12

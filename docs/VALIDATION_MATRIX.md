@@ -74,6 +74,17 @@ pytest -q tests/unit tests/integration -k "investigation or agentic or evidence"
 pytest -q tests/unit tests/integration -k "graph or temporal or edge"
 ```
 
+## Time-series forecast and residual changes
+
+```bash
+pytest -q tests/unit/test_time_series_forecast.py tests/unit/test_time_series_residual.py tests/integration/test_time_series_residual_fixture.py
+pytest -q tests/unit tests/integration -k "time_series or residual or composer or disagreement or evaluation or registry or evidence or investigation or detection"
+pytest -q tests/unit/test_rust_core_scaffold.py tests/unit/test_qt_workstation_scaffold.py
+make fixture-smoke
+make verify-rust-core
+python -m pip check
+```
+
 ## UI changes
 
 ```bash
