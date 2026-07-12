@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
@@ -9,7 +10,16 @@ import pytest
 
 from ares_netguard.models import time_series_residual
 from ares_netguard.models.time_series_forecast import (
+    CHRONOS_BUNDLE_SHA256,
+    CHRONOS_CONFIG_SHA256,
+    CHRONOS_MODEL_ID,
+    CHRONOS_MODEL_REVISION,
+    CHRONOS_PACKAGE_VERSIONS,
+    CHRONOS_RUNTIME_PLATFORM,
+    CHRONOS_WEIGHTS_SHA256,
     OFFLINE_SYNTHETIC_BACKEND_SAFETY,
+    ChronosBoltTinyLocalBackend,
+    ForecastArtifactProvenance,
     ForecastBackendSafety,
     ForecastEstimate,
     ForecastRequest,
@@ -19,6 +29,7 @@ from ares_netguard.models.time_series_residual import (
     LEGACY_REPORT_SCHEMA_VERSION,
     MODEL_FAMILY,
     MODEL_ID,
+    PRETRAINED_REPORT_SCHEMA_VERSION,
     PROVENANCE_EVIDENCE_KIND,
     REPORT_SCHEMA_VERSION,
     dump_report,
@@ -27,6 +38,60 @@ from ares_netguard.models.time_series_residual import (
     residual_evidence_to_score_rows,
     validate_residual_report,
 )
+
+
+class _FakeChronosTorch:
+    float32 = "float32"
+
+    @staticmethod
+    def tensor(values: object, *, dtype: object) -> object:
+        assert dtype == "float32"
+        return values
+
+    @staticmethod
+    def inference_mode() -> object:
+        return nullcontext()
+
+
+class _ContextQuantilePipeline:
+    def __init__(self) -> None:
+        self.contexts: list[tuple[float, ...]] = []
+
+    def predict_quantiles(
+        self,
+        context: tuple[float, ...],
+        *,
+        prediction_length: int,
+        quantile_levels: list[float],
+    ) -> tuple[list[list[list[float]]], list[list[float]]]:
+        self.contexts.append(tuple(context))
+        assert prediction_length == 1
+        assert quantile_levels == [0.1, 0.5, 0.9]
+        point = sum(context[-16:]) / 16
+        return [[[point - 2.0, point, point + 2.0]]], [[point]]
+
+
+def _fake_chronos_backend() -> tuple[ChronosBoltTinyLocalBackend, _ContextQuantilePipeline]:
+    pipeline = _ContextQuantilePipeline()
+    artifact = ForecastArtifactProvenance(
+        model_id=CHRONOS_MODEL_ID,
+        revision=CHRONOS_MODEL_REVISION,
+        license_id="apache-2.0",
+        serialization="safetensors",
+        config_sha256=CHRONOS_CONFIG_SHA256,
+        weights_sha256=CHRONOS_WEIGHTS_SHA256,
+        bundle_sha256=CHRONOS_BUNDLE_SHA256,
+        runtime_platform=CHRONOS_RUNTIME_PLATFORM,
+        packages=MappingProxyType(dict(CHRONOS_PACKAGE_VERSIONS)),
+    )
+    return (
+        ChronosBoltTinyLocalBackend(
+            _pipeline=pipeline,
+            _torch=_FakeChronosTorch(),
+            artifact=artifact,
+        ),
+        pipeline,
+    )
 
 
 def _series(
@@ -151,6 +216,127 @@ def test_v1_uses_three_history_rows_eight_calibration_rows_and_emits_row_twelve(
             "model_family": MODEL_FAMILY,
         }
     ]
+
+
+def test_v2_uses_fixed_chronos_run_and_emits_sanitized_pretrained_provenance() -> None:
+    backend, pipeline = _fake_chronos_backend()
+    rows = load_time_window_rows(
+        Path("tests/fixtures/time_series_forecast/synthetic_windows.jsonl")
+    )
+
+    report = generate_residual_report(
+        rows,
+        history_window=64,
+        calibration_window=32,
+        interval_z=2.0,
+        backend=backend,
+    )
+
+    assert report["schema_version"] == PRETRAINED_REPORT_SCHEMA_VERSION
+    assert len(report["rows"]) == 64
+    assert len(pipeline.contexts) == 128
+    first_series = [
+        float(row["actual_value"]) for row in rows if row["entity_id"] == "fixture-chronos-a"
+    ]
+    second_series = [
+        float(row["actual_value"]) for row in rows if row["entity_id"] == "fixture-chronos-b"
+    ]
+    assert pipeline.contexts[0] == tuple(first_series[:64])
+    assert pipeline.contexts[1] == tuple(first_series[1:65])
+    assert pipeline.contexts[64] == tuple(second_series[:64])
+    assert report["rows"][0]["window_start"] == "2026-02-01T01:36:00Z"
+    assert report["forecast_backend"]["backend_id"] == "chronos_bolt_tiny_local_v1"
+    assert report["forecast_backend"]["settings"]["point_method"] == "median_q0_5"
+    assert report["forecast_backend"]["artifact"] == {
+        "model_id": CHRONOS_MODEL_ID,
+        "revision": CHRONOS_MODEL_REVISION,
+        "license_id": "apache-2.0",
+        "serialization": "safetensors",
+        "config_sha256": CHRONOS_CONFIG_SHA256,
+        "weights_sha256": CHRONOS_WEIGHTS_SHA256,
+        "bundle_sha256": CHRONOS_BUNDLE_SHA256,
+        "runtime_platform": CHRONOS_RUNTIME_PLATFORM,
+        "packages": dict(CHRONOS_PACKAGE_VERSIONS),
+    }
+    assert report["safety_flags"] == {
+        "local_only": True,
+        "synthetic_only": True,
+        "pretrained_model_used": True,
+        "operator_provisioned_artifact": True,
+        "artifact_digest_verified": True,
+        "local_files_only": True,
+        "network_used": False,
+        "download_used": False,
+        "external_service_used": False,
+        "remote_code_used": False,
+        "artifact_persisted_by_ares": False,
+        "deployment_allowed": False,
+    }
+    assert "/tmp" not in json.dumps(report)
+
+
+def test_v2_score_conversion_keeps_v0_score_rows_and_appends_one_provenance() -> None:
+    backend, _pipeline = _fake_chronos_backend()
+    report = generate_residual_report(
+        load_time_window_rows(Path("tests/fixtures/time_series_forecast/synthetic_windows.jsonl")),
+        history_window=64,
+        calibration_window=32,
+        interval_z=2.0,
+        backend=backend,
+    )
+
+    score_rows = residual_evidence_to_score_rows(report)
+    provenance = score_rows[0]["scores"][MODEL_ID]["evidence"][-1]
+
+    assert {row["schema_version"] for row in score_rows} == {"model_score_row.v0"}
+    assert provenance == {
+        "evidence_kind": PROVENANCE_EVIDENCE_KIND,
+        "forecast_backend": report["forecast_backend"],
+        "calibration": report["calibration"],
+        "safety_flags": report["safety_flags"],
+    }
+
+
+def test_v2_rejects_non_pinned_run_settings_before_inference() -> None:
+    backend, pipeline = _fake_chronos_backend()
+    rows = load_time_window_rows(
+        Path("tests/fixtures/time_series_forecast/synthetic_windows.jsonl")
+    )
+
+    with pytest.raises(ValueError, match="history_window=64, calibration_window=32"):
+        generate_residual_report(
+            rows,
+            history_window=32,
+            calibration_window=32,
+            interval_z=2.0,
+            backend=backend,
+        )
+    assert pipeline.contexts == []
+
+
+def test_v2_validator_rejects_artifact_and_safety_drift() -> None:
+    backend, _pipeline = _fake_chronos_backend()
+    report = generate_residual_report(
+        load_time_window_rows(Path("tests/fixtures/time_series_forecast/synthetic_windows.jsonl")),
+        history_window=64,
+        calibration_window=32,
+        interval_z=2.0,
+        backend=backend,
+    )
+    artifact_drift = json.loads(json.dumps(report))
+    artifact_drift["forecast_backend"]["artifact"]["revision"] = "main"
+    with pytest.raises(ValueError, match="artifact.revision is not pinned"):
+        validate_residual_report(artifact_drift)
+
+    safety_drift = json.loads(json.dumps(report))
+    safety_drift["safety_flags"]["network_used"] = True
+    with pytest.raises(ValueError, match="network_used must be false"):
+        validate_residual_report(safety_drift)
+
+    settings_drift = json.loads(json.dumps(report))
+    settings_drift["forecast_backend"]["settings"]["point_method"] = "context_arithmetic_mean"
+    with pytest.raises(ValueError, match="settings must be pinned"):
+        validate_residual_report(settings_drift)
 
 
 def test_backend_receives_only_past_numeric_context_and_prefix_is_invariant() -> None:
@@ -451,5 +637,29 @@ def test_unknown_cli_backend_leaves_existing_output_untouched(tmp_path: Path) ->
 
     with pytest.raises(ValueError, match="unsupported forecast backend"):
         time_series_residual.main([str(input_path), str(output), "--backend", "organization/model"])
+
+    assert output.read_text(encoding="utf-8") == "existing\n"
+
+
+def test_chronos_artifact_failure_leaves_existing_output_untouched(tmp_path: Path) -> None:
+    input_path = Path("tests/fixtures/time_series_forecast/synthetic_windows.jsonl")
+    output = tmp_path / "report.json"
+    output.write_text("existing\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="model root is unavailable"):
+        time_series_residual.main(
+            [
+                str(input_path),
+                str(output),
+                "--backend",
+                "chronos_bolt_tiny_local",
+                "--model-root",
+                str(tmp_path / "missing-model"),
+                "--history-window",
+                "64",
+                "--calibration-window",
+                "32",
+            ]
+        )
 
     assert output.read_text(encoding="utf-8") == "existing\n"

@@ -27,6 +27,7 @@ htmlcov/
 *.pt
 *.pth
 *.ckpt
+*.safetensors
 *.db
 *.sqlite
 *.duckdb

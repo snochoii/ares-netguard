@@ -124,6 +124,7 @@ for the primary disagreement smoke path. It accepts:
 - existing JSON or JSONL `model_score_row.v0` lists;
 - `time_series_residual_report.v0` (strict legacy input);
 - `time_series_residual_report.v1`;
+- `time_series_residual_report.v2`;
 - `traffic_representation_report.v0`;
 - `temporal_security_graph_report.v0`.
 

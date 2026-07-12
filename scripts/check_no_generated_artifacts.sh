@@ -45,7 +45,7 @@ is_forbidden_artifact() {
   esac
 
   case "${path}" in
-    *.pcap|*.pcapng|*.parquet|*.joblib|*.pkl|*.onnx|*.pt|*.pth|*.ckpt)
+    *.pcap|*.pcapng|*.parquet|*.joblib|*.pkl|*.onnx|*.pt|*.pth|*.ckpt|*.safetensors)
       return 0
       ;;
     *.db|*.sqlite|*.duckdb)

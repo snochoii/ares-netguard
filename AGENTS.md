@@ -351,6 +351,7 @@ Never stage or commit:
 *.pt
 *.pth
 *.ckpt
+*.safetensors
 *.db
 *.sqlite
 *.duckdb

@@ -36,9 +36,12 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
      calibration cohort, finite-sample correction, conservative ties, and
      score-before-observe ordering.
    - Retains strict read-only v0 compatibility; no pretrained foundation model
-     executes yet.
-   - Next: an optional locally provisioned backend with pinned dependencies,
-     immutable revision/digest, `local_files_only`, and no remote code.
+     executes through v1.
+   - Implemented `time_series_residual_report.v2` with an optional pinned,
+     locally provisioned Chronos-Bolt-Tiny CPU backend, verified safetensors
+     digest, `local_files_only`, no remote code, and held-out proxy comparison.
+   - Next: longer drift/replay evaluation before any export or native-runtime
+     promotion decision.
 
 6. **Self-Supervised Traffic Representation Prototype**
    - Tokenization/embedding experiment over sanitized synthetic telemetry.

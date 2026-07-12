@@ -1,0 +1,32 @@
+{
+  "files": [
+    {
+      "name": "config.json",
+      "sha256": "278f0086733031635fb1c861cb01c1bad6477420c7fcb19381a2993e335785e0",
+      "size_bytes": 1120
+    },
+    {
+      "name": "model.safetensors",
+      "sha256": "75068728d376d2bec670379eeef4bfb4d24c0cfe24d957451f8d19b447030a32",
+      "size_bytes": 34622352
+    }
+  ],
+  "license_id": "apache-2.0",
+  "model_id": "amazon/chronos-bolt-tiny",
+  "packages": {
+    "accelerate": "1.14.0",
+    "chronos-forecasting": "2.3.1",
+    "einops": "0.8.2",
+    "huggingface-hub": "1.21.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "safetensors": "0.8.0",
+    "tokenizers": "0.22.2",
+    "torch": "2.12.1+cpu",
+    "transformers": "5.12.1"
+  },
+  "revision": "a0e552de83495b5c28c14c71c374f3e33280b340",
+  "runtime_platform": "cpython312_linux_x86_64_cpu",
+  "schema_version": "forecast_artifact_manifest.v0",
+  "serialization": "safetensors"
+}

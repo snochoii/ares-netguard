@@ -77,12 +77,22 @@ pytest -q tests/unit tests/integration -k "graph or temporal or edge"
 ## Time-series forecast and residual changes
 
 ```bash
-pytest -q tests/unit/test_time_series_forecast.py tests/unit/test_time_series_residual.py tests/integration/test_time_series_residual_fixture.py
+pytest -q tests/unit/test_time_series_forecast.py tests/unit/test_time_series_residual.py tests/unit/test_time_series_forecast_evaluation.py tests/integration/test_time_series_residual_fixture.py tests/integration/test_time_series_forecast_fixture.py
 pytest -q tests/unit tests/integration -k "time_series or residual or composer or disagreement or evaluation or registry or evidence or investigation or detection"
 pytest -q tests/unit/test_rust_core_scaffold.py tests/unit/test_qt_workstation_scaffold.py
 make fixture-smoke
 make verify-rust-core
 python -m pip check
+```
+
+For changes that claim real locally provisioned foundation-model execution,
+also run in the hash-locked optional environment:
+
+```bash
+make verify-foundation-forecast \
+  FOUNDATION_PYTHON=/tmp/ares-chronos-venv/bin/python \
+  CHRONOS_MODEL_ROOT=/tmp/ares-chronos-bolt-tiny
+/tmp/ares-chronos-venv/bin/python -m pip check
 ```
 
 ## UI changes
