@@ -1,7 +1,9 @@
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 CARGO ?= $(shell if [ -x $$HOME/.cargo/bin/cargo ]; then echo $$HOME/.cargo/bin/cargo; else echo cargo; fi)
 PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH))
+MPLCONFIGDIR ?= /tmp/ares-netguard-matplotlib
 export PYTHONPATH
+export MPLCONFIGDIR
 
 .PHONY: verify verify-rust-core fixture-smoke
 
@@ -26,6 +28,14 @@ fixture-smoke:
 		tests/fixtures/telemetry_foundation/synthetic_events.jsonl \
 		/tmp/ares-netguard/telemetry-feature-windows.json
 	$(PYTHON) -m json.tool /tmp/ares-netguard/telemetry-feature-windows.json >/dev/null
+	$(PYTHON) -m ares_netguard.ingest.telemetry_foundation \
+		tests/fixtures/detector_zoo/synthetic_events.jsonl \
+		/tmp/ares-netguard/detector-zoo-feature-windows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/detector-zoo-feature-windows.json >/dev/null
+	$(PYTHON) -m ares_netguard.models.detector_zoo \
+		/tmp/ares-netguard/detector-zoo-feature-windows.json \
+		/tmp/ares-netguard/detector-zoo-score-rows.json
+	$(PYTHON) -m json.tool /tmp/ares-netguard/detector-zoo-score-rows.json >/dev/null
 	$(PYTHON) -m ares_netguard.models.time_series_residual \
 		tests/fixtures/time_series_residual/synthetic_windows.jsonl \
 		/tmp/ares-netguard/time-series-residual-report.json
@@ -48,6 +58,7 @@ fixture-smoke:
 	$(PYTHON) -m ares_netguard.models.score_row_composer \
 		/tmp/ares-netguard/composed-model-score-rows.json \
 		--score-rows tests/fixtures/model_disagreement/synthetic_scores.jsonl \
+		--score-rows /tmp/ares-netguard/detector-zoo-score-rows.json \
 		--score-rows /tmp/ares-netguard/native-inference-score-rows.json \
 		--residual-report /tmp/ares-netguard/time-series-residual-report.json \
 		--representation-report /tmp/ares-netguard/traffic-representation-report.json \
@@ -85,6 +96,7 @@ fixture-smoke:
 	$(PYTHON) -m ares_netguard.storage.evidence_index \
 		/tmp/ares-netguard/evidence-index.json \
 		/tmp/ares-netguard/telemetry-feature-windows.json \
+		/tmp/ares-netguard/detector-zoo-feature-windows.json \
 		/tmp/ares-netguard/model-disagreement-report.json \
 		/tmp/ares-netguard/time-series-residual-report.json \
 		/tmp/ares-netguard/traffic-representation-report.json \

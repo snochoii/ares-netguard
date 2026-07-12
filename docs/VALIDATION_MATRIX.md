@@ -41,7 +41,9 @@ rg "Subagent decision|Parallel decision|Worktree decision|MERGE_READY|same-run m
 
 ```bash
 pytest -q tests/unit tests/integration -k "composer or model or registry or evaluation or pyod or river or disagreement or self_supervised or representation or token or embedding"
+pytest -q tests/unit/test_detector_zoo.py tests/integration/test_detector_zoo_fixture.py
 pytest -q tests/unit/test_score_row_composer.py tests/integration/test_score_row_composer_fixture.py
+python -m pip check
 make fixture-smoke
 ```
 
