@@ -119,7 +119,7 @@ def test_non_strict_json_constants_are_rejected(tmp_path: Path) -> None:
 def test_invalid_report_schema_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "residual-report.json"
     source.write_text(
-        json.dumps({"schema_version": "time_series_residual_report.v2", "rows": []}),
+        json.dumps({"schema_version": "time_series_residual_report.v3", "rows": []}),
         encoding="utf-8",
     )
 

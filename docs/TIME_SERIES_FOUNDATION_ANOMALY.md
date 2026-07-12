@@ -2,152 +2,164 @@
 
 ## Current status
 
-`time_series_residual_report.v1` is an offline, stdlib-only research contract
-for leakage-resistant forecast-residual evidence. It introduces an explicit
-forecast backend seam and frozen split-conformal calibration. It is not a real
-TimesFM, Chronos, Moirai, PatchTST, iTransformer, TimeMixer, or other pretrained
-foundation model execution path.
+ARES has two offline forecast paths behind one numeric-only seam:
 
-The former `time_series_residual_report.v0` contract remains accepted as a
-strict read-only input by score conversion, composition, evaluation, agentic
-investigation, evidence indexing, and Rust schema allowlists. New reports are
-always v1.
+- `rolling_mean_proxy` remains the dependency-free default and emits
+  `time_series_residual_report.v1`;
+- `chronos_bolt_tiny_local` executes a pinned, operator-provisioned
+  Chronos-Bolt-Tiny artifact and emits `time_series_residual_report.v2`.
 
-## Forecast backend seam
+The v0 report remains a strict read-only input, while the default proxy
+continues producing v1. Residual rows and `model_score_row.v0` are unchanged.
+The local pretrained path is an experimental Python ML-sidecar capability, not
+product runtime inference or a deployment gate.
 
-`src/ares_netguard/models/time_series_forecast.py` defines:
+## Numeric-only forecast seam
 
-- `ForecastRequest(context: tuple[float, ...], interval_z: float)`;
-- `ForecastEstimate(mean, lower, upper, scale)`;
-- a fixed-identity `ForecastBackend` protocol with immutable settings and one
-  `forecast_one()` operation;
-- an immutable `ForecastBackendSafety` contract from which report safety flags
-  are derived and validated before execution;
-- a closed resolver whose only CLI name is `rolling_mean_proxy`.
+`ForecastRequest` contains only `context: tuple[float, ...]` and `interval_z`.
+A backend never receives entity IDs, feature names, timestamps, labels, file
+paths, raw telemetry, the current target, or future values. The resolver accepts
+only `rolling_mean_proxy` and `chronos_bolt_tiny_local`; URLs, model-hub IDs,
+dotted imports, paths used as selectors, cache aliases, and unknown names fail
+without proxy fallback.
 
-The built-in backend identity is `rolling_mean_proxy_v1`, version `1`, kind
-`deterministic_proxy`. It calculates the arithmetic mean and population
-standard deviation of the supplied context, with a `1e-6` minimum scale.
+The proxy uses context arithmetic mean and population standard deviation with
+a `1e-6` scale floor. It retains the three-history/eight-calibration v1 defaults.
 
-The backend request deliberately excludes entity IDs, feature names,
-timestamps, file paths, telemetry payloads, the current target, and future
-values. Selectors that look like URLs, paths, dotted imports, model-hub IDs, or
-unknown names are rejected without fallback. The adapter contains no dynamic
-imports, sockets, subprocesses, cache discovery, weight lookup, or downloads.
-Programmatic mock adapters must explicitly attest the same offline,
-synthetic-only, no-pretrained-model, no-artifact, no-network, no-download,
-no-external-service, and no-deployment contract. Missing or false safety claims
-fail before the first forecast; custom adapter code remains trusted local code
-and is not sandboxed by this seam.
+The Chronos adapter has fixed research settings:
 
-## Frozen calibration flow
+- 64 past values, four 16-value Bolt patches;
+- 32 frozen calibration residuals;
+- one-step horizon and `interval_z=2.0`;
+- q0.1/q0.5/q0.9 prediction on CPU/fp32;
+- q0.5 as the point estimate;
+- scale `max((q0.9-q0.1)/(2*1.2815515655446004), 1e-6)`;
+- reported interval `q0.5 ± interval_z*scale`.
 
-Defaults are `history_window=3`, `calibration_window=8`, and `interval_z=2.0`.
-Each entity/feature series is processed independently:
+The legacy residual field remains named `forecast_mean`, but v2 provenance
+explicitly records `point_method=median_q0_5`.
 
-1. The first three values form forecast context.
-2. The next eight targets are forecast before observation, producing
-   standardized absolute residuals.
-3. Those eight calibration scores are frozen.
-4. Later targets are scored against only that frozen cohort.
-5. With target score `s`, the p-value is
-   `(1 + count(calibration_score >= s)) / 9` and the conformal anomaly score is
-   `1 - p`.
-6. Residual risk remains the maximum of conformal score, bounded z-risk, and a
-   `0.75` interval-breach floor.
-7. A current actual value enters history only after its forecast and score are
-   complete.
+## Pinned local artifact boundary
 
-The first evidence row is therefore emitted on observation 12. Every input
-series must contain at least 12 observations. Conservative `>=` ties,
-finite-sample correction, score-before-observe ordering, and no-future-data
-behavior are explicit v1 metadata.
-
-## Report contract
-
-The top-level v1 report contains:
+The packaged `forecast_artifact_manifest.v0` trust anchor fixes:
 
 ```text
-schema_version
-model_id
-model_family
-history_window
-calibration_window
-interval_z
-forecast_backend
-calibration
-safety_flags
-rows
+model: amazon/chronos-bolt-tiny
+revision: a0e552de83495b5c28c14c71c374f3e33280b340
+license: apache-2.0
+config.json: 1120 bytes
+config SHA-256: 278f0086733031635fb1c861cb01c1bad6477420c7fcb19381a2993e335785e0
+model.safetensors: 34622352 bytes
+weights SHA-256: 75068728d376d2bec670379eeef4bfb4d24c0cfe24d957451f8d19b447030a32
 ```
 
-The strict nested metadata records backend identity/version/kind/settings,
-calibration method/count/frozen state/tie rule, and local synthetic safety
-non-claims. Residual row fields remain unchanged from v0:
+The model root must be an explicit absolute directory beneath `/tmp`,
+`data/models/`, `.runtime/models/`, or `artifacts/models/`. It must contain
+exactly those two regular files. Root/file symlinks, special files, size or
+digest drift, unexpected files, pickle formats, `auto_map`, custom code, and
+configuration drift are rejected before optional packages are imported. The
+root and both files must be owned by the current user and must not be writable
+by group or other users; those checks and digests run again after loading.
 
-```text
-entity_id
-feature_name
-window_start
-actual_value
-forecast_mean
-forecast_lower
-forecast_upper
-residual
-residual_z
-conformal_score
-residual_risk
-model_id
-model_family
-```
+Loading uses only the verified directory with `local_files_only=True`,
+`trust_remote_code=False`, `use_safetensors=True`, `device_map="cpu"`, and
+`token=False` on fp32. Hugging Face and Transformers
+offline/telemetry-disable controls are set before import. Application code
+never downloads weights, discovers caches, reads tokens, resolves `main`,
+invokes a service, or spawns a worker process. The local path is never copied
+into report provenance or error artifacts.
 
-Conversion still emits `model_score_row.v0` with model ID
-`time_series_residual`. V1 score evidence preserves every feature row and adds
-one structured backend/calibration provenance object per entity/window score.
+## Optional dependency lane
 
-## Input, output, and safety boundaries
+The base environment and `make verify` do not install PyTorch or Chronos.
+`requirements-foundation-forecast.in` pins the direct CPython 3.12/Linux
+x86-64 CPU surface; `requirements-foundation-forecast.lock` hash-locks the
+complete resolved environment. The resolver-backed tokenizers pin is `0.22.2`,
+which satisfies Transformers 5.12.1's declared range.
 
-- Inputs are bounded strict JSON/JSONL with exact fields, coarse synthetic
-  entity IDs, snake_case feature names, finite values, UTC timestamps, and
-  duplicate/order checks.
-- Backend estimates must be finite, use positive scale, and satisfy
-  `lower <= mean <= upper`; failures do not select a fallback.
-- A complete report is validated before atomic replacement of an output;
-  lexical and resolved repository locations are checked, and symlink outputs
-  are rejected.
-- Repository outputs are limited to ignored `data/reports/`, `.runtime/`, or
-  `artifacts/` roots. Fixture smoke writes to `/tmp/ares-netguard/`.
-- Tests use synthetic fixtures only. No live capture, raw packet payloads,
-  private telemetry, external service, pretrained weights, artifact
-  persistence, download, or deployment is involved.
-
-Fixture smoke invocation:
+Provision a wheelhouse and model bundle outside the repository. Install only
+from the pre-provisioned wheelhouse:
 
 ```bash
-python -m ares_netguard.models.time_series_residual \
-  tests/fixtures/time_series_residual/synthetic_windows.jsonl \
-  /tmp/ares-netguard/time-series-residual-report.json \
-  --backend rolling_mean_proxy \
-  --history-window 3 \
-  --calibration-window 8
+python3.12 -m venv /tmp/ares-chronos-venv
+/tmp/ares-chronos-venv/bin/python -m pip install \
+  --no-index \
+  --find-links /path/to/verified-wheelhouse \
+  --require-hashes \
+  -r requirements-foundation-forecast.lock
 ```
+
+No wheel, model, cache, generated report, or local environment may be committed.
+`*.safetensors` is globally ignored and rejected by the artifact guard.
+
+## V2 evidence and frozen calibration
+
+Each entity/feature series is independent. Forecasts occur before each target
+is observed. The first 64 values form context, the next 32 standardized
+absolute residuals form a frozen split-conformal cohort, and observations
+97-128 are scored without modifying that cohort. For target score `s`:
+
+```text
+p = (1 + count(calibration_score >= s)) / 33
+conformal_score = 1 - p
+```
+
+The current target enters history only after forecasting and scoring. Residual
+risk remains the maximum of conformal score, bounded z-risk, and the `0.75`
+interval-breach floor.
+
+V2 adds strict sanitized artifact, package, quantile-mapping, and safety
+provenance. It truthfully records pretrained/operator-provisioned artifact use,
+verified digests, local-files-only execution, and false network/download/
+external-service/remote-code/persistence/deployment flags. Score conversion
+preserves feature evidence and appends one structured provenance object.
+
+Composer, disagreement, evaluation bundle, registry metadata, investigation,
+evidence index, and Rust source-schema allowlists accept v2. Static Rust/QML v0
+snapshots remain unchanged compatibility gates.
+
+## Held-out comparison
+
+`time_series_forecast_evaluation.v0` compares proxy v1 and Chronos v2 reports
+over the same two 128-observation synthetic series: 64 history, 32 calibration,
+and 32 scored observations per series. The report records a fixed cohort ID and
+SHA-256 over canonical full windows plus the separate eight anomaly labels.
+Generation rejects cohort, label, scored-key, or scored-actual drift. Labels are
+loaded only after both reports exist. The v0 cohort identity is
+`time_series_foundation_synthetic_v0`; its pinned digest is
+`af2a440076123497f1435ac477df200280767c1de7f07522dc58909ba4d6ade3`.
+
+Per backend, the evaluation records count, MAE, RMSE, interval coverage, mean
+interval width, AUROC, average precision, recall at risk `>=0.75`, and false
+positive rate at that threshold. Deltas are Chronos minus proxy. The report is
+not a superiority assertion, production benchmark, promotion gate, or
+deployment approval; a negative experimental result remains valid evidence.
+
+The explicit real-model gate denies socket and subprocess access, repeats the
+Chronos run to verify determinism, writes only under `/tmp`, and fails if the
+model path appears in evidence:
+
+```bash
+make verify-foundation-forecast \
+  FOUNDATION_PYTHON=/tmp/ares-chronos-venv/bin/python \
+  CHRONOS_MODEL_ROOT=/tmp/ares-chronos-bolt-tiny
+```
+
+Ordinary fixture smoke continues using `rolling_mean_proxy` so default CI is
+dependency- and weight-free.
 
 ## Technology and migration
 
-Selected technology is Python stdlib for the experimental forecast/calibration
-adapter, with a minimal Rust source-schema allowlist update for typed handoff
-compatibility. Rust does not implement this unstable research backend; C++ and
-Qt/QML add no behavior to this milestone, and the static QML/v0 snapshot stays
-unchanged.
-
-Migration path:
+Python remains the research adapter and benchmark layer. Rust only recognizes
+stable evidence schema identifiers; C++ and Qt/QML add no inference behavior.
 
 ```text
-offline deterministic proxy or mock
-  -> optional locally provisioned backend with immutable revision/digest
-  -> reproducible held-out evaluation
-  -> stable export contract
+pinned local Python research backend
+  -> reproducible held-out and drift evaluation
+  -> stable forecast/export contract
   -> ONNX or selected native-runtime candidate
+  -> Rust/C++ product runtime integration
 ```
 
-V1 improves reproducibility and leakage resistance, but remains synthetic,
-in-memory, download-disabled, non-persistent, and deployment-disabled.
+The current capability remains synthetic, in-memory, CPU-only,
+operator-provisioned, non-persistent, and deployment-disabled.

@@ -8743,8 +8743,10 @@ const MODEL_REGISTRY_SUPPORTED_SOURCE_SCHEMAS: &[&str] = &[
     "model_disagreement_report.v0",
     "model_score_rows.v0",
     "temporal_security_graph_report.v0",
+    "time_series_forecast_evaluation.v0",
     "time_series_residual_report.v0",
     "time_series_residual_report.v1",
+    "time_series_residual_report.v2",
     "traffic_representation_report.v0",
 ];
 const MODEL_REGISTRY_MODELS_WITH_SCORE_ROWS: &[&str] = &[
@@ -8790,8 +8792,10 @@ const EVIDENCE_INDEX_SUPPORTED_SOURCE_SCHEMAS: &[&str] = &[
     "model_score_rows.v0",
     "telemetry_feature_window_report.v0",
     "temporal_security_graph_report.v0",
+    "time_series_forecast_evaluation.v0",
     "time_series_residual_report.v0",
     "time_series_residual_report.v1",
+    "time_series_residual_report.v2",
     "traffic_representation_report.v0",
 ];
 
@@ -9003,7 +9007,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_time_series_residual_v1_source_schema_allowlists() {
+    fn accepts_time_series_forecast_v2_source_schema_allowlists() {
         assert!(validate_supported_model_registry_source_schema(
             "model_registry_metadata.entries.observed_source_schemas",
             "time_series_residual_report.v1",
@@ -9012,6 +9016,26 @@ mod tests {
         assert!(validate_supported_evidence_source_schema(
             "evidence_index.source_summaries.source_schema",
             "time_series_residual_report.v1",
+        )
+        .is_ok());
+        assert!(validate_supported_model_registry_source_schema(
+            "model_registry_metadata.entries.observed_source_schemas",
+            "time_series_residual_report.v2",
+        )
+        .is_ok());
+        assert!(validate_supported_evidence_source_schema(
+            "evidence_index.source_summaries.source_schema",
+            "time_series_residual_report.v2",
+        )
+        .is_ok());
+        assert!(validate_supported_model_registry_source_schema(
+            "model_registry_metadata.aggregate_summary.schemas_present",
+            "time_series_forecast_evaluation.v0",
+        )
+        .is_ok());
+        assert!(validate_supported_evidence_source_schema(
+            "evidence_index.source_summaries.source_schema",
+            "time_series_forecast_evaluation.v0",
         )
         .is_ok());
     }

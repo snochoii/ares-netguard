@@ -21,7 +21,11 @@ from typing import Any
 from ares_netguard.detection_engineering import candidates as detection_candidates
 from ares_netguard.graph import temporal_security_graph
 from ares_netguard.investigation import agentic_layer
-from ares_netguard.models import self_supervised_representation, time_series_residual
+from ares_netguard.models import (
+    self_supervised_representation,
+    time_series_forecast_evaluation,
+    time_series_residual,
+)
 from ares_netguard.models.disagreement import REPORT_SCHEMA_VERSION as DISAGREEMENT_SCHEMA_VERSION
 from ares_netguard.models.disagreement import ROW_SCHEMA_VERSION
 
@@ -32,6 +36,7 @@ SUPPORTED_REPORT_SCHEMAS = frozenset(
     {
         DISAGREEMENT_SCHEMA_VERSION,
         *time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS,
+        time_series_forecast_evaluation.REPORT_SCHEMA_VERSION,
         self_supervised_representation.REPORT_SCHEMA_VERSION,
         temporal_security_graph.REPORT_SCHEMA_VERSION,
         agentic_layer.REPORT_SCHEMA_VERSION,
@@ -331,6 +336,8 @@ def _validate_report_source(report: Mapping[str, Any], schema: str) -> None:
         _validate_disagreement_report(report)
     elif schema in time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS:
         _validate_residual_report(report)
+    elif schema == time_series_forecast_evaluation.REPORT_SCHEMA_VERSION:
+        time_series_forecast_evaluation.validate_forecast_evaluation(report)
     elif schema == self_supervised_representation.REPORT_SCHEMA_VERSION:
         _validate_representation_report(report)
     elif schema == temporal_security_graph.REPORT_SCHEMA_VERSION:
@@ -489,6 +496,8 @@ def _summarize_source(source: SourcePayload, *, schema: str, source_name: str) -
         _collect_disagreement_stats(source, stats)
     elif schema in time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS:
         _collect_evidence_report_stats(source, stats, risk_feature_field="feature_name")
+    elif schema == time_series_forecast_evaluation.REPORT_SCHEMA_VERSION:
+        pass
     elif schema == self_supervised_representation.REPORT_SCHEMA_VERSION:
         _collect_evidence_report_stats(source, stats, sequence_field="sequence_id")
         stats["sequence_ids"].update(

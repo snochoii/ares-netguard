@@ -21,19 +21,41 @@ from typing import Any
 
 from ares_netguard.models.disagreement import ROW_SCHEMA_VERSION
 from ares_netguard.models.time_series_forecast import (
+    CHRONOS_BACKEND_ID,
+    CHRONOS_BACKEND_KIND,
+    CHRONOS_BACKEND_SETTINGS,
+    CHRONOS_BACKEND_VERSION,
+    CHRONOS_BUNDLE_SHA256,
+    CHRONOS_CONFIG_SHA256,
+    CHRONOS_MODEL_ID,
+    CHRONOS_MODEL_REVISION,
+    CHRONOS_PACKAGE_VERSIONS,
+    CHRONOS_RUNTIME_PLATFORM,
+    CHRONOS_WEIGHTS_SHA256,
     DEFAULT_BACKEND_NAME,
+    SUPPORTED_BACKEND_NAMES,
+    ForecastArtifactProvenance,
     ForecastBackend,
     ForecastBackendSafety,
     ForecastEstimate,
     ForecastRequest,
     ForecastSetting,
+    PretrainedForecastBackendSafety,
     resolve_forecast_backend,
     validate_forecast_estimate,
+    validate_forecast_run_requirements,
 )
 
 REPORT_SCHEMA_VERSION = "time_series_residual_report.v1"
+PRETRAINED_REPORT_SCHEMA_VERSION = "time_series_residual_report.v2"
 LEGACY_REPORT_SCHEMA_VERSION = "time_series_residual_report.v0"
-SUPPORTED_REPORT_SCHEMA_VERSIONS = frozenset({LEGACY_REPORT_SCHEMA_VERSION, REPORT_SCHEMA_VERSION})
+SUPPORTED_REPORT_SCHEMA_VERSIONS = frozenset(
+    {
+        LEGACY_REPORT_SCHEMA_VERSION,
+        REPORT_SCHEMA_VERSION,
+        PRETRAINED_REPORT_SCHEMA_VERSION,
+    }
+)
 SUPPORTED_REPORT_SCHEMAS = SUPPORTED_REPORT_SCHEMA_VERSIONS
 
 MODEL_ID = "time_series_residual"
@@ -77,6 +99,20 @@ REPORT_FIELDS = frozenset(
     }
 )
 FORECAST_BACKEND_FIELDS = frozenset({"backend_id", "backend_version", "backend_kind", "settings"})
+PRETRAINED_FORECAST_BACKEND_FIELDS = FORECAST_BACKEND_FIELDS | {"artifact"}
+FORECAST_ARTIFACT_FIELDS = frozenset(
+    {
+        "model_id",
+        "revision",
+        "license_id",
+        "serialization",
+        "config_sha256",
+        "weights_sha256",
+        "bundle_sha256",
+        "runtime_platform",
+        "packages",
+    }
+)
 CALIBRATION_FIELDS = frozenset(
     {
         "method",
@@ -100,6 +136,23 @@ SAFETY_FLAG_FIELDS = frozenset(
         "no_deployment",
     }
 )
+PRETRAINED_SAFETY_FLAG_FIELDS = frozenset(
+    {
+        "local_only",
+        "synthetic_only",
+        "pretrained_model_used",
+        "operator_provisioned_artifact",
+        "artifact_digest_verified",
+        "local_files_only",
+        "network_used",
+        "download_used",
+        "external_service_used",
+        "remote_code_used",
+        "artifact_persisted_by_ares",
+        "deployment_allowed",
+    }
+)
+CHRONOS_PACKAGE_NAMES = frozenset(CHRONOS_PACKAGE_VERSIONS)
 RESIDUAL_ROW_FIELDS = (
     "entity_id",
     "feature_name",
@@ -122,6 +175,7 @@ SAFE_BACKEND_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,80}$")
 SAFE_BACKEND_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 SAFE_SETTING_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 SAFE_SETTING_TEXT_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,127}$")
+SAFE_PACKAGE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$")
 
 JsonMap = dict[str, Any]
 
@@ -168,7 +222,7 @@ def generate_residual_report(
     interval_z: float = DEFAULT_INTERVAL_Z,
     backend: ForecastBackend | None = None,
 ) -> JsonMap:
-    """Generate v1 residual evidence using frozen split-conformal calibration."""
+    """Generate strict v1/v2 evidence using frozen split-conformal calibration."""
     _validate_settings(history_window, calibration_window, interval_z)
     if isinstance(rows, str | bytes | bytearray) or not isinstance(rows, Sequence):
         raise ValueError("time-window rows must be a sequence of objects")
@@ -189,8 +243,18 @@ def generate_residual_report(
     selected_backend = (
         backend if backend is not None else resolve_forecast_backend(DEFAULT_BACKEND_NAME)
     )
-    backend_metadata = _forecast_backend_metadata(selected_backend)
-    backend_safety_flags = _forecast_backend_safety_flags(selected_backend)
+    validate_forecast_run_requirements(
+        selected_backend,
+        history_window=history_window,
+        calibration_window=calibration_window,
+        interval_z=interval_z,
+    )
+    report_schema = _report_schema_for_backend(selected_backend)
+    backend_metadata = _forecast_backend_metadata(selected_backend, schema=report_schema)
+    backend_safety_flags = _forecast_backend_safety_flags(
+        selected_backend,
+        schema=report_schema,
+    )
 
     history_by_series: dict[tuple[str, str], list[float]] = defaultdict(list)
     calibration_by_series: dict[tuple[str, str], list[float]] = defaultdict(list)
@@ -238,7 +302,7 @@ def generate_residual_report(
         key=lambda item: (item["entity_id"], item["feature_name"], item["window_start"])
     )
     report = {
-        "schema_version": REPORT_SCHEMA_VERSION,
+        "schema_version": report_schema,
         "model_id": MODEL_ID,
         "model_family": MODEL_FAMILY,
         "history_window": history_window,
@@ -293,13 +357,13 @@ def residual_evidence_to_score_rows(
 
 
 def validate_residual_report(report: Mapping[str, Any]) -> None:
-    """Validate the complete strict v0 legacy or v1 residual report contract."""
+    """Validate the complete strict v0, v1, or v2 residual report contract."""
     if not isinstance(report, Mapping):
         raise ValueError("residual report must be an object")
     schema = report.get("schema_version")
     if schema == LEGACY_REPORT_SCHEMA_VERSION:
         _require_exact_fields(report, LEGACY_REPORT_FIELDS, "legacy residual report")
-    elif schema == REPORT_SCHEMA_VERSION:
+    elif schema in {REPORT_SCHEMA_VERSION, PRETRAINED_REPORT_SCHEMA_VERSION}:
         _require_exact_fields(report, REPORT_FIELDS, "residual report")
     else:
         supported = ", ".join(sorted(SUPPORTED_REPORT_SCHEMA_VERSIONS))
@@ -312,11 +376,19 @@ def validate_residual_report(report: Mapping[str, Any]) -> None:
     history_window = _positive_int(report["history_window"], "history_window")
     _bounded_number(report["interval_z"], "interval_z", MIN_SCALE, 1000.0)
 
-    if schema == REPORT_SCHEMA_VERSION:
+    if schema in {REPORT_SCHEMA_VERSION, PRETRAINED_REPORT_SCHEMA_VERSION}:
         calibration_window = _positive_int(report["calibration_window"], "calibration_window")
-        _validate_backend_metadata(report["forecast_backend"])
+        _validate_backend_metadata(
+            report["forecast_backend"],
+            pretrained=schema == PRETRAINED_REPORT_SCHEMA_VERSION,
+        )
         _validate_calibration_metadata(report["calibration"], calibration_window=calibration_window)
-        _validate_safety_flags(report["safety_flags"])
+        if schema == PRETRAINED_REPORT_SCHEMA_VERSION:
+            _validate_pretrained_safety_flags(report["safety_flags"])
+            if history_window != 64 or calibration_window != 32 or report["interval_z"] != 2.0:
+                raise ValueError("v2 residual report requires the fixed 64/32/2.0 run settings")
+        else:
+            _validate_safety_flags(report["safety_flags"])
         if history_window + calibration_window + 1 > MAX_INPUT_ROWS:
             raise ValueError("history and calibration windows exceed the input row bound")
 
@@ -325,8 +397,8 @@ def validate_residual_report(report: Mapping[str, Any]) -> None:
         raise ValueError("residual report requires a 'rows' list")
     if len(rows) > MAX_REPORT_ROWS:
         raise ValueError(f"residual report rows must not exceed {MAX_REPORT_ROWS}")
-    if schema == REPORT_SCHEMA_VERSION and not rows:
-        raise ValueError("v1 residual report rows must not be empty")
+    if schema in {REPORT_SCHEMA_VERSION, PRETRAINED_REPORT_SCHEMA_VERSION} and not rows:
+        raise ValueError("v1/v2 residual report rows must not be empty")
 
     row_keys: list[tuple[str, str, str]] = []
     for row in rows:
@@ -379,7 +451,7 @@ def dump_report(
     *,
     repo_root: str | Path | None = None,
 ) -> None:
-    """Validate and atomically write one strict v0/v1 residual report."""
+    """Validate and atomically write one strict v0/v1/v2 residual report."""
     validate_residual_report(report)
     output = _validated_output_path(path, repo_root=repo_root)
     serialized = json.dumps(report, allow_nan=False, indent=2, sort_keys=True) + "\n"
@@ -392,12 +464,17 @@ def _extract_residual_rows(
     if isinstance(report_or_rows, Mapping):
         validate_residual_report(report_or_rows)
         provenance = None
-        if report_or_rows["schema_version"] == REPORT_SCHEMA_VERSION:
+        if report_or_rows["schema_version"] in {
+            REPORT_SCHEMA_VERSION,
+            PRETRAINED_REPORT_SCHEMA_VERSION,
+        }:
             provenance = {
                 "evidence_kind": PROVENANCE_EVIDENCE_KIND,
                 "forecast_backend": _clone_json(report_or_rows["forecast_backend"]),
                 "calibration": _clone_json(report_or_rows["calibration"]),
             }
+            if report_or_rows["schema_version"] == PRETRAINED_REPORT_SCHEMA_VERSION:
+                provenance["safety_flags"] = _clone_json(report_or_rows["safety_flags"])
         return report_or_rows["rows"], provenance
 
     if isinstance(report_or_rows, str | bytes | bytearray) or not isinstance(
@@ -462,7 +539,19 @@ def _build_residual_row(
     }
 
 
-def _forecast_backend_metadata(backend: ForecastBackend) -> JsonMap:
+def _report_schema_for_backend(backend: ForecastBackend) -> str:
+    safety = getattr(backend, "safety", None)
+    artifact = getattr(backend, "artifact", None)
+    if isinstance(safety, ForecastBackendSafety) and artifact is None:
+        return REPORT_SCHEMA_VERSION
+    if isinstance(safety, PretrainedForecastBackendSafety) and isinstance(
+        artifact, ForecastArtifactProvenance
+    ):
+        return PRETRAINED_REPORT_SCHEMA_VERSION
+    raise ValueError("forecast backend safety and artifact contracts are inconsistent")
+
+
+def _forecast_backend_metadata(backend: ForecastBackend, *, schema: str) -> JsonMap:
     try:
         settings = backend.settings
         metadata = {
@@ -473,7 +562,31 @@ def _forecast_backend_metadata(backend: ForecastBackend) -> JsonMap:
         }
     except AttributeError as exc:
         raise ValueError("forecast backend identity and settings are required") from exc
-    _validate_backend_metadata(metadata)
+    if schema == PRETRAINED_REPORT_SCHEMA_VERSION:
+        artifact = getattr(backend, "artifact", None)
+        if not isinstance(artifact, ForecastArtifactProvenance):
+            raise ValueError("pretrained forecast backend requires artifact provenance")
+        metadata["artifact"] = _forecast_artifact_metadata(artifact)
+    _validate_backend_metadata(
+        metadata,
+        pretrained=schema == PRETRAINED_REPORT_SCHEMA_VERSION,
+    )
+    return metadata
+
+
+def _forecast_artifact_metadata(artifact: ForecastArtifactProvenance) -> JsonMap:
+    metadata = {
+        "model_id": artifact.model_id,
+        "revision": artifact.revision,
+        "license_id": artifact.license_id,
+        "serialization": artifact.serialization,
+        "config_sha256": artifact.config_sha256,
+        "weights_sha256": artifact.weights_sha256,
+        "bundle_sha256": artifact.bundle_sha256,
+        "runtime_platform": artifact.runtime_platform,
+        "packages": dict(sorted(artifact.packages.items())),
+    }
+    _validate_forecast_artifact(metadata)
     return metadata
 
 
@@ -509,31 +622,53 @@ def _calibration_metadata(calibration_window: int) -> JsonMap:
     }
 
 
-def _forecast_backend_safety_flags(backend: ForecastBackend) -> JsonMap:
+def _forecast_backend_safety_flags(backend: ForecastBackend, *, schema: str) -> JsonMap:
     try:
         safety = backend.safety
     except AttributeError as exc:
         raise ValueError("forecast backend requires an immutable safety contract") from exc
-    if not isinstance(safety, ForecastBackendSafety):
-        raise ValueError("forecast backend safety must be a ForecastBackendSafety")
+    if schema == REPORT_SCHEMA_VERSION:
+        if not isinstance(safety, ForecastBackendSafety):
+            raise ValueError("v1 forecast backend safety contract is malformed")
+        flags = {
+            "local_only": safety.local_only,
+            "synthetic_only": safety.synthetic_only,
+            "no_pretrained_model": safety.no_pretrained_model,
+            "no_artifact": safety.no_artifact,
+            "no_network": safety.no_network,
+            "no_download": safety.no_download,
+            "no_external_service": safety.no_external_service,
+            "no_deployment": safety.no_deployment,
+        }
+        _validate_safety_flags(flags)
+        return flags
+    if schema != PRETRAINED_REPORT_SCHEMA_VERSION or not isinstance(
+        safety, PretrainedForecastBackendSafety
+    ):
+        raise ValueError("v2 forecast backend safety contract is malformed")
     flags = {
         "local_only": safety.local_only,
         "synthetic_only": safety.synthetic_only,
-        "no_pretrained_model": safety.no_pretrained_model,
-        "no_artifact": safety.no_artifact,
-        "no_network": safety.no_network,
-        "no_download": safety.no_download,
-        "no_external_service": safety.no_external_service,
-        "no_deployment": safety.no_deployment,
+        "pretrained_model_used": safety.pretrained_model_used,
+        "operator_provisioned_artifact": safety.operator_provisioned_artifact,
+        "artifact_digest_verified": safety.artifact_digest_verified,
+        "local_files_only": safety.local_files_only,
+        "network_used": safety.network_used,
+        "download_used": safety.download_used,
+        "external_service_used": safety.external_service_used,
+        "remote_code_used": safety.remote_code_used,
+        "artifact_persisted_by_ares": safety.artifact_persisted_by_ares,
+        "deployment_allowed": safety.deployment_allowed,
     }
-    _validate_safety_flags(flags)
+    _validate_pretrained_safety_flags(flags)
     return flags
 
 
-def _validate_backend_metadata(raw_metadata: Any) -> None:
+def _validate_backend_metadata(raw_metadata: Any, *, pretrained: bool) -> None:
     if not isinstance(raw_metadata, Mapping):
         raise ValueError("forecast_backend must be an object")
-    _require_exact_fields(raw_metadata, FORECAST_BACKEND_FIELDS, "forecast_backend")
+    expected_fields = PRETRAINED_FORECAST_BACKEND_FIELDS if pretrained else FORECAST_BACKEND_FIELDS
+    _require_exact_fields(raw_metadata, expected_fields, "forecast_backend")
     backend_id = raw_metadata["backend_id"]
     version = raw_metadata["backend_version"]
     kind = raw_metadata["backend_kind"]
@@ -546,6 +681,43 @@ def _validate_backend_metadata(raw_metadata: Any) -> None:
     normalized = _normalized_backend_settings(raw_metadata["settings"])
     if dict(raw_metadata["settings"]) != normalized:
         raise ValueError("forecast_backend.settings must contain normalized safe scalars")
+    if pretrained:
+        if backend_id != CHRONOS_BACKEND_ID:
+            raise ValueError(f"v2 forecast_backend.backend_id must be '{CHRONOS_BACKEND_ID}'")
+        if version != CHRONOS_BACKEND_VERSION or kind != CHRONOS_BACKEND_KIND:
+            raise ValueError("v2 forecast_backend version and kind must be pinned")
+        if normalized != dict(CHRONOS_BACKEND_SETTINGS):
+            raise ValueError("v2 forecast_backend settings must be pinned")
+        _validate_forecast_artifact(raw_metadata["artifact"])
+
+
+def _validate_forecast_artifact(raw_artifact: Any) -> None:
+    if not isinstance(raw_artifact, Mapping):
+        raise ValueError("forecast_backend.artifact must be an object")
+    _require_exact_fields(raw_artifact, FORECAST_ARTIFACT_FIELDS, "forecast_backend.artifact")
+    expected_scalars = {
+        "model_id": CHRONOS_MODEL_ID,
+        "revision": CHRONOS_MODEL_REVISION,
+        "license_id": "apache-2.0",
+        "serialization": "safetensors",
+        "config_sha256": CHRONOS_CONFIG_SHA256,
+        "weights_sha256": CHRONOS_WEIGHTS_SHA256,
+        "runtime_platform": CHRONOS_RUNTIME_PLATFORM,
+    }
+    for field, expected in expected_scalars.items():
+        if raw_artifact[field] != expected:
+            raise ValueError(f"forecast_backend.artifact.{field} is not pinned")
+    if raw_artifact["bundle_sha256"] != CHRONOS_BUNDLE_SHA256:
+        raise ValueError("forecast_backend.artifact.bundle_sha256 is not pinned")
+    packages = raw_artifact["packages"]
+    if not isinstance(packages, Mapping):
+        raise ValueError("forecast_backend.artifact.packages must be an object")
+    _require_exact_fields(packages, CHRONOS_PACKAGE_NAMES, "forecast_backend.artifact.packages")
+    for version in packages.values():
+        if not isinstance(version, str) or not SAFE_PACKAGE_VERSION_RE.fullmatch(version):
+            raise ValueError("forecast_backend.artifact package versions must be safe")
+    if dict(packages) != dict(CHRONOS_PACKAGE_VERSIONS):
+        raise ValueError("forecast_backend.artifact package versions are not pinned")
 
 
 def _validate_calibration_metadata(raw_metadata: Any, *, calibration_window: int) -> None:
@@ -575,6 +747,27 @@ def _validate_safety_flags(raw_flags: Any) -> None:
     for field in sorted(SAFETY_FLAG_FIELDS):
         if raw_flags[field] is not True:
             raise ValueError(f"safety_flags.{field} must be true")
+
+
+def _validate_pretrained_safety_flags(raw_flags: Any) -> None:
+    if not isinstance(raw_flags, Mapping):
+        raise ValueError("safety_flags must be an object")
+    _require_exact_fields(raw_flags, PRETRAINED_SAFETY_FLAG_FIELDS, "safety_flags")
+    required_true = {
+        "local_only",
+        "synthetic_only",
+        "pretrained_model_used",
+        "operator_provisioned_artifact",
+        "artifact_digest_verified",
+        "local_files_only",
+    }
+    required_false = PRETRAINED_SAFETY_FLAG_FIELDS - required_true
+    for field in sorted(required_true):
+        if raw_flags[field] is not True:
+            raise ValueError(f"safety_flags.{field} must be true")
+    for field in sorted(required_false):
+        if raw_flags[field] is not False:
+            raise ValueError(f"safety_flags.{field} must be false")
 
 
 def _rows_from_payload(payload: Any, source: Path) -> list[Any]:
@@ -827,7 +1020,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--backend",
         default=DEFAULT_BACKEND_NAME,
-        help=f"Closed forecast backend selector (allowed: {DEFAULT_BACKEND_NAME})",
+        help=f"Closed forecast backend selector (allowed: {', '.join(SUPPORTED_BACKEND_NAMES)})",
+    )
+    parser.add_argument(
+        "--model-root",
+        help="Explicit local model root; required only for chronos_bolt_tiny_local",
     )
     parser.add_argument(
         "--history-window",
@@ -849,7 +1046,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    backend = resolve_forecast_backend(args.backend)
+    backend = resolve_forecast_backend(args.backend, model_root=args.model_root)
     report = generate_residual_report(
         load_time_window_rows(args.input),
         history_window=args.history_window,

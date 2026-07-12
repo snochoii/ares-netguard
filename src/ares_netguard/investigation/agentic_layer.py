@@ -17,12 +17,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ares_netguard.models import time_series_residual
+
 REPORT_SCHEMA_VERSION = "agentic_investigation_report.v0"
 PRIMARY_REPORT_SCHEMA_VERSION = "model_disagreement_report.v0"
 SUPPORTED_EVIDENCE_REPORT_SCHEMAS = frozenset(
     {
         "time_series_residual_report.v0",
         "time_series_residual_report.v1",
+        "time_series_residual_report.v2",
         "traffic_representation_report.v0",
         "temporal_security_graph_report.v0",
     }
@@ -31,6 +34,13 @@ SUPPORTED_REPORT_SCHEMAS = {
     REPORT_SCHEMA_VERSION,
     PRIMARY_REPORT_SCHEMA_VERSION,
 } | SUPPORTED_EVIDENCE_REPORT_SCHEMAS
+RESIDUAL_REPORT_SCHEMAS = frozenset(
+    {
+        "time_series_residual_report.v0",
+        "time_series_residual_report.v1",
+        "time_series_residual_report.v2",
+    }
+)
 
 HIGH_CONSENSUS_RISK_THRESHOLD = 0.75
 SUPPORTING_MODEL_RISK_THRESHOLD = 0.7
@@ -112,6 +122,7 @@ FORBIDDEN_KEY_PARTS = (
 RISK_FIELD_BY_SCHEMA = {
     "time_series_residual_report.v0": "residual_risk",
     "time_series_residual_report.v1": "residual_risk",
+    "time_series_residual_report.v2": "residual_risk",
     "traffic_representation_report.v0": "representation_risk",
     "temporal_security_graph_report.v0": "graph_novelty_risk",
 }
@@ -132,6 +143,8 @@ def load_report(path: str | Path) -> JsonMap:
     if schema_version not in SUPPORTED_REPORT_SCHEMAS:
         raise ValueError(f"unknown report schema_version '{schema_version}'")
     _validate_safe_tree(report, "report")
+    if schema_version in RESIDUAL_REPORT_SCHEMAS:
+        time_series_residual.validate_residual_report(report)
     return report
 
 
@@ -460,6 +473,8 @@ def _local_evidence_refs_by_window(
     for report in evidence_reports:
         schema = _report_schema(report, SUPPORTED_EVIDENCE_REPORT_SCHEMAS)
         _validate_safe_tree(report, f"{schema} report")
+        if schema in RESIDUAL_REPORT_SCHEMAS:
+            time_series_residual.validate_residual_report(report)
         rows = _bounded_list(report.get("rows"), f"{schema} rows")
         report_model_id = _required_model_id(report.get("model_id"), "model_id")
         risk_field = RISK_FIELD_BY_SCHEMA[schema]

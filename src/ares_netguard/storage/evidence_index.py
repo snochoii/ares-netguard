@@ -24,6 +24,7 @@ from ares_netguard.models import (
     evaluation_bundle,
     registry_metadata,
     self_supervised_representation,
+    time_series_forecast_evaluation,
     time_series_residual,
 )
 from ares_netguard.models.disagreement import REPORT_SCHEMA_VERSION as DISAGREEMENT_SCHEMA_VERSION
@@ -37,6 +38,7 @@ SUPPORTED_REPORT_SCHEMAS = frozenset(
         evidence_windows.REPORT_SCHEMA_VERSION,
         DISAGREEMENT_SCHEMA_VERSION,
         *time_series_residual.SUPPORTED_REPORT_SCHEMA_VERSIONS,
+        time_series_forecast_evaluation.REPORT_SCHEMA_VERSION,
         self_supervised_representation.REPORT_SCHEMA_VERSION,
         temporal_security_graph.REPORT_SCHEMA_VERSION,
         agentic_layer.REPORT_SCHEMA_VERSION,
@@ -355,6 +357,8 @@ def _source_refs(source: SourcePayload, *, schema: str, source_name: str) -> lis
             row_kind="time_series_residual_evidence",
             feature_fields=("feature_name",),
         )
+    if schema == time_series_forecast_evaluation.REPORT_SCHEMA_VERSION:
+        return []
     if schema == self_supervised_representation.REPORT_SCHEMA_VERSION:
         return _evidence_report_refs(
             source,

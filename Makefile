@@ -5,7 +5,10 @@ MPLCONFIGDIR ?= /tmp/ares-netguard-matplotlib
 export PYTHONPATH
 export MPLCONFIGDIR
 
-.PHONY: verify verify-rust-core fixture-smoke
+FOUNDATION_PYTHON ?= $(PYTHON)
+CHRONOS_MODEL_ROOT ?=
+
+.PHONY: verify verify-rust-core fixture-smoke verify-foundation-forecast
 
 verify:
 	$(PYTHON) -m ruff check .
@@ -21,6 +24,18 @@ verify-rust-core:
 	cd apps/rust-core && $(CARGO) fmt --check
 	cd apps/rust-core && $(CARGO) test
 	cd apps/rust-core && $(CARGO) clippy -- -D warnings
+
+verify-foundation-forecast:
+	test -n "$(CHRONOS_MODEL_ROOT)" || (echo "CHRONOS_MODEL_ROOT is required" >&2; exit 2)
+	mkdir -p /tmp/ares-netguard-foundation-forecast
+	HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
+		$(FOUNDATION_PYTHON) -m ares_netguard.models.time_series_foundation_smoke \
+		tests/fixtures/time_series_forecast/synthetic_windows.jsonl \
+		tests/fixtures/time_series_forecast/anomaly_labels.jsonl \
+		"$(CHRONOS_MODEL_ROOT)" \
+		/tmp/ares-netguard-foundation-forecast
+	$(FOUNDATION_PYTHON) -m json.tool \
+		/tmp/ares-netguard-foundation-forecast/forecast-evaluation.json >/dev/null
 
 fixture-smoke:
 	mkdir -p /tmp/ares-netguard

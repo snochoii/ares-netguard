@@ -67,6 +67,7 @@ Optional local evidence inputs:
 
 - `time_series_residual_report.v0` (strict legacy input)
 - `time_series_residual_report.v1`
+- `time_series_residual_report.v2`
 - `traffic_representation_report.v0`
 - `temporal_security_graph_report.v0`
 
