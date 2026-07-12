@@ -74,15 +74,25 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
 
 14. **Score Row Composer**
     - Local `model_score_row.v0` composer for synthetic fixture smoke plumbing.
-    - Merges handcrafted base, native reference, residual, representation, and
-      graph score rows before the primary disagreement report.
+    - Merges handcrafted base, executable detector zoo, native reference,
+      residual, representation, and graph score rows before the primary
+      disagreement report.
     - Fails closed on duplicate `(entity_id, window_start, model_id)` tuples.
-    - Not a new detector, live capture path, durable store, deployment flow, or
-      native runtime executor.
+    - The composer itself is not a detector, live capture path, durable store,
+      deployment flow, or native runtime executor.
     - See `docs/MODEL_DISAGREEMENT_ENGINE.md`.
 
-15. **Qt/QML AI-NDR Workstation Shell**
+15. **Executable Detector Zoo v0**
+    - Executes PyOD ECOD, COPOD, HBOS, and Isolation Forest plus online River
+      Half-Space Trees over strict synthetic five-minute feature windows.
+    - Emits only existing `model_score_row.v0` rows with deterministic rank
+      normalization and structured synthetic-only provenance.
+    - In-memory research execution only; no model persistence, downloads,
+      capture, promotion, deployment, or external services.
+    - See `docs/MODEL_DISAGREEMENT_ENGINE.md`.
+
+16. **Qt/QML AI-NDR Workstation Shell**
    - Product UI begins once ML evidence artifacts are meaningful.
 
-16. **Rust/C++ Product Runtime**
+17. **Rust/C++ Product Runtime**
    - Workspace/session/job/storage/native inference core.

@@ -1,7 +1,8 @@
 # Model Evaluation Bundle
 
 `model_evaluation_bundle.v0` is a local, reproducible summary over existing
-synthetic ARES model reports and native-inference score rows.
+synthetic ARES model reports and score rows, including rows from bounded
+library-backed research execution and native-reference scoring.
 
 It is part of the model registry and evaluation reports roadmap track, but v0
 is not a registry. It is an aggregate report contract that verifies supported
@@ -22,8 +23,9 @@ The v0 bundle accepts local JSON objects for these report schemas:
 It also accepts JSON lists of `model_score_row.v0` rows. The fixture-smoke path
 uses the composed score-row list produced by
 `ares_netguard.models.score_row_composer`, which merges the handcrafted base
-score rows, native reference score rows, and report-derived residual,
-representation, and graph score rows before disagreement and bundle generation.
+score rows, executable detector-zoo score rows, native reference score rows,
+and report-derived residual, representation, and graph score rows before
+disagreement and bundle generation.
 
 Unknown schemas fail closed.
 
@@ -82,7 +84,10 @@ smoke target writes to `/tmp`.
 /tmp/ares-netguard/model-evaluation-bundle.json
 ```
 
-after the existing synthetic residual, representation, graph, native-inference
-score, composed disagreement, investigation, and detection-candidate outputs.
-The composed rows are synthetic score-row plumbing, not new detector semantics,
-live capture, deployment, durable storage, or native runtime execution.
+after the synthetic detector-zoo, residual, representation, graph,
+native-inference score, composed disagreement, investigation, and
+detection-candidate outputs.
+The bundle does not execute detectors or create detector semantics; it
+summarizes the composed rows, which now include a real PyOD/River research run
+over synthetic features. The bundle remains neither live capture, deployment,
+durable storage, nor a native runtime execution trace.

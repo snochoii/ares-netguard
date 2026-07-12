@@ -12,6 +12,7 @@ The v0 implementation is Python stdlib only:
 python -m ares_netguard.storage.evidence_index \
   /tmp/ares-netguard/evidence-index.json \
   /tmp/ares-netguard/telemetry-feature-windows.json \
+  /tmp/ares-netguard/detector-zoo-feature-windows.json \
   /tmp/ares-netguard/model-disagreement-report.json \
   /tmp/ares-netguard/time-series-residual-report.json \
   /tmp/ares-netguard/traffic-representation-report.json \
@@ -37,10 +38,10 @@ python -m ares_netguard.storage.evidence_index \
 Each input is loaded with strict JSON constants and validated through the
 existing source contract before indexing.
 
-The fixture smoke path passes the composed score-row list as the single
-`model_score_rows.v0` source. It does not pass native rows separately to the
-bundle or evidence index, although native rows remain one intermediate input to
-the composer.
+The fixture smoke path passes both synthetic feature reports and the composed
+score-row list as the single `model_score_rows.v0` source. It does not pass
+detector-zoo or native rows separately to the bundle or evidence index; both
+remain intermediate inputs to the composer.
 
 ## Output Shape
 
@@ -68,7 +69,8 @@ once the schema is stable.
 ## Fixture Smoke
 
 `make fixture-smoke` writes `/tmp/ares-netguard/evidence-index.json` and
-validates that it is strict JSON. The composed score rows are synthetic
-score-row plumbing only; they are not durable storage, a native runtime
-execution trace, capture output, deployment state, or a new detector claim. All
-outputs are runtime artifacts and must not be committed.
+validates that it is strict JSON. The index does not execute detectors or make
+new detector claims; it points to composed rows that now include an executed
+PyOD/River synthetic research run. It is not durable storage, a native runtime
+execution trace, capture output, or deployment state. All outputs are runtime
+artifacts and must not be committed.
