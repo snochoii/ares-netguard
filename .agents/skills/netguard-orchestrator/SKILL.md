@@ -1,143 +1,176 @@
 ---
 name: netguard-orchestrator
-description: Master orchestrator for ARES NetGuard-ML. Selects and, within explicit user authority, executes the highest-leverage safe route.
+description: Coordinate ARES NetGuard-ML work by interpreting user authority, selecting safe execution and fallback paths, sequencing integration, and making the final root judgment.
 ---
 
 
-# NetGuard Orchestrator Skill
+# NetGuard Orchestrator
 
-Invoking `$netguard-orchestrator` selects the safest highest-leverage workflow.
-It does not by itself authorize edits, branches, commits, pushes, PRs, merges,
-cleanup, or other mutation. Derive mutation authority from the user's request or
-an accepted implementation plan, following the repository `AGENTS.md`.
+Coordinate repository work without expanding the authority granted by the user
+or an accepted plan. Keep product capability progress separate from workflow
+routing and approval.
 
-## Phase A safety contract
+## Root coordinator ownership
 
-These requirements take precedence over older workflow prose in this skill:
+Own user-goal interpretation, mutation-authority checks, preflight, dependency
+ordering, execution-path selection, retry and fallback, integration sequencing,
+and the final root judgment. Delegate only these bounded responsibilities:
 
-- Treat implicit routing separately from mutation authority.
-- For authorized implementation, record the base SHA and move to a dedicated
-  non-main branch before editing. Recheck the branch before staging or commit.
-- Execute shared chokepoints serially under one root integration owner.
-- Before delegated work, revalidate the visible spawn schema, named-agent
-  selection, `fork_turns`, effective sandbox, concurrency, and visible
-  model/effort overrides.
-- Use `fork_turns: "none"` for a named specialized or heterogeneous child.
-- Fall back from a named child to a generic child with a complete task packet,
-  then to root-thread serial execution. Do not fail a batch only because named
-  selection or spawning is unavailable.
-- A generic implementation packet must name the exact skill and `SKILL.md`
-  path, objective, base SHA, worktree/branch, owned and forbidden paths,
-  required tests, stopping conditions, and result contract. The child must
-  acknowledge that it found and read that skill before editing; otherwise it
-  must return `STATUS: capability_failure` without edits and the root must run
-  the same packet serially.
-- `sandbox_mode = "read-only"` in TOML is declarative only. Delegate read-only
-  work only after effective sandbox verification; otherwise use the root.
-- Merge-gating review output must use `MERGE_READY: yes` or
-  `MERGE_READY: no` exactly on line one and `HEAD_SHA: <reviewed_head_sha>` on
-  line two. A head change invalidates the result.
-- Product capability progress is not a workflow routing or approval gate.
+- use `$netguard-parallel-dev` to decide lane and worktree topology;
+- use `$netguard-worktree-lane-worker` for a delegated implementation packet;
+- use `$git-safe-commit-push` for an authorized commit or push;
+- use `$github-pr-create-merge` for GitHub transport only;
+- use `$netguard-integration-merge` as the sole merge-readiness judge and for
+  post-merge verification.
 
-## Plan mode
+Do not own lane implementation details, review-receipt parsing, or GitHub
+transport inside this skill.
 
-For `/plan $netguard-orchestrator`:
+## Preflight and authority
 
-- inspect repository state;
-- spawn read-only subagents if useful;
-- choose one route;
-- choose and report technology using `docs/TECHNOLOGY_SELECTION_POLICY.md`;
-- output plan only;
-- do not edit files;
-- do not create branches;
-- do not commit, push, PR, merge, or cleanup.
+Before mutation:
 
-## Authorized implementation mode
+1. Derive edit, branch, commit, push, PR, merge, and cleanup authority
+   separately from the request or accepted plan. Skill invocation grants none
+   of them.
+2. Record the current branch, base SHA, `HEAD`, status, remotes, open PRs,
+   pushed unmerged branches, worktrees, and known blocked gates.
+3. For implementation, require a clean understood baseline and switch to a
+   dedicated non-main branch before the first edit.
+4. Read the repository authority, merge, technology, safety, and artifact
+   policies relevant to the changed surface.
+5. Recheck authority and branch state immediately before every staging,
+   commit, push, PR, merge, or cleanup boundary.
 
-For `$netguard-orchestrator`:
+Treat review, audit, explain, plan, and research requests as read-only unless
+the user separately authorizes mutation. Execute all shared chokepoints
+serially under the root integration owner.
 
-1. Run preflight:
-   - current branch;
-   - `git status --short`;
-   - `git remote -v`;
-   - `gh auth status -h github.com` if available;
-   - open PRs if GitHub CLI is available;
-   - pushed unmerged branches;
-   - open and dirty worktrees;
-   - blocked merge gates from existing PRs;
-   - docs and capability map.
+## Execution-path selection
 
-2. Spawn read-only subagents when useful:
-   - codebase explorer;
-   - product architect;
-   - ML research architect;
-   - security reviewer;
-   - test/eval engineer.
+Before a delegated batch, inspect the currently visible spawn schema and
+verify named-agent selection, `fork_turns`, effective sandbox, available
+concurrency, and visible model or effort overrides. Never enable
+`MultiAgentV2` manually.
 
-   Read-only subagents may run in the same checkout for exploration, research,
-   security/privacy, integration, test/eval, and product architecture review.
-   Implementation subagents that write concurrently require isolated Git
-   worktrees. Skipping subagents requires a concrete reason, such as small
-   docs-only work, narrow serial work, unavailable tools, sufficient context,
-   plan-mode limits, or no review gate yet.
+Select execution in this order:
 
-3. Choose route:
-   - `finish-open-prs` if an already validated branch/PR should be completed;
-   - `integration-merge` if merge-ready PRs exist;
-   - `merge-only` when normalizing `finish-open-prs` or `integration-merge`
-     as the selected merge-priority route;
-   - `commit-push-only` if validated local changes only need commit/push;
-   - `safety-cleanup` if generated artifacts or unsafe staged files exist;
-   - `plan-only` if the safe outcome is a decision-complete plan without mutation;
-   - `parallel-worktree` if two or more independent non-conflicting high-leverage tasks exist;
-   - `single-milestone` otherwise.
+1. Use a verified named custom agent with `fork_turns: "none"` and a complete
+   task packet.
+2. If named selection is unavailable, rejected, or cannot use
+   `fork_turns: "none"`, use a generic child with the same complete packet.
+3. If spawning, skill loading, isolation, or permission verification fails,
+   execute the unchanged packet root-serial and label the handoff `SIMULATED`.
 
-   Before selecting new feature work, prioritize existing completed PRs or
-   pushed unmerged branches that can be validated and merged.
+Do not treat inherited context as a substitute for packet fields or skill
+acknowledgment. Require isolated worktrees for concurrent writers. Use root
+serial execution when an isolated writer worktree is unavailable or when work
+touches a shared chokepoint.
 
-   Worktree required: yes for two or more concurrent writer agents or
-   independent implementation lanes. Worktree required: no for read-only
-   subagents, serial single-writer work, docs-only serial work,
-   merge/review-only routes, or plan-only output. Reject parallel lanes that
-   touch shared chokepoints: schemas, model score contracts, feature contracts,
-   model artifact contracts, `Makefile`, requirements files, `AGENTS.md`,
-   orchestrator skills, artifact guards, validation policy, storage migrations,
-   or product runtime interfaces.
-
-4. Select highest-leverage next milestone from the experimental AI-NDR roadmap:
-   - model disagreement engine;
-   - time-series foundation residual anomaly;
-   - self-supervised traffic representation;
-   - temporal security graph;
-   - agentic investigation;
-   - detection engineering candidates;
-   - native inference adapters;
-   - Qt/QML workstation;
-   - Rust/C++ runtime.
-
-5. Select technology using `docs/TECHNOLOGY_SELECTION_POLICY.md`.
-6. Implement only bounded milestones.
-7. Validate.
-8. If explicitly authorized, commit and push using `$git-safe-commit-push`.
-9. If explicitly authorized, create a PR using `$github-pr-create-merge`, then
-   continue into guarded merge-gate evaluation only when merge was also
-   explicitly authorized.
-10. If merge is authorized and all gates pass, merge and complete only the
-    authorized cleanup. Otherwise report the exact blocker or authority limit.
-11. Report workflow status, technology selection, and next task.
-
-When the user explicitly authorized both PR creation and guarded merge, PR
-creation is not a terminal success state: continue into merge-gate evaluation.
-When only PR creation was authorized, stop after reporting the open PR.
-
-Every required read-only review gate must return a final response beginning
-with exactly `MERGE_READY: yes` or `MERGE_READY: no` on line one and
-`HEAD_SHA: <reviewed_head_sha>` on line two. Missing, malformed, stale, or
-negative review output blocks merge.
-
-Every plan and final report must include:
+A `SIMULATED` root handoff must report:
 
 ```text
+EXECUTION_MODE: SIMULATED_ROOT_SERIAL
+ACTUAL_SPAWN_COUNT_DELTA: 0
+ACTUAL_HANDOFF_COUNT_DELTA: 0
+```
+
+## Effective sandbox
+
+Treat an agent TOML `sandbox_mode = "read-only"` declaration as unverified.
+Do not infer authority to create or delete probe artifacts from a read-only
+request. When explicit probe authority is absent, do not delegate the review;
+execute the unchanged packet root-serial with read-only commands and mark it
+`SIMULATED`.
+
+When explicit probe authority exists, verify a delegated read-only surface as
+follows:
+
+1. Have the root allocate one isolated disposable probe directory under `/tmp`
+   for that exact execution surface.
+2. Have the child attempt one harmless file creation inside only that
+   directory.
+3. Trust the surface only when the write is denied and runtime permissions are
+   otherwise consistent with read-only operation.
+4. If the write succeeds or enforcement is ambiguous, discard the probe and
+   every result from that child. Remove only the exact probe artifact when
+   cleanup authority separately exists; otherwise report and leave it. Rerun
+   the unchanged review packet through a verified CLI `--sandbox read-only`
+   root-serial path marked `SIMULATED`, or through root-thread read-only
+   commands when that CLI surface is unavailable.
+
+Never accept an unverified child result as a merge-gating receipt.
+
+## Retry and fallback
+
+Classify failures before retrying:
+
+- Retry an infrastructure failure on the same path at most once, and only
+  when retrying is safe and cannot duplicate side effects.
+- Do not automatically retry policy, authority, correctness, stale-SHA,
+  malformed-result, or partial-write failures.
+- After an eligible retry fails, move to the next execution path.
+- Preserve the objective, scope, authority, packet, base SHA, required tests,
+  and stopping conditions across fallback.
+- If a malformed writer completion follows an edit, inspect that worktree
+  directly and block integration until its state is understood.
+
+## Integration sequence
+
+Use this order for an authorized implementation:
+
+1. Select serial or worktree topology.
+2. Execute bounded implementation.
+3. Validate the exact diff.
+4. Commit and optionally push only with their separate authorities.
+5. Create or update a PR only with PR authority and a pushed head.
+6. Determine the final candidate SHA and required review categories from the
+   current repository policies.
+7. Obtain only effective-read-only review receipts bound to that SHA.
+8. Ask `$netguard-integration-merge` for the sole `MERGE_GATE` decision.
+9. If the gate is ready and merge authority exists, issue the exact
+   `MERGE_EXECUTION` authorization for GitHub transport.
+10. Ask `$netguard-integration-merge` to verify the merged base.
+11. Make the final cleanup decision from explicit cleanup authority and the
+    verified branch and worktree state.
+
+PR creation is not terminal when the accepted plan explicitly authorizes a
+same-run guarded merge. Stop after PR creation when merge authority is absent.
+
+## Hard stops
+
+Stop the affected mutation or gate when any of these conditions holds:
+
+- authority is absent or ambiguous;
+- the implementation branch is empty, `main`, detached, dirty for unexplained
+  reasons, or no longer based on the recorded SHA;
+- an edit would exceed authorized paths or touch a shared chokepoint in a
+  parallel lane;
+- validation, artifact, secret, privacy, branch-safety, mergeability, or check
+  requirements fail;
+- a required skill cannot be read or acknowledged;
+- a child sandbox is unverified;
+- a review receipt is missing, malformed, negative, or bound to a different
+  SHA;
+- local `HEAD`, PR head, authorization SHA, or review SHA disagree;
+- the candidate head changes after validation or review;
+- live capture, public probing, exploitation, or third-party telemetry appears
+  without the required explicit authority and safety contract.
+
+## Result reporting
+
+Report the actual route, authority used, validation, branch, commit, push, PR,
+merge, cleanup, blockers, and remaining risks. Include:
+
+```text
+Selected route:
+Workflow migration status:
+Confidence:
+Selected technology:
+Why this technology:
+Why not Python/Rust/C++/Qt for this milestone:
+Migration path if this is a prototype:
+Production-readiness implication:
 Subagent decision:
   Read-only subagents:
   Implementation subagents:
@@ -154,45 +187,8 @@ Parallel decision:
 Worktree decision:
   Worktrees required:
   Why:
-```
-
-## Hard stops
-
-Stop without commit/merge if:
-
-- validation fails;
-- generated artifacts are staged/tracked incorrectly;
-- secrets/private telemetry are detected;
-- unreviewed technology boundary, dependency, runtime, UI toolkit, storage,
-  capture, packaging, or native inference changes are present;
-- merge conflicts exist;
-- required review output is missing, does not begin with exactly
-  `MERGE_READY: yes` or `MERGE_READY: no`, omits the reviewed head SHA on line
-  two, or is stale for the current head;
-- required review returns `MERGE_READY: no`;
-- live capture/probing appears without explicit authorized safety contract;
-- multiple writer lanes would touch shared chokepoints.
-
-## Final response
-
-Report:
-
-```text
-Selected route:
-Workflow migration status:
-Confidence:
-Selected technology:
-Why this technology:
-Why not Python/Rust/C++/Qt for this milestone:
-Migration path if this is a prototype:
-Production-readiness implication:
-Subagent decision:
-Parallel decision:
-Worktree decision:
 Completed workflow changes:
 Remaining workflow risks:
-Subagents used:
-Worktrees used:
 Validation:
 Commit:
 Push:
