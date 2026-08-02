@@ -14,32 +14,94 @@ documented gate blocks merge.
 | Change type | Required review |
 |---|---|
 | safety/privacy/artifact/capture/telemetry | netguard-product-security-reviewer + netguard-integration-reviewer |
-| ML/research changes | netguard-ml-research-architect + netguard-integration-reviewer |
-| model/eval/native inference contracts | netguard-integration-reviewer + netguard-ml-research-architect |
-| experimental AI claim docs | netguard-ml-research-architect |
+| ML/research changes | netguard-correctness-reviewer + netguard-integration-reviewer |
+| model/eval/native inference contracts | netguard-correctness-reviewer + netguard-integration-reviewer |
+| experimental AI claim docs | netguard-correctness-reviewer; add netguard-docs-api-researcher evidence for external/version/source claims and the applicable root-owned packet for product direction or product fit judgments |
 | shared contracts | netguard-integration-reviewer |
-| Qt/Rust/C++ product architecture | netguard-product-architect + netguard-integration-reviewer |
+| Qt/Rust/C++ product architecture | root-owned `architectural_tradeoff` packet + netguard-integration-reviewer |
 | agentic investigation / generated rules | netguard-product-security-reviewer + netguard-integration-reviewer |
-| technology boundary / language / runtime / UI toolkit / packaging policy | netguard-product-architect + netguard-integration-reviewer |
+| technology boundary / language / runtime / UI toolkit / packaging policy | root-owned `technology_choice` packet + netguard-integration-reviewer |
 | low-risk docs-only with no safety/artifact/cleanup/merge policy change | netguard-integration-reviewer |
 
 Additional routing from `docs/TECHNOLOGY_SELECTION_POLICY.md` applies when a
 technology choice touches ML frameworks, capture/telemetry, native inference,
 storage, external services, or artifact policy.
 
+`netguard-docs-api-researcher` is an evidence provider only. Its findings may
+be required evidence for another review, but it does not issue a merge receipt
+or decide merge readiness.
+
+For product direction, technology rationale, architectural tradeoffs, and
+product fit, the root owns a bounded `review_packet_v1` with this canonical
+schema:
+
+```text
+review_category: product_direction | technology_choice | architectural_tradeoff | product_fit
+objective: <one bounded review objective>
+base_sha: <40-character base SHA>
+head_sha: <40-character reviewed head SHA>
+inspected_paths:
+  - <repository-relative path>
+required_evidence:
+  - <exact evidence or command result>
+decision_criteria:
+  - <explicit criterion>
+output_contract: sha_bound_review_v1
+stopping_conditions:
+  - <explicit stop condition>
+```
+
+Use `product_direction` for positioning or strategic capability direction,
+`technology_choice` for a language, framework, runtime, UI toolkit, or
+packaging choice, `architectural_tradeoff` for component topology or boundary
+tradeoffs, and `product_fit` for whether milestone scope matches product
+doctrine.
+
+The root-owned packet is neither a persistent custom-agent definition nor
+mutation authority. Its execution follows the repository delegation contract:
+verify effective read-only enforcement for the exact surface, prefer named and
+then generic execution with `fork_turns: "none"`, and use a verified
+`SIMULATED_ROOT_SERIAL` path when delegation is unavailable or unverified.
+The packet output is:
+
+```text
+MERGE_READY: yes | no
+HEAD_SHA: <reviewed_head_sha>
+REVIEW_CATEGORY: <review_category>
+EXECUTION_MODE: generic | SIMULATED_ROOT_SERIAL
+SANDBOX_VERIFIED: yes
+FINDINGS: <summary>
+UNRESOLVED_RISKS: none | <risks>
+ROOT_ACTION: accept | reject | inspect
+```
+
+The root owns the packet and final judgment. An unverified child, stale SHA,
+malformed output, or negative receipt blocks merge. Evidence from
+`netguard-docs-api-researcher` may satisfy `required_evidence`, but does not
+count as an independent merge receipt. `$netguard-integration-merge` remains
+the sole merge-readiness gate.
+
 ## Review output contract
 
 Every required read-only review gate must return a final response that begins
-with exactly one of:
+at byte one with exactly one of these two-line SHA-bound headers:
 
 ```text
 MERGE_READY: yes
+HEAD_SHA: <reviewed_head_sha>
+```
+
+or:
+
+```text
 MERGE_READY: no
+HEAD_SHA: <reviewed_head_sha>
 ```
 
 `MERGE_READY: yes` allows merge only when all other gates pass. `MERGE_READY:
 no`, missing review output, or output that does not begin with one of the exact
-markers blocks merge.
+headers blocks merge. The reviewed SHA must be one 40-character commit SHA and
+must match the unchanged candidate head.
 
 ## Same-run merge gate
 
