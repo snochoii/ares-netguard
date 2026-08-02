@@ -37,10 +37,13 @@ Confirm commit authority separately. Stage only exact authorized paths, then:
 5. capture the resulting commit SHA and verify status contains no unexplained
    changes.
 
-Never stage `.venv/`, `.env*`, PCAP/PCAPNG, Parquet, joblib/pickle, model
-binaries, databases, private logs or telemetry, `data/` runtime outputs,
-`.runtime/`, or `artifacts/` unless an applicable repository policy explicitly
-allows a narrowly documented synthetic fixture.
+Never stage secrets, private logs or telemetry, unauthorized captures, or
+runtime outputs. No fixture allowlist overrides this prohibition. Treat
+`.venv/`, `.env*` except `.env.example`, PCAP/PCAPNG, Parquet, joblib/pickle,
+model binaries, databases, `data/**`, `.runtime/**`, and `artifacts/**` as
+prohibited unless an applicable repository policy explicitly allows a narrowly
+documented synthetic fixture. Require every allowed synthetic fixture to
+contain no secret or private telemetry.
 
 ## Push
 

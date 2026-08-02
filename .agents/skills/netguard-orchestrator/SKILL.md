@@ -78,17 +78,26 @@ ACTUAL_HANDOFF_COUNT_DELTA: 0
 ## Effective sandbox
 
 Treat an agent TOML `sandbox_mode = "read-only"` declaration as unverified.
-Before trusting delegated read-only work:
+Do not infer authority to create or delete probe artifacts from a read-only
+request. When explicit probe authority is absent, do not delegate the review;
+execute the unchanged packet root-serial with read-only commands and mark it
+`SIMULATED`.
 
-1. Allocate an isolated disposable probe directory under `/tmp` for that exact
-   execution surface.
-2. Run a safe write-denial probe inside only that directory.
+When explicit probe authority exists, verify a delegated read-only surface as
+follows:
+
+1. Have the root allocate one isolated disposable probe directory under `/tmp`
+   for that exact execution surface.
+2. Have the child attempt one harmless file creation inside only that
+   directory.
 3. Trust the surface only when the write is denied and runtime permissions are
    otherwise consistent with read-only operation.
 4. If the write succeeds or enforcement is ambiguous, discard the probe and
-   every result from that child, safely remove only its probe artifact, and
-   rerun the unchanged review packet through a verified CLI
-   `--sandbox read-only` root-serial path marked `SIMULATED`.
+   every result from that child. Remove only the exact probe artifact when
+   cleanup authority separately exists; otherwise report and leave it. Rerun
+   the unchanged review packet through a verified CLI `--sandbox read-only`
+   root-serial path marked `SIMULATED`, or through root-thread read-only
+   commands when that CLI surface is unavailable.
 
 Never accept an unverified child result as a merge-gating receipt.
 
