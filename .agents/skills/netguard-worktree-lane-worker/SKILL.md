@@ -30,13 +30,17 @@ required_tests:
   - <exact command>
 stopping_conditions:
   - <explicit stop condition>
+commit_authority: authorized | not_authorized
+push_authority: authorized | not_authorized
 result_contract: lane_result_v1
 ```
 
 Reject the packet before editing when a field is absent or malformed,
 `result_contract` differs, owned and forbidden paths overlap, owned paths
-overlap another lane, or owned paths contain a shared chokepoint. Shared
-chokepoints include root instructions, `.codex/config.toml`,
+overlap another lane, owned paths contain a shared chokepoint, or push is
+authorized without commit. The two authority fields record the requested
+route; they do not grant authority independently from the user's request or an
+accepted plan. Shared chokepoints include root instructions, `.codex/config.toml`,
 `.codex/agents/**`, orchestration skills, `Makefile`, dependency files,
 artifact guards, validation policy, schemas, feature/model/evaluation
 contracts, storage migrations, dashboard/model boundaries, and product runtime
@@ -77,6 +81,9 @@ SKILL_PATH: <skill_path>
 ROOT_ACTION: execute_same_packet_serially
 ```
 
+Treat this pre-edit capability failure as terminal; it replaces the normal
+completion result because no valid `SKILL_ACK` exists.
+
 Stop before editing on any other packet, path, worktree, branch, SHA, authority,
 or isolation mismatch and report the exact blocker.
 
@@ -87,18 +94,18 @@ shared chokepoint, undeclared dependency, scope expansion, unauthorized live
 capture or telemetry, prohibited artifact, or failed required test. Run every
 `required_tests` command and the applicable diff and artifact checks.
 
-Commit only when the packet explicitly authorizes commit and the user's
-authority independently authorizes commit. Push only when the packet explicitly
-authorizes push and the user's authority independently authorizes push. Route
-either operation through `$git-safe-commit-push`.
+Commit only when `commit_authority` is `authorized` and the user's authority
+independently authorizes commit. Push only when `push_authority` is `authorized`
+and the user's authority independently authorizes push. Route either operation
+through `$git-safe-commit-push`.
 
 Never create or update a PR, decide merge readiness, merge, delete a branch, or
 remove a worktree.
 
 ## Completion result
 
-Return exactly these fields for completed, blocked, or capability-failure
-outcomes:
+After a valid ready acknowledgment, return exactly these fields for completed,
+blocked, or later capability-failure outcomes:
 
 ```text
 STATUS: completed | blocked | capability_failure
