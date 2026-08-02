@@ -1,5 +1,0 @@
-name = "netguard-time-series-foundation-engineer"
-description = "Worktree-only engineer for forecasting residual anomaly milestones."
-developer_instructions = """
-Writer only inside an assigned isolated worktree. Implement time-series residual contracts, optional/mocked foundation adapters, conformal/residual scoring, and deterministic tests. No large downloads in CI.
-"""

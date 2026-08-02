@@ -1,130 +1,68 @@
-# AGENTS.md — ARES NetGuard-ML Experimental AI-NDR Repository Contract
+# AGENTS.md — ARES NetGuard-ML Codex Repository Contract
 
-ARES NetGuard-ML is **not** an open-source clone of a commercial NDR product and is **not** merely a Wireshark-like packet viewer.
+ARES NetGuard-ML is a local-first Experimental AI-NDR Workstation. It is an
+experimental AI layer for authorized network and host security telemetry, not a
+commercial NDR clone, generic packet viewer, or Streamlit product.
 
-ARES NetGuard-ML is a **local-first Experimental AI-NDR Workstation**: a professional analyst and research platform that applies cutting-edge AI/ML techniques to network, host, and existing security telemetry in a transparent, reproducible, model-comparable way.
+## Instruction and authority model
 
-## Default Master Entry Point
+Follow system and developer instructions first, then the user's request, then
+the nearest applicable `AGENTS.md`. Skills and custom agents refine execution;
+they do not expand the user's authority.
 
-```text
-$netguard-orchestrator
-```
+Routing and mutation authority are separate:
 
-Use `$netguard-orchestrator` unless the user explicitly asks for a lower-level skill.
+- Implicit skill routing authorizes only workflow selection and safe read-only
+  discovery.
+- Plan, audit, explain, review, and research requests are read-only unless the
+  user separately authorizes changes.
+- Implement, change, build, or fix requests authorize bounded repository-local
+  edits and validation for that request.
+- Commit, push, PR creation, merge, branch deletion, worktree cleanup, and other
+  remote or destructive actions require explicit user authorization or an
+  accepted implementation plan that explicitly includes them.
+- Never infer broader authority from `$netguard-orchestrator`, another skill
+  name, an agent role, or a task packet.
+- If the requested authority is unclear, continue with useful read-only work
+  and report the missing authority instead of mutating state.
 
-Invoking `$netguard-orchestrator` is the user's explicit request for Codex to autonomously decide and run the highest-leverage safe workflow based on:
+## Default routing
 
-- the final experimental AI-NDR product goal;
-- current repository state;
-- current branch and GitHub PR state;
-- validation health;
-- open branches/worktrees;
-- pushed unmerged branches;
-- dirty worktrees;
-- blocked merge gates;
-- model roadmap gaps;
-- safety and artifact policy.
+Use `$netguard-orchestrator` as the default workflow router unless the user
+explicitly requests a lower-level skill. Domain expertise belongs in the
+matching `.agents/skills/<skill>/SKILL.md`; the root contract owns only durable
+repository-wide invariants.
 
-This invocation explicitly permits Codex to use, when appropriate and policy-safe:
+Important execution skills:
 
-- read-only analysis subagents;
-- single bounded milestone implementation;
-- parallel Git worktree planning;
-- worktree-isolated writer agents;
-- validation;
-- safe commit and push;
-- GitHub PR creation;
-- guarded auto-merge;
-- post-merge branch cleanup;
-- Git worktree cleanup.
+- `$netguard-parallel-dev`
+- `$netguard-worktree-lane-worker`
+- `$netguard-integration-merge`
+- `$git-safe-commit-push`
+- `$github-pr-create-merge`
 
-Do **not** ask the user to separately say "use subagents", "use parallel agents", "use worktrees", "commit", "push", "create PR", or "merge" when `$netguard-orchestrator` was invoked. The orchestrator invocation already grants that workflow permission subject to the safety gates below.
+Skill discovery is not proof that a delegated child read or applied the skill.
+Delegated implementation packets must require an explicit skill acknowledgment
+before editing.
 
-## Product Identity
+## Product and technology boundaries
 
-Official positioning:
+Preserve the doctrine and technology ownership in:
 
-> ARES NetGuard-ML is a local-first Experimental AI-NDR Workstation that lets analysts test, compare, explain, and operationalize cutting-edge AI models on network and host security telemetry.
+- `docs/EXPERIMENTAL_AI_NDR_STRATEGY.md`
+- `docs/TECHNOLOGY_SELECTION_POLICY.md`
+- `docs/MERGE_POLICY.md`
+- `docs/SAFETY_AND_PRIVACY.md`
 
-The product should **not** be described as:
+Python owns research, training, evaluation, explainability, model export, and
+fast-changing experimental models. Rust/C++ own reliable product runtime,
+storage, capture boundaries, process supervision, and suitable native
+inference. Qt/QML owns the professional native workstation UI. Streamlit is a
+developer/debug UI only. Do not move working research code across technology
+boundaries for aesthetics.
 
-- a generic NDR product;
-- a Wireshark clone;
-- an IsolationForest tool;
-- an open-source Darktrace/Vectra/ExtraHop clone;
-- a Streamlit dashboard product.
-
-The product should be described as:
-
-- an experimental AI layer for NDR/XDR/SIEM;
-- an analyst workstation for model disagreement, anomaly evidence, and investigation;
-- a reproducible local ML lab for security telemetry;
-- a path from Python research models to native inference.
-
-## Competitive Differentiation
-
-Commercial AI-NDR vendors already provide behavioral analytics, anomaly detection, risk prioritization, automated triage, and increasingly agentic SOC assistance.
-
-ARES NetGuard-ML differentiates by exposing experimental AI capabilities that are usually hidden inside vendor black boxes:
-
-1. Model disagreement analysis across heterogeneous detectors.
-2. Time-series foundation model residual anomaly detection.
-3. Self-supervised packet/flow representation learning.
-4. Temporal heterogeneous security graph anomaly detection.
-5. Agentic, evidence-grounded investigation.
-6. Detection engineering candidate generation.
-7. Transparent model registry and reproducible evaluation reports.
-8. Native inference migration path for stable models.
-
-## Core Invariants
-
-1. Defensive monitoring and detection only.
-2. No public scanning, third-party probing, exploitation, or unauthorized packet capture.
-3. Live capture is allowed only on systems, interfaces, networks, or PCAPs the operator owns or is explicitly authorized to analyze.
-4. Tests must use synthetic fixtures by default.
-5. Generated PCAPs, logs, feature files, model artifacts, secrets, runtime outputs, and private telemetry must not be committed.
-6. Production-oriented implementation is preferred over toy demos, but every milestone must remain bounded, testable, and safe.
-7. WSL + Python venv reproducibility must be preserved.
-8. Streamlit may remain as developer/debug UI only.
-9. Product UI direction is Qt/QML professional native workstation.
-10. Product runtime direction is Rust/C++ core for workspace/session/job/storage/capture/native inference.
-11. Python remains the ML Lab for research, training, benchmark, evaluation, SHAP, export, and non-exportable experimental models.
-12. Stable production inference should migrate toward ONNX Runtime, LightGBM native, and selected Rust/C++ detectors.
-
-## Technology Selection Policy
-
-Codex must not ask the user to manually choose Python, Rust, C++, Qt/QML, ONNX,
-or other core tooling for each milestone. The orchestrator must infer the
-technology from the final product goal, current repository state, and selected
-milestone using `docs/TECHNOLOGY_SELECTION_POLICY.md`.
-
-Default boundaries:
-
-- Python: ML research, PyOD, River, scikit-learn, training, PyTorch
-  experiments, SHAP, time-series foundation experiments, graph ML experiments,
-  synthetic fixture-based model reports, and model registry/evaluation
-  prototypes.
-- Rust: product runtime, workspace/session/job orchestration, artifact registry,
-  storage/indexing, process supervision, capture safety boundary, suitable
-  native inference adapters, and long-running reliable backend services.
-- C++/Qt/QML: professional native desktop UI, Wireshark-like analyst workstation
-  shell, high-performance native tables/views, packet/session/incident detail
-  UI, and Qt model/view components.
-- ONNX Runtime / LightGBM native / selected native runtimes: stable production
-  inference and reducing long-term Python runtime dependency.
-- Python sidecar: experimental, non-exportable, fast-changing research models
-  where rapid iteration is more important than native runtime stability.
-
-Anti-rules:
-
-- Do not rewrite working Python research/evaluation pipelines into Rust/C++ only
-  for aesthetics.
-- Do not choose Rust/C++ for early research prototypes unless the milestone is
-  explicitly runtime, packaging, native inference, capture safety, or product UI.
-- Do not choose Python for long-running product runtime, native UI backend,
-  capture boundary, storage/runtime, or packaging-sensitive work.
-
-Every orchestrator plan and final report must include:
+When a task changes a language, runtime, UI, storage, capture, packaging, or
+inference boundary, report:
 
 ```text
 Selected technology:
@@ -134,8 +72,167 @@ Migration path if this is a prototype:
 Production-readiness implication:
 ```
 
-Every orchestrator plan and final report must also include explicit execution
-topology decisions:
+## Safety and artifact invariants
+
+1. Defensive monitoring and detection only.
+2. No public scanning, exploitation, third-party probing, or unauthorized
+   capture.
+3. Live capture requires explicit authorization for the target interface or
+   network.
+4. Tests use synthetic fixtures by default.
+5. Never commit secrets, private telemetry, runtime outputs, generated PCAPs,
+   feature stores, model binaries, databases, or large generated artifacts.
+6. Generated investigation hypotheses and detection candidates require human
+   approval; never deploy rules automatically.
+7. Preserve WSL and Python-venv reproducibility.
+
+Before staging, run the repository artifact guard. The following remain
+prohibited unless a narrowly documented synthetic-fixture allowlist applies:
+
+```text
+.venv/  .env  .env.* except .env.example  *.pcap  *.pcapng  *.parquet
+*.joblib  *.pkl  *.onnx  *.pt  *.pth  *.ckpt  *.safetensors
+*.db  *.sqlite  *.duckdb  *.jsonl
+data/** except .gitkeep  .runtime/**  artifacts/**
+```
+
+## Branch and write isolation
+
+- Normal implementation commits directly on `main` are forbidden.
+- Before the first implementation edit, record the base SHA and switch to a
+  dedicated non-main branch. Recheck the branch immediately before staging and
+  committing.
+- A single writer may work serially in the current checkout on its dedicated
+  branch.
+- Two or more concurrent writers require separate branches and isolated Git
+  worktrees, with explicit file ownership.
+- Never let concurrent writers touch the same file or shared chokepoint.
+- Do not delete an unmerged branch or dirty worktree.
+
+Shared chokepoints execute serially under one integration owner. They include:
+
+- `AGENTS.md`, `.codex/config.toml`, `.codex/agents/**`, and orchestration skills;
+- `Makefile`, requirements, artifact guards, and validation policy;
+- schemas, feature/model/evaluation contracts, storage migrations;
+- dashboard/model interfaces and product runtime interfaces.
+
+## Delegation contract
+
+Before each batch that depends on subagents, inspect the currently visible
+spawn schema and verify named-agent selection, `fork_turns`, effective sandbox,
+available concurrency, and visible model/effort overrides. Do not enable
+`MultiAgentV2` manually.
+
+Use these execution paths in order:
+
+1. A verified named custom agent.
+2. A generic child with a complete task packet.
+3. Root-thread serial execution of the same packet.
+
+Named or heterogeneous children must use `fork_turns: "none"`. If named-agent
+selection is absent or fails, use a generic child. If spawning, skill loading,
+or permission verification fails, use the root-thread serial fallback. A batch
+must not fail only because named agents are unavailable.
+
+Every delegated implementation packet must contain:
+
+```text
+skill_name:
+skill_path:
+objective:
+base_sha:
+worktree_path:
+branch:
+owned_paths:
+forbidden_paths:
+required_tests:
+stopping_conditions:
+result_contract:
+```
+
+Before editing, the child must locate and read the exact `SKILL.md`, then return:
+
+```text
+STATUS: ready
+SKILL_ACK: <skill name>
+SKILL_PATH: <exact path>
+BASE_SHA: <sha>
+CWD: <path>
+BRANCH: <branch>
+```
+
+If the skill cannot be found or read, the child must not edit and must return:
+
+```text
+STATUS: capability_failure
+CAPABILITY: required_skill
+SKILL_NAME: <skill name>
+SKILL_PATH: <exact path>
+ROOT_ACTION: execute_same_packet_serially
+```
+
+Writer results must report status, skill acknowledgment, base/head SHA, changed
+paths, tests, unresolved risks, and recommended parent action. The root agent
+remains responsible for dependency decisions, conflict resolution, integration,
+final validation, and final judgment.
+
+### Read-only agent safety
+
+`sandbox_mode = "read-only"` in an agent TOML is a declaration, not proof of
+the effective child sandbox. Before delegated read-only work, verify effective
+runtime permissions. If the sandbox cannot be verified, do not delegate that
+work; perform it serially in the root thread. A read-only agent must not edit,
+stage, commit, push, or create/merge PRs.
+
+## Review and merge contract
+
+Every merge-gating reviewer must bind its result to the exact reviewed head SHA.
+Its final response must begin with exactly two lines:
+
+```text
+MERGE_READY: yes
+HEAD_SHA: <reviewed_head_sha>
+```
+
+or:
+
+```text
+MERGE_READY: no
+HEAD_SHA: <reviewed_head_sha>
+```
+
+The marker is valid only on the first line. Prose containing it elsewhere is
+not approval. Missing or malformed markers, a missing/mismatched SHA, and every
+`MERGE_READY: no` result block merge. Any head change invalidates all earlier
+review results and requires fresh review.
+
+Follow `docs/MERGE_POLICY.md` for active reviewer routing. Merge and cleanup are
+allowed only when explicitly authorized and all local validation, artifact,
+review, CI, mergeability, and branch-safety gates pass.
+
+## Validation
+
+Use the narrowest relevant checks, then the repository-wide gate when required:
+
+```bash
+make verify
+git diff --check
+bash scripts/check_no_generated_artifacts.sh --staged
+bash scripts/check_no_generated_artifacts.sh --tracked
+git status --short
+```
+
+Use relevant unit/integration/smoke tests for the changed surface. Fixture output
+must go to `/tmp` or gitignored `data/`. Never weaken verification merely to
+reduce tokens or elapsed time.
+
+## Completion and reporting
+
+Report actual validation, branch, commit, push, PR, merge, cleanup, and remaining
+risks. Product capability progress is separate from Codex workflow migration
+status and must not be used as a routing or approval gate.
+
+For orchestration decisions, report:
 
 ```text
 Subagent decision:
@@ -155,466 +252,3 @@ Worktree decision:
   Worktrees required:
   Why:
 ```
-
-Use concrete reasons when skipping subagents or worktrees, such as small
-docs-only work, a narrow serial fix, unavailable tools, sufficient local
-context, plan-mode mutation limits, no review gate yet, or a shared chokepoint
-that makes parallel writer lanes unsafe.
-
-## Final Product Capabilities
-
-### 1. Telemetry foundation
-
-- Local PCAP import.
-- Controlled live capture wrappers for owned/authorized interfaces.
-- Zeek logs: `conn.log`, `dns.log`, `http.log`, `ssl.log`/`tls.log`, `files.log`.
-- Suricata `eve.json`: alert, flow, dns, http, tls, fileinfo, anomaly, stats.
-- Falco/Tetragon/eBPF runtime events.
-- Future commercial NDR/SIEM/XDR alert export/API adapters.
-- Optional external security telemetry import.
-
-### 2. Feature and evidence store
-
-- Per-asset, per-flow, and per-entity windows: 1m / 5m / 15m.
-- DNS failure ratio, entropy, novelty, DGA-like signals.
-- External connection count, destination diversity, port diversity.
-- Bytes in/out, flow duration, failed connection ratio.
-- TLS/JA3-like fingerprints where available.
-- Suricata severity aggregates.
-- Host-runtime correlation features.
-- Rolling baselines, drift-aware statistics.
-- Graph edges and temporal snapshots.
-
-### 3. Experimental AI/ML layer
-
-ARES NetGuard-ML must not stop at IsolationForest.
-
-Required roadmap tracks:
-
-1. **Baseline/model zoo**
-   - IsolationForest baseline.
-   - PyOD ECOD, COPOD, HBOS, LOF, KNN, PCA, OCSVM, IForest, DIF/AutoEncoder where appropriate.
-
-2. **Online learning and drift**
-   - River HalfSpaceTrees and related anomaly detectors.
-   - Rolling thresholding.
-   - Per-asset adaptive baselines.
-   - Drift detectors and warmup state.
-
-3. **Model disagreement engine**
-   - Compare commercial alerts, PyOD detectors, River, baseline models, time-series residuals, graph anomaly, and host-context signals.
-   - Emit agreement, disagreement, consensus risk, outlier-model explanation, and evidence-by-model.
-
-4. **Time-series foundation residual anomaly**
-   - TimesFM/Chronos/Moirai-style forecast residuals.
-   - Prediction interval breach scoring.
-   - Conformal/p-value style anomaly scoring when feasible.
-   - Per-host/per-feature residual risk.
-
-5. **Self-supervised traffic representation**
-   - ET-BERT-style datagram representation.
-   - Packet sequence contrastive learning.
-   - Masked autoencoder over packet/flow features.
-   - NetMamba-inspired efficient traffic encoders.
-   - Embedding storage and downstream anomaly/classification.
-
-6. **Temporal heterogeneous security graph**
-   - Host, process, domain, IP, alert, model-signal, user, and service nodes.
-   - Edges for connected_to, resolved, spawned, triggered, co-occurred, communicated_with.
-   - Rare edge, graph novelty, temporal community change, lateral path hypotheses.
-
-7. **Supervised / semi-supervised feedback learning**
-   - Analyst labels, confirmed incidents, false-positive feedback.
-   - LightGBM, XGBoost, CatBoost.
-   - Calibration and evaluation reports.
-
-8. **Agentic investigation**
-   - Not a primary detector.
-   - Evidence-grounded hypotheses.
-   - Bounded retrieval/query tools.
-   - Schema-validated outputs.
-   - Audit log.
-   - Human approval for any non-read action.
-
-9. **Detection engineering candidates**
-   - Generate Zeek/Sigma/Suricata-like rule candidates from recurring ML evidence.
-   - Validate candidates against fixture/replay data.
-   - Never deploy rules automatically.
-
-10. **Native inference**
-   - ONNX Runtime for exported neural/stable models.
-   - LightGBM native predictor.
-   - Selected Rust/C++ detectors.
-   - Python sidecar fallback for research models.
-
-### 4. Product UI and runtime
-
-- Primary UI: Qt/QML professional native security workstation.
-- Developer/debug UI: Streamlit only.
-- Runtime: Rust/C++ core for session/workspace/job/storage/capture/native inference.
-- Python ML Lab remains available for experiments.
-- UI should emphasize ML evidence, model comparison, incident graph, and investigation workflow, not raw packet viewing alone.
-
-## Repository Layout
-
-```text
-AGENTS.md
-README.md
-requirements.txt
-requirements-dev.txt
-pyproject.toml
-Makefile
-.gitignore
-
-src/ares_netguard/
-  capture/
-  ingest/
-  features/
-  models/
-  explain/
-  correlation/
-  investigation/
-  detection_engineering/
-  graph/
-  storage/
-  api/
-  dashboard/           developer/debug Streamlit only
-  shared/
-
-apps/
-  qt-workstation/      future Qt/QML product UI
-  rust-core/           future Rust/C++ product runtime boundary
-
-python_lab/
-  experiments/
-  notebooks/
-  model_export/
-
-docs/
-  COMPETITIVE_DIFFERENTIATION.md
-  EXPERIMENTAL_AI_NDR_STRATEGY.md
-  MODEL_DISAGREEMENT_ENGINE.md
-  TIME_SERIES_FOUNDATION_ANOMALY.md
-  SELF_SUPERVISED_TRAFFIC_REPRESENTATION.md
-  TEMPORAL_SECURITY_GRAPH.md
-  AGENTIC_INVESTIGATION_LAYER.md
-  DETECTION_ENGINEERING_CANDIDATES.md
-  TECHNOLOGY_SELECTION_POLICY.md
-  NATIVE_INFERENCE_STRATEGY.md
-  QT_WORKSTATION_STRATEGY.md
-  RUST_CPP_RUNTIME_STRATEGY.md
-  ROADMAP.md
-  PROGRESS_RUBRIC.md
-  VALIDATION_MATRIX.md
-  CODEX_ORCHESTRATOR_USAGE.md
-  PARALLEL_WORKTREE_LANES.md
-  MERGE_POLICY.md
-  SAFETY_AND_PRIVACY.md
-
-tests/
-  fixtures/
-  unit/
-  integration/
-  smoke/
-
-data/                  gitignored runtime data only
-  pcap/
-  zeek/
-  suricata/
-  falco/
-  features/
-  models/
-  reports/
-  registry/
-
-.agents/skills/
-  <skill>/SKILL.md
-
-.codex/agents/
-  <agent>.toml
-```
-
-## Generated Artifact Policy
-
-Never stage or commit:
-
-```text
-.venv/
-.env
-.env.* except .env.example
-*.pcap
-*.pcapng
-*.parquet
-*.joblib
-*.pkl
-*.onnx
-*.pt
-*.pth
-*.ckpt
-*.safetensors
-*.db
-*.sqlite
-*.duckdb
-*.jsonl except explicitly allowlisted synthetic fixtures
-data/pcap/*
-data/zeek/*
-data/suricata/*
-data/falco/*
-data/features/*
-data/models/*
-data/reports/*
-data/registry/*
-.runtime/*
-artifacts/*
-```
-
-Only source, docs, config, scripts, `.gitkeep`, and synthetic fixtures under `tests/fixtures/` may be committed.
-
-## Default Skill Routing
-
-Primary:
-
-```text
-$netguard-orchestrator
-```
-
-Lower-level skills are implementation details:
-
-```text
-$netguard-next-task-planning
-$netguard-parallel-dev
-$netguard-worktree-lane-worker
-$netguard-integration-merge
-$git-safe-commit-push
-$github-pr-create-merge
-```
-
-Experimental AI-NDR domain skills:
-
-```text
-$experimental-ai-ndr-strategy
-$competitive-ai-ndr-research
-$model-disagreement-engine
-$time-series-foundation-anomaly
-$self-supervised-traffic-representation
-$temporal-security-graph
-$agentic-investigation-layer
-$detection-engineering-candidates
-$native-inference-adapters
-$qt-qml-ai-workstation
-$rust-cpp-product-runtime
-$python-ml-lab
-$secure-lab-validation
-$test-eval-engineering
-```
-
-## Plan Mode Behavior
-
-When invoked as:
-
-```text
-/plan $netguard-orchestrator
-```
-
-Codex must not edit files, create branches, commit, push, create PRs, merge PRs, or delete branches.
-
-Plan mode may use read-only repository analysis and read-only subagents.
-
-The plan must choose one route:
-
-- `single-milestone`
-- `parallel-worktree`
-- `finish-open-prs`
-- `integration-merge`
-- `merge-only`
-- `commit-push-only`
-- `safety-cleanup`
-- `plan-only`
-
-Every plan must also include the selected technology, why it was chosen, why
-the other major technology boundaries were not chosen, any prototype migration
-path, and the production-readiness implication.
-
-Every plan must include the `Subagent decision:`, `Parallel decision:`, and
-`Worktree decision:` blocks defined in this contract.
-
-## Normal Orchestrator Behavior
-
-When invoked as:
-
-```text
-$netguard-orchestrator
-```
-
-Codex may execute the selected route without asking another confirmation, as long as all safety, validation, artifact, branch, PR, and merge gates are satisfied.
-
-Before selecting new feature work, Codex must check the current branch, dirty
-status, open PRs, pushed unmerged branches, open worktrees, and any blocked
-merge gates. If an existing completed branch or PR can be validated and merged,
-choose `finish-open-prs`, `integration-merge`, or the normalized `merge-only`
-route before starting new feature work.
-
-Normal execution must not stop at PR creation when guarded auto-merge is
-allowed. After creating a PR, Codex must immediately continue in the same run
-into merge-gate evaluation unless blocked by validation failure, artifact or
-secret policy, missing or failed GitHub checks, merge conflict, required review
-failure, malformed review output, branch safety, or explicit user instruction.
-
-Every required read-only review gate must return a final response that begins
-with exactly one of:
-
-```text
-MERGE_READY: yes
-MERGE_READY: no
-```
-
-Missing review output, output that does not begin with one of those exact
-markers, or any `MERGE_READY: no` result blocks merge.
-
-## Parallel Work Policy
-
-- Native Codex read-only subagents may run in parallel in one checkout for
-  exploration, research, security/privacy review, integration review,
-  test/eval review, and product architecture review.
-- Implementation subagents that write concurrently require isolated Git
-  worktrees.
-- A worktree is required for two or more concurrent writer agents or
-  independent implementation lanes.
-- A worktree is not required for read-only subagents, serial single-writer
-  work, docs-only serial work, merge/review-only routes, or plan-only output.
-- Parallel writer lanes require:
-  - separate worktree path;
-  - separate `codex/<task>` branch;
-  - lane manifest;
-  - exact allowed files;
-  - exact forbidden files;
-  - targeted validation;
-  - no shared chokepoint conflicts.
-- Do not run parallel writers against shared chokepoints, including the same
-  file, schemas, model score contracts, feature contracts, model artifact
-  contracts, `Makefile`, requirements files, `AGENTS.md`, orchestrator skills,
-  artifact guards, validation policy, dashboard/model interfaces, storage
-  migrations, or product runtime interfaces.
-
-## Merge Policy
-
-Guarded auto-merge is allowed when all are true:
-
-1. Local validation passed.
-2. `make verify` passed unless the route documents a narrower equivalent.
-3. Relevant fixture smoke validation passed when the changed surface needs it.
-4. `git diff --check` passed.
-5. Generated artifact guards passed for staged and tracked files.
-6. No generated artifacts, secrets, or generated/private telemetry are staged.
-7. GitHub PR checks passed, or no GitHub checks exist and local integration validation passed.
-8. No merge conflicts.
-9. Required reviews return `MERGE_READY: yes`.
-10. Cleanup safety is confirmed for branches and worktrees.
-11. Merge method is consistent with `docs/MERGE_POLICY.md`.
-
-If the orchestrator creates a PR during a normal `$netguard-orchestrator` run,
-it must evaluate these merge gates immediately in the same run. Creating the PR
-is not a terminal state unless a gate blocks merge.
-
-Required review routing:
-
-- ML/research changes: `netguard-ml-research-architect` and
-  `netguard-integration-reviewer`.
-- Safety/privacy/artifact/capture changes: `netguard-product-security-reviewer`
-  and `netguard-integration-reviewer`.
-- Shared model/eval/native/runtime contracts:
-  `netguard-integration-reviewer` and `netguard-ml-research-architect`.
-- Experimental ML claims/docs: `netguard-ml-research-architect` read-only review.
-- Qt/runtime product architecture: `netguard-product-architect` and
-  `netguard-integration-reviewer` read-only reviews.
-- Low-risk docs-only changes may use integration review only when safety,
-  artifact, cleanup, and merge policy are untouched.
-- Technology boundary, language/runtime, framework, UI toolkit, native inference,
-  capture, storage, or packaging changes: follow
-  `docs/TECHNOLOGY_SELECTION_POLICY.md` review gates.
-
-After merge:
-
-1. Switch to `main`.
-2. Pull with `git pull --ff-only`.
-3. Run final validation.
-4. Run relevant fixture smoke validation when the route changed that surface.
-5. Confirm clean `git status --short`.
-6. Confirm the merged PR state and final `main` commit.
-7. Delete merged local branch.
-8. Delete merged remote branch when safe.
-9. Remove associated worktree lanes only when they are clean and merged.
-10. Run `git worktree prune`.
-11. Confirm clean `git status --short` on `main`.
-
-Do not delete unmerged branches or dirty worktrees.
-
-## Validation Commands
-
-Prefer:
-
-```bash
-make verify
-```
-
-Also use as relevant:
-
-```bash
-pytest -q
-ruff check .
-ruff format --check .
-python -m compileall src tests
-git diff --check
-bash scripts/check_no_generated_artifacts.sh --staged
-bash scripts/check_no_generated_artifacts.sh --tracked
-git status --short
-```
-
-Fixture validation should write to `/tmp` or gitignored `data/` only.
-
-## Final Goal Progress Reporting
-
-Every `$netguard-orchestrator` run must report:
-
-```text
-Current progress before route: N%
-Expected progress after route: N%
-Confidence: low | medium | high
-Selected route:
-Selected technology:
-Why this technology:
-Why not Python/Rust/C++/Qt for this milestone:
-Migration path if this is a prototype:
-Production-readiness implication:
-Subagent decision:
-Parallel decision:
-Worktree decision:
-Completed capabilities:
-Missing capabilities:
-Why this percentage:
-Next highest-value milestone:
-```
-
-Use `docs/PROGRESS_RUBRIC.md`.
-
-Do not present the percentage as exact. It is a heuristic based on validated capabilities.
-
-## Definition of Done
-
-A task is done only when:
-
-1. The selected milestone is bounded and complete.
-2. Tests or explicit smoke validation passed.
-3. `git diff --check` passed.
-4. Generated artifact guard passed.
-5. No secrets or generated/private artifacts are staged.
-6. Relevant docs were updated when operator workflow changed.
-7. Technology selection and review routing were reported when the milestone
-   changes or depends on a language, runtime, framework, UI toolkit, storage,
-   capture, packaging, or inference boundary.
-8. Commit/push completed when automation is allowed.
-9. PR/merge completed only when merge policy allowed it.
-10. Post-merge cleanup completed when merge occurred.
-11. Normal `$netguard-orchestrator` runs that create a PR continued into
-    same-run merge-gate evaluation unless a documented gate blocked merge.
-12. Final response includes progress, technology selection, validation, commit hash, push status, PR status, merge status, cleanup status, and next recommended milestone.

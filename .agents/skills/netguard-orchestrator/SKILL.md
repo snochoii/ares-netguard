@@ -1,14 +1,43 @@
 ---
 name: netguard-orchestrator
-description: Master orchestrator for ARES NetGuard-ML. Plans and executes the highest-leverage safe route, including subagents, worktrees, implementation, validation, commit/push, PR, guarded merge, and cleanup.
+description: Master orchestrator for ARES NetGuard-ML. Selects and, within explicit user authority, executes the highest-leverage safe route.
 ---
 
 
 # NetGuard Orchestrator Skill
 
-Invoking `$netguard-orchestrator` is explicit user permission to autonomously decide and run the safest highest-leverage workflow.
+Invoking `$netguard-orchestrator` selects the safest highest-leverage workflow.
+It does not by itself authorize edits, branches, commits, pushes, PRs, merges,
+cleanup, or other mutation. Derive mutation authority from the user's request or
+an accepted implementation plan, following the repository `AGENTS.md`.
 
-Do not say the user failed to request subagents, parallel work, commit, push, PR creation, or merge. The user did request them by invoking this skill.
+## Phase A safety contract
+
+These requirements take precedence over older workflow prose in this skill:
+
+- Treat implicit routing separately from mutation authority.
+- For authorized implementation, record the base SHA and move to a dedicated
+  non-main branch before editing. Recheck the branch before staging or commit.
+- Execute shared chokepoints serially under one root integration owner.
+- Before delegated work, revalidate the visible spawn schema, named-agent
+  selection, `fork_turns`, effective sandbox, concurrency, and visible
+  model/effort overrides.
+- Use `fork_turns: "none"` for a named specialized or heterogeneous child.
+- Fall back from a named child to a generic child with a complete task packet,
+  then to root-thread serial execution. Do not fail a batch only because named
+  selection or spawning is unavailable.
+- A generic implementation packet must name the exact skill and `SKILL.md`
+  path, objective, base SHA, worktree/branch, owned and forbidden paths,
+  required tests, stopping conditions, and result contract. The child must
+  acknowledge that it found and read that skill before editing; otherwise it
+  must return `STATUS: capability_failure` without edits and the root must run
+  the same packet serially.
+- `sandbox_mode = "read-only"` in TOML is declarative only. Delegate read-only
+  work only after effective sandbox verification; otherwise use the root.
+- Merge-gating review output must use `MERGE_READY: yes` or
+  `MERGE_READY: no` exactly on line one and `HEAD_SHA: <reviewed_head_sha>` on
+  line two. A head change invalidates the result.
+- Product capability progress is not a workflow routing or approval gate.
 
 ## Plan mode
 
@@ -23,7 +52,7 @@ For `/plan $netguard-orchestrator`:
 - do not create branches;
 - do not commit, push, PR, merge, or cleanup.
 
-## Normal mode
+## Authorized implementation mode
 
 For `$netguard-orchestrator`:
 
@@ -89,20 +118,21 @@ For `$netguard-orchestrator`:
 5. Select technology using `docs/TECHNOLOGY_SELECTION_POLICY.md`.
 6. Implement only bounded milestones.
 7. Validate.
-8. Commit and push using `$git-safe-commit-push`.
-9. Create PR using `$github-pr-create-merge`, then immediately continue into
-   guarded merge-gate evaluation in the same run.
-10. If merge gates pass, merge and complete post-merge cleanup. If any gate
-    blocks merge, stop after reporting the exact blocker.
-11. Report progress, technology selection, and next task.
+8. If explicitly authorized, commit and push using `$git-safe-commit-push`.
+9. If explicitly authorized, create a PR using `$github-pr-create-merge`, then
+   continue into guarded merge-gate evaluation only when merge was also
+   explicitly authorized.
+10. If merge is authorized and all gates pass, merge and complete only the
+    authorized cleanup. Otherwise report the exact blocker or authority limit.
+11. Report workflow status, technology selection, and next task.
 
-Creating a PR is not a terminal success state for normal `$netguard-orchestrator`
-execution. Do not stop at PR creation unless validation, CI/checks, mergeability,
-required reviews, artifact/secret policy, branch safety, or explicit user
-instruction blocks guarded auto-merge.
+When the user explicitly authorized both PR creation and guarded merge, PR
+creation is not a terminal success state: continue into merge-gate evaluation.
+When only PR creation was authorized, stop after reporting the open PR.
 
-Every required read-only review gate must return a final response that begins
-with exactly `MERGE_READY: yes` or `MERGE_READY: no`. Missing, malformed, or
+Every required read-only review gate must return a final response beginning
+with exactly `MERGE_READY: yes` or `MERGE_READY: no` on line one and
+`HEAD_SHA: <reviewed_head_sha>` on line two. Missing, malformed, stale, or
 negative review output blocks merge.
 
 Every plan and final report must include:
@@ -136,8 +166,9 @@ Stop without commit/merge if:
 - unreviewed technology boundary, dependency, runtime, UI toolkit, storage,
   capture, packaging, or native inference changes are present;
 - merge conflicts exist;
-- required review output is missing or does not begin with exactly
-  `MERGE_READY: yes` or `MERGE_READY: no`;
+- required review output is missing, does not begin with exactly
+  `MERGE_READY: yes` or `MERGE_READY: no`, omits the reviewed head SHA on line
+  two, or is stale for the current head;
 - required review returns `MERGE_READY: no`;
 - live capture/probing appears without explicit authorized safety contract;
 - multiple writer lanes would touch shared chokepoints.
@@ -148,8 +179,7 @@ Report:
 
 ```text
 Selected route:
-Current progress before route:
-Expected progress after route:
+Workflow migration status:
 Confidence:
 Selected technology:
 Why this technology:
@@ -159,9 +189,8 @@ Production-readiness implication:
 Subagent decision:
 Parallel decision:
 Worktree decision:
-Completed capabilities:
-Missing capabilities:
-Why this percentage:
+Completed workflow changes:
+Remaining workflow risks:
 Subagents used:
 Worktrees used:
 Validation:
