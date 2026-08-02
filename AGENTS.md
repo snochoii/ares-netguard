@@ -52,7 +52,6 @@ Preserve the doctrine and technology ownership in:
 - `docs/EXPERIMENTAL_AI_NDR_STRATEGY.md`
 - `docs/TECHNOLOGY_SELECTION_POLICY.md`
 - `docs/MERGE_POLICY.md`
-- `docs/SAFETY_AND_PRIVACY.md`
 
 Python owns research, training, evaluation, explainability, model export, and
 fast-changing experimental models. Rust/C++ own reliable product runtime,
