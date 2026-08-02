@@ -95,11 +95,18 @@ Record a technology decision when a milestone introduces or changes:
 
 ## Review gates
 
-- ML framework or research-model choices require `netguard-ml-research-architect`.
+- ML methodology and evaluation design require
+  `netguard-correctness-reviewer`. ML framework or runtime selection rationale
+  requires a root-owned `technology_choice` packet, and current external
+  availability, API, or version claims require
+  `netguard-docs-api-researcher` evidence.
 - Shared model, evaluation, native inference, runtime, or storage contracts
   require `netguard-integration-reviewer`.
-- Qt, Rust, C++, native runtime, or product architecture boundary choices
-  require `netguard-product-architect`.
+- Qt, Rust, C++, native runtime, UI, or product architecture choices require a
+  root-owned `technology_choice` packet for technology selection, an
+  `architectural_tradeoff` packet for component topology, or a
+  `product_direction` packet for product direction or positioning. Add
+  `netguard-integration-reviewer` when the choice affects shared compatibility.
 - Capture, telemetry, privacy, external service, or artifact-policy-impacting
   choices require `netguard-product-security-reviewer`.
 
