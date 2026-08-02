@@ -1,76 +1,67 @@
 ---
 name: github-pr-create-merge
-description: Create GitHub PRs and perform guarded auto-merge only when validation and review gates pass.
+description: Perform authorized GitHub PR create, update, read, checks, and merge transport without routing reviews or deciding merge readiness.
 ---
 
 
-# GitHub PR Create Merge
+# GitHub PR Transport
 
-## PR
+Own GitHub PR create, update, read, checks lookup, and an already-authorized
+merge execution. Do not route reviews, parse review receipts, decide readiness,
+grant authority, or decide and perform cleanup.
 
-Use `gh pr create` after branch push and validation.
+## PR create or update
 
-PR body must include:
+Require explicit PR create or update authority and a pushed non-main head.
+Before mutation, verify the remote head SHA, intended base, repository, and
+branch. Stop on an unpushed or mismatched head.
 
-- summary;
-- validation commands;
-- artifact guard result;
-- privacy/safety note;
+Include in the PR body:
+
+- summary and exact changed scope;
+- validation commands and results;
+- staged and tracked artifact-guard results;
+- privacy and safety impact;
 - technology selection and rejected alternatives when applicable;
 - subagent, parallel, and worktree decisions;
-- required review routing.
+- required review categories as supplied by the root from current policy.
 
-After creating the PR during normal `$netguard-orchestrator` execution, do not
-stop. Immediately continue into guarded merge-gate evaluation in the same run
-unless validation, checks, mergeability, artifact/secret policy, required review
-gates, branch safety, or explicit user instruction blocks merge.
+Return the PR number, URL, remote head SHA, base, and remote state. Reading PR
+state or checks is transport evidence only and never produces a readiness
+decision.
 
-## Merge
+## Merge transport
 
-Auto-merge only if:
+Execute merge only after the root supplies this exact authorization from a
+current ready integration gate:
 
-- local validation passed;
-- `make verify` passed unless the route documents a narrower equivalent;
-- relevant fixture smoke validation passed when the changed surface needs it;
-- `git diff --check` passed;
-- GitHub checks passed, or no GitHub checks exist and local integration
-  validation passed;
-- staged and tracked artifact guards passed;
-- no generated artifacts, secrets, or generated/private telemetry are staged;
-- required reviews return `MERGE_READY: yes`;
-- no conflicts;
-- cleanup safety is confirmed for branches and worktrees;
-- branch is not main.
+```text
+MERGE_EXECUTION: authorized
+HEAD_SHA: <current_pr_head_sha>
+PR_NUMBER: <number>
+MERGE_METHOD: squash | merge | rebase
+```
 
-Every required review final response must begin with exactly `MERGE_READY: yes`
-or `MERGE_READY: no`. Missing, malformed, or negative review output blocks
-merge.
+Immediately before the merge command, read the remote PR again and require its
+repository, PR number, base, open state, and head SHA to match the authorization
+and expected target. Hard stop if the remote PR head differs from `HEAD_SHA`,
+if checks or mergeability changed adversely, or if any authorization field is
+missing or malformed. Return `STATUS: authority_failure` when no valid
+`MERGE_EXECUTION` receipt exists.
 
-Review routing:
+Do not reinterpret validation or reviews and do not independently approve the
+merge. Do not switch branches, pull, delete local or remote branches, remove
+worktrees, or prune.
 
-- ML/research changes require `netguard-ml-research-architect` and
-  `netguard-integration-reviewer`.
-- Safety/privacy/artifact/capture changes require
-  `netguard-product-security-reviewer` and `netguard-integration-reviewer`.
-- Shared model/eval/native/runtime contracts require
-  `netguard-integration-reviewer` and `netguard-ml-research-architect`.
-- Product architecture changes require `netguard-product-architect` and
-  `netguard-integration-reviewer`.
-- Low-risk docs-only changes may use integration review only when safety,
-  artifact, cleanup, and merge policy are untouched.
+## Transport result
 
-After merge:
+Return:
 
-1. Switch to `main`.
-2. Pull with `git pull --ff-only`.
-3. Run final validation.
-4. Run relevant fixture smoke validation when the route changed that surface.
-5. Confirm clean `git status --short`.
-6. Confirm the merged PR state and final `main` commit.
-7. Delete the merged local branch.
-8. Delete the merged remote branch when safe.
-9. Remove associated worktrees that are clean and merged.
-10. Run `git worktree prune`.
-11. Confirm clean status on `main`.
-
-Never delete unmerged branches or dirty worktrees.
+```text
+REMOTE_STATUS: created | updated | open | checks_reported | merged | blocked
+PR_NUMBER: <number>
+PR_URL: <url>
+REMOTE_HEAD_SHA: <sha>
+MERGE_COMMIT: not_applicable | none | <sha>
+CHECKS_STATUS: passed | pending | failed | none
+```

@@ -1,41 +1,63 @@
 ---
 name: netguard-parallel-dev
-description: Split independent work into Git worktree lanes and run worktree-isolated writer agents when parallelism is safe.
+description: Decide whether implementation can run in parallel and define isolated branch, worktree, and path topology for non-conflicting lanes.
 ---
 
 
-# Parallel Development
+# Parallel Development Topology
 
-Use when two or more independent tasks can be safely implemented without
-shared-file conflicts.
+Own parallel eligibility, shared-chokepoint classification, and lane topology.
+Do not implement, commit, push, review, create or merge PRs, or clean up
+worktrees.
 
-Worktree required: yes for two or more concurrent writer agents or independent
-implementation lanes. Worktree required: no for read-only subagents, serial
-single-writer work, docs-only serial work, merge/review-only routes, or
-plan-only output.
+## Eligibility
 
-## Required steps
+Select parallel writers only when two or more tasks are independent and all
+paths can be partitioned without overlap. Otherwise select a serial route.
 
-1. Confirm clean main.
-2. Check open PRs, pushed unmerged branches, dirty worktrees, and blocked merge
-   gates before selecting new feature lanes.
-3. Identify lane candidates.
-4. Reject lanes touching shared chokepoints.
-5. Create lane manifests.
-6. Create worktrees with `git worktree add -b codex/<task> <path> main`.
-7. Assign each writer to one worktree only.
-8. Validate each lane.
-9. Commit/push each lane.
-10. Create PRs.
-11. Run integration review and other required read-only review gates.
-12. Merge only when policy allows.
-13. Cleanup merged worktrees.
+Fix one 40-character base SHA for the complete batch. For every accepted lane,
+define:
 
-## Never
+- one dedicated non-main branch;
+- one absolute isolated worktree path;
+- explicit, repository-relative `owned_paths`;
+- explicit, repository-relative `forbidden_paths`;
+- required tests and stopping conditions.
 
-- never run multiple writers in the same checkout;
-- never let two lanes touch the same schema, model score contract, feature
-  contract, model artifact contract, `Makefile`, requirements file,
-  `AGENTS.md`, orchestrator skill, artifact guard, validation policy, storage
-  migration, or product runtime interface;
-- never merge a lane with failed validation.
+Require every writer to operate in exactly one assigned worktree. A serial
+single writer, read-only work, review, integration, merge, or planning does not
+require an additional worktree.
+
+## Conflict rules
+
+Reject parallel execution for shared chokepoints, including:
+
+- root instructions, `.codex/config.toml`, `.codex/agents/**`, and
+  orchestration skills;
+- `Makefile`, dependency files, artifact guards, and validation policy;
+- schemas, feature, model, and evaluation contracts;
+- storage migrations, dashboard/model boundaries, and product runtime
+  interfaces;
+- integration, readiness, merge, and cleanup state.
+
+Shared chokepoints cannot be assigned to a lane. If two proposed lanes require
+the same file or bounded directory, route all related work serially. Reject a
+packet whose owned and forbidden paths overlap, whose owned paths overlap
+another lane, or whose owned paths include a shared chokepoint.
+
+## Handoff
+
+Return topology only:
+
+```text
+PARALLEL_SELECTED: yes | no
+BASE_SHA: <40-character commit SHA>
+LANES: <branch, absolute worktree, owned paths, forbidden paths>
+SERIAL_WORK: none | <shared or overlapping work>
+REJECTED_LANES: none | <lane and reason>
+```
+
+Hand accepted lane definitions to `$netguard-worktree-lane-worker`. Hand
+commit or push to `$git-safe-commit-push`, PR transport to
+`$github-pr-create-merge`, and readiness or post-merge verification to
+`$netguard-integration-merge`.
