@@ -1,0 +1,37 @@
+name: Codex workflow contracts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up supported Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Verify Python range
+        run: python3 -c 'import sys; assert sys.version_info >= (3, 11), sys.version'
+
+      - name: Install focused test dependency
+        run: python3 -m pip install --disable-pip-version-check "pytest>=8.0"
+
+      - name: Verify focused test runner
+        run: python3 -m pytest --version
+
+      - name: Validate Codex workflow contracts
+        run: PYTHON=python3 make verify-codex-workflow
