@@ -239,6 +239,24 @@ push_authority = "not_authorized"
 result_contract = "lane_result_v1"
 
 [[lane_packet_cases]]
+name = "authorized_lane_packet"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement, commit, and push one bounded lane."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-e"
+branch = "codex/lane-e"
+owned_paths = ["src/ares_netguard/example_lane_e.py"]
+forbidden_paths = []
+required_tests = ["python3 -m pytest tests/unit/test_example_e.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "authorized"
+push_authority = "authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
 name = "same_branch_lane_packet"
 valid = true
 [lane_packet_cases.packet]
@@ -436,12 +454,107 @@ text = """STATUS: completed
 SKILL_ACK: test-eval-engineering
 SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
 BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 CWD: /tmp/ares-netguard-lane-a
 BRANCH: codex/lane-a
 CHANGED_PATHS: src/ares_netguard/example_lane.py
 FORBIDDEN_PATHS_TOUCHED: none
 TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: not_authorized
+PUSH_STATUS: not_authorized
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "authorized_completion_result"
+packet = "authorized_lane_packet"
+valid = true
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-e
+BRANCH: codex/lane-e
+CHANGED_PATHS: src/ares_netguard/example_lane_e.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: 77 passed, 0 failed
+COMMIT_STATUS: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+PUSH_STATUS: origin/codex/lane-e
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "authorized_completion_without_commit"
+packet = "authorized_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-e
+BRANCH: codex/lane-e
+CHANGED_PATHS: src/ares_netguard/example_lane_e.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: not_created
+PUSH_STATUS: origin/codex/lane-e
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "authorized_completion_failed_push"
+packet = "authorized_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-e
+BRANCH: codex/lane-e
+CHANGED_PATHS: src/ares_netguard/example_lane_e.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+PUSH_STATUS: failed
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "completion_head_commit_mismatch"
+packet = "authorized_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: cccccccccccccccccccccccccccccccccccccccc
+CWD: /tmp/ares-netguard-lane-e
+BRANCH: codex/lane-e
+CHANGED_PATHS: src/ares_netguard/example_lane_e.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+PUSH_STATUS: origin/codex/lane-e
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "completion_positive_failure_count"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: src/ares_netguard/example_lane.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: 76 passed, 1 failure
 COMMIT_STATUS: not_authorized
 PUSH_STATUS: not_authorized
 UNRESOLVED_RISKS: none

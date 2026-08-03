@@ -751,6 +751,33 @@ def path_is_within(path: str, owner: str) -> bool:
     return path == owner or path.startswith(f"{owner}/")
 
 
+def tests_report_passed(value: str) -> bool:
+    normalized = value.lower()
+    without_zero_failures = re.sub(
+        r"\b0\s+(?:failed|failures?|errors?)\b",
+        "",
+        normalized,
+    )
+    return bool(re.search(r"\bpassed\b", normalized)) and not bool(
+        re.search(
+            r"\b(?:failed|failures?|errors?|not[_ -]run)\b",
+            without_zero_failures,
+        )
+    )
+
+
+def parse_push_status(value: str) -> tuple[str, str] | None:
+    if value in {"not_authorized", "not_pushed"}:
+        return None
+    match = re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9._-]*)/(.+)", value)
+    require(match is not None, "completion result: invalid PUSH_STATUS")
+    remote, ref = match.groups()
+    branch = ref.removeprefix("refs/heads/")
+    validate_branch(branch)
+    require(ref in {branch, f"refs/heads/{branch}"}, "completion result: invalid push ref")
+    return remote, branch
+
+
 def validate_completion_result(
     text: Any, packet: Mapping[str, Any] | None = None
 ) -> dict[str, str]:
@@ -761,7 +788,7 @@ def validate_completion_result(
     )
     normalize_repo_path(values["SKILL_PATH"], "completion result SKILL_PATH")
     normalize_sha(values["BASE_SHA"], "completion result BASE_SHA")
-    normalize_sha(values["HEAD_SHA"], "completion result HEAD_SHA")
+    head_sha = normalize_sha(values["HEAD_SHA"], "completion result HEAD_SHA")
     validate_absolute_path(values["CWD"], "completion result CWD")
     validate_branch(values["BRANCH"])
     expected_actions = {
@@ -780,9 +807,10 @@ def validate_completion_result(
     )
     commit_status = values["COMMIT_STATUS"]
     push_status = values["PUSH_STATUS"]
+    commit_sha: str | None = None
     if commit_status not in {"not_authorized", "not_created"}:
-        normalize_sha(commit_status, "completion result COMMIT_STATUS")
-    nonempty_string(push_status, "completion result PUSH_STATUS")
+        commit_sha = normalize_sha(commit_status, "completion result COMMIT_STATUS")
+    pushed_ref = parse_push_status(push_status)
     if packet is not None:
         for key, packet_key in (
             ("SKILL_ACK", "skill_name"),
@@ -817,26 +845,49 @@ def validate_completion_result(
                 commit_status == "not_authorized",
                 "completion result: unauthorized commit status",
             )
+        else:
+            require(
+                commit_status != "not_authorized",
+                "completion result: authorized commit reported not_authorized",
+            )
         if packet["push_authority"] == "not_authorized":
             require(
                 push_status == "not_authorized",
                 "completion result: unauthorized push status",
             )
+        else:
+            require(
+                push_status != "not_authorized",
+                "completion result: authorized push reported not_authorized",
+            )
+        expected_head = commit_sha or normalize_sha(packet["base_sha"], "lane packet base_sha")
+        require(
+            head_sha == expected_head,
+            "completion result: HEAD_SHA does not match commit/base state",
+        )
     if values["PARENT_ACTION"] == "integrate":
         require(
             not forbidden_touched,
             "completion result: integration blocked by forbidden paths",
         )
         require(
-            re.search(r"\bpassed\b", values["TEST_RESULTS"], re.IGNORECASE) is not None
-            and re.search(r"\b(failed|error|not[_ ]run)\b", values["TEST_RESULTS"], re.IGNORECASE)
-            is None,
+            tests_report_passed(values["TEST_RESULTS"]),
             "completion result: integration requires passing tests",
         )
         require(
             values["UNRESOLVED_RISKS"] == "none",
             "completion result: integration blocked by unresolved risks",
         )
+        if packet is not None and packet["commit_authority"] == "authorized":
+            require(
+                commit_sha is not None,
+                "completion result: authorized integration requires a commit",
+            )
+        if packet is not None and packet["push_authority"] == "authorized":
+            require(
+                pushed_ref is not None and pushed_ref[1] == packet["branch"],
+                "completion result: authorized integration requires the packet branch push",
+            )
     return values
 
 
@@ -1091,6 +1142,12 @@ def validate_fixtures(root: Path = ROOT) -> None:
         data.get("meta", {}).get("schema") == "codex_workflow_contract_fixtures_v1",
         "fixture schema mismatch",
     )
+    for table_name, cases in data.items():
+        if table_name == "meta":
+            continue
+        require(isinstance(cases, list), f"fixture {table_name}: expected case list")
+        names = [nonempty_string(case.get("name"), f"fixture {table_name} name") for case in cases]
+        require(len(names) == len(set(names)), f"fixture {table_name}: duplicate case name")
 
     for case in data.get("branch_cases", []):
         expect_case(case, lambda case=case: validate_branch(case["branch"]))

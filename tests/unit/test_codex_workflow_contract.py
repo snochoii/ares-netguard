@@ -170,7 +170,7 @@ def _valid_completion_result() -> str:
             "SKILL_ACK: test-eval-engineering",
             "SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md",
             f"BASE_SHA: {'a' * 40}",
-            f"HEAD_SHA: {'b' * 40}",
+            f"HEAD_SHA: {'a' * 40}",
             "CWD: /tmp/ares-netguard-test-lane",
             "BRANCH: codex/test-lane",
             "CHANGED_PATHS: src/ares_netguard/example.py",
@@ -233,6 +233,72 @@ def test_acknowledgement_and_completion_are_bound_to_lane_packet() -> None:
             ),
             packet,
         )
+
+
+def test_completion_test_summary_distinguishes_zero_and_positive_failures() -> None:
+    packet = _valid_lane_packet()
+    validator.validate_completion_result(
+        _valid_completion_result().replace(
+            "python3 -m pytest: passed",
+            "python3 -m pytest: 77 passed, 0 failed",
+        ),
+        packet,
+    )
+    with pytest.raises(validator.ContractError, match="passing tests"):
+        validator.validate_completion_result(
+            _valid_completion_result().replace(
+                "python3 -m pytest: passed",
+                "python3 -m pytest: 76 passed, 1 failure",
+            ),
+            packet,
+        )
+
+
+def test_authorized_completion_binds_commit_head_and_push_branch() -> None:
+    packet = _valid_lane_packet()
+    packet["commit_authority"] = "authorized"
+    packet["push_authority"] = "authorized"
+    result = (
+        _valid_completion_result()
+        .replace(f"HEAD_SHA: {'a' * 40}", f"HEAD_SHA: {'b' * 40}")
+        .replace("COMMIT_STATUS: not_authorized", f"COMMIT_STATUS: {'b' * 40}")
+        .replace("PUSH_STATUS: not_authorized", "PUSH_STATUS: origin/codex/test-lane")
+    )
+    validator.validate_completion_result(result, packet)
+
+    with pytest.raises(validator.ContractError, match="HEAD_SHA"):
+        validator.validate_completion_result(
+            result.replace(f"HEAD_SHA: {'b' * 40}", f"HEAD_SHA: {'c' * 40}"),
+            packet,
+        )
+    with pytest.raises(validator.ContractError, match="packet branch push"):
+        validator.validate_completion_result(
+            result.replace("origin/codex/test-lane", "origin/codex/other-lane"),
+            packet,
+        )
+
+
+def test_fixture_case_names_must_be_unique(tmp_path: Path) -> None:
+    fixture = tmp_path / "tests/fixtures/codex_workflow/contracts.toml"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text(
+        """[meta]
+schema = "codex_workflow_contract_fixtures_v1"
+
+[[branch_cases]]
+name = "duplicate"
+branch = "codex/one"
+valid = true
+
+[[branch_cases]]
+name = "duplicate"
+branch = "codex/two"
+valid = true
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(validator.ContractError, match="duplicate case name"):
+        validator.validate_fixtures(tmp_path)
 
 
 @pytest.mark.parametrize(
