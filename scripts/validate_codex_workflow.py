@@ -658,6 +658,14 @@ def validate_lane_set(packets: Sequence[Mapping[str, Any]], root: Path = ROOT) -
     for index, left in enumerate(packets):
         for right in packets[index + 1 :]:
             require(
+                left["branch"] != right["branch"],
+                "lane set: writer branches must be distinct",
+            )
+            require(
+                Path(left["worktree_path"]) != Path(right["worktree_path"]),
+                "lane set: writer worktrees must be distinct",
+            )
+            require(
                 not any(
                     paths_overlap(left_path, right_path)
                     for left_path in left["owned_paths"]
@@ -705,7 +713,9 @@ def validate_ready_ack(text: Any, packet: Mapping[str, Any] | None = None) -> di
     return values
 
 
-def validate_capability_failure(text: Any) -> dict[str, str]:
+def validate_capability_failure(
+    text: Any, packet: Mapping[str, Any] | None = None
+) -> dict[str, str]:
     values = parse_field_block(text, CAPABILITY_FAILURE_FIELDS, "capability failure")
     require(values["STATUS"] == "capability_failure", "capability failure: invalid status")
     require(values["CAPABILITY"] == "required_skill", "capability failure: invalid capability")
@@ -714,7 +724,31 @@ def validate_capability_failure(text: Any) -> dict[str, str]:
         values["ROOT_ACTION"] == "execute_same_packet_serially",
         "capability failure: invalid ROOT_ACTION",
     )
+    if packet is not None:
+        require(
+            values["SKILL_NAME"] == packet["skill_name"],
+            "capability failure: SKILL_NAME mismatch",
+        )
+        require(
+            values["SKILL_PATH"] == packet["skill_path"],
+            "capability failure: SKILL_PATH mismatch",
+        )
     return values
+
+
+def parse_reported_paths(value: str, owner: str) -> list[str]:
+    if value == "none":
+        return []
+    paths = value.split(", ")
+    require(
+        ", ".join(paths) == value and all(paths),
+        f"{owner}: expected 'none' or a comma-space-separated path list",
+    )
+    return [normalize_repo_path(path, owner) for path in paths]
+
+
+def path_is_within(path: str, owner: str) -> bool:
+    return path == owner or path.startswith(f"{owner}/")
 
 
 def validate_completion_result(
@@ -730,10 +764,25 @@ def validate_completion_result(
     normalize_sha(values["HEAD_SHA"], "completion result HEAD_SHA")
     validate_absolute_path(values["CWD"], "completion result CWD")
     validate_branch(values["BRANCH"])
+    expected_actions = {
+        "completed": "integrate",
+        "blocked": "inspect_blocker",
+        "capability_failure": "execute_same_packet_serially",
+    }
     require(
-        values["PARENT_ACTION"] in {"integrate", "execute_same_packet_serially", "inspect_blocker"},
-        "completion result: invalid PARENT_ACTION",
+        values["PARENT_ACTION"] == expected_actions[values["STATUS"]],
+        "completion result: status/PARENT_ACTION mismatch",
     )
+    changed_paths = parse_reported_paths(values["CHANGED_PATHS"], "completion result CHANGED_PATHS")
+    forbidden_touched = parse_reported_paths(
+        values["FORBIDDEN_PATHS_TOUCHED"],
+        "completion result FORBIDDEN_PATHS_TOUCHED",
+    )
+    commit_status = values["COMMIT_STATUS"]
+    push_status = values["PUSH_STATUS"]
+    if commit_status not in {"not_authorized", "not_created"}:
+        normalize_sha(commit_status, "completion result COMMIT_STATUS")
+    nonempty_string(push_status, "completion result PUSH_STATUS")
     if packet is not None:
         for key, packet_key in (
             ("SKILL_ACK", "skill_name"),
@@ -748,6 +797,46 @@ def validate_completion_result(
                 actual.lower() == expected.lower() if key == "BASE_SHA" else actual == expected,
                 f"completion result: {key} mismatch",
             )
+        owned_paths = [str(path) for path in packet["owned_paths"]]
+        require(
+            all(
+                any(path_is_within(path, owned) for owned in owned_paths) for path in changed_paths
+            ),
+            "completion result: changed path outside owned paths",
+        )
+        require(
+            not any(
+                paths_overlap(path, forbidden)
+                for path in changed_paths
+                for forbidden in packet["forbidden_paths"]
+            ),
+            "completion result: changed path overlaps forbidden paths",
+        )
+        if packet["commit_authority"] == "not_authorized":
+            require(
+                commit_status == "not_authorized",
+                "completion result: unauthorized commit status",
+            )
+        if packet["push_authority"] == "not_authorized":
+            require(
+                push_status == "not_authorized",
+                "completion result: unauthorized push status",
+            )
+    if values["PARENT_ACTION"] == "integrate":
+        require(
+            not forbidden_touched,
+            "completion result: integration blocked by forbidden paths",
+        )
+        require(
+            re.search(r"\bpassed\b", values["TEST_RESULTS"], re.IGNORECASE) is not None
+            and re.search(r"\b(failed|error|not[_ ]run)\b", values["TEST_RESULTS"], re.IGNORECASE)
+            is None,
+            "completion result: integration requires passing tests",
+        )
+        require(
+            values["UNRESOLVED_RISKS"] == "none",
+            "completion result: integration blocked by unresolved risks",
+        )
     return values
 
 
@@ -1032,13 +1121,26 @@ def validate_fixtures(root: Path = ROOT) -> None:
             ),
         )
 
+    for case in data.get("lane_set_cases", []):
+        expect_case(
+            case,
+            lambda case=case: validate_lane_set(
+                [lane_cases[name]["packet"] for name in case["packets"]], root
+            ),
+        )
+
     for table_name, callback in (
         ("ready_ack_cases", validate_ready_ack),
         ("capability_failure_cases", validate_capability_failure),
         ("completion_result_cases", validate_completion_result),
     ):
         for case in data.get(table_name, []):
-            expect_case(case, lambda case=case, callback=callback: callback(case["text"]))
+            expect_case(
+                case,
+                lambda case=case, callback=callback: callback(
+                    case["text"], lane_cases[case["packet"]]["packet"]
+                ),
+            )
 
     for case in data.get("path_ownership_cases", []):
         expect_case(case, lambda case=case: validate_path_ownership(case["lanes"]))

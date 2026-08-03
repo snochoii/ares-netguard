@@ -144,6 +144,98 @@ def test_cross_lane_ancestor_overlap_is_rejected() -> None:
 
 
 @pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("branch", "codex/test-lane", "branches must be distinct"),
+        ("worktree_path", "/tmp/ares-netguard-test-lane", "worktrees must be distinct"),
+    ],
+)
+def test_parallel_writers_require_distinct_branch_and_worktree(
+    field: str, value: str, message: str
+) -> None:
+    first = _valid_lane_packet()
+    second = deepcopy(first)
+    second["branch"] = "codex/test-lane-two"
+    second["worktree_path"] = "/tmp/ares-netguard-test-lane-two"
+    second["owned_paths"] = ["src/ares_netguard/disjoint.py"]
+    second[field] = value
+    with pytest.raises(validator.ContractError, match=message):
+        validator.validate_lane_set([first, second], ROOT)
+
+
+def _valid_completion_result() -> str:
+    return "\n".join(
+        (
+            "STATUS: completed",
+            "SKILL_ACK: test-eval-engineering",
+            "SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md",
+            f"BASE_SHA: {'a' * 40}",
+            f"HEAD_SHA: {'b' * 40}",
+            "CWD: /tmp/ares-netguard-test-lane",
+            "BRANCH: codex/test-lane",
+            "CHANGED_PATHS: src/ares_netguard/example.py",
+            "FORBIDDEN_PATHS_TOUCHED: none",
+            "TEST_RESULTS: python3 -m pytest: passed",
+            "COMMIT_STATUS: not_authorized",
+            "PUSH_STATUS: not_authorized",
+            "UNRESOLVED_RISKS: none",
+            "PARENT_ACTION: integrate",
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "message"),
+    [
+        (
+            "CHANGED_PATHS: src/ares_netguard/example.py",
+            "CHANGED_PATHS: src/ares_netguard/outside.py",
+            "outside owned",
+        ),
+        (
+            "FORBIDDEN_PATHS_TOUCHED: none",
+            "FORBIDDEN_PATHS_TOUCHED: src/ares_netguard/other.py",
+            "forbidden paths",
+        ),
+        ("TEST_RESULTS: python3 -m pytest: passed", "TEST_RESULTS: pytest: failed", "tests"),
+        ("COMMIT_STATUS: not_authorized", f"COMMIT_STATUS: {'c' * 40}", "commit"),
+        ("PUSH_STATUS: not_authorized", "PUSH_STATUS: origin/codex/test-lane", "push"),
+        ("UNRESOLVED_RISKS: none", "UNRESOLVED_RISKS: blocker", "risks"),
+    ],
+)
+def test_completion_cannot_recommend_integration_with_blockers(
+    old: str, new: str, message: str
+) -> None:
+    with pytest.raises(validator.ContractError, match=message):
+        validator.validate_completion_result(
+            _valid_completion_result().replace(old, new), _valid_lane_packet()
+        )
+
+
+def test_acknowledgement_and_completion_are_bound_to_lane_packet() -> None:
+    packet = _valid_lane_packet()
+    acknowledgment = "\n".join(
+        (
+            "STATUS: ready",
+            "SKILL_ACK: test-eval-engineering",
+            "SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md",
+            f"BASE_SHA: {'a' * 40}",
+            "CWD: /tmp/ares-netguard-test-lane",
+            "BRANCH: codex/other-lane",
+        )
+    )
+    with pytest.raises(validator.ContractError, match="BRANCH mismatch"):
+        validator.validate_ready_ack(acknowledgment, packet)
+    with pytest.raises(validator.ContractError, match="BRANCH mismatch"):
+        validator.validate_completion_result(
+            _valid_completion_result().replace(
+                "BRANCH: codex/test-lane", "BRANCH: codex/other-lane"
+            ),
+            packet,
+        )
+
+
+@pytest.mark.parametrize(
     "path",
     [
         "AGENTS.md",

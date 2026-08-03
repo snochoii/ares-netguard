@@ -221,6 +221,60 @@ push_authority = "not_authorized"
 result_contract = "lane_result_v1"
 
 [[lane_packet_cases]]
+name = "valid_lane_packet_b"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement a disjoint bounded test file."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-b"
+branch = "codex/lane-b"
+owned_paths = ["src/ares_netguard/example_lane_b.py"]
+forbidden_paths = ["src/ares_netguard/other_lane.py"]
+required_tests = ["python3 -m pytest tests/unit/test_example_b.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "same_branch_lane_packet"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement a disjoint file on a conflicting branch."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-c"
+branch = "codex/lane-a"
+owned_paths = ["src/ares_netguard/example_lane_c.py"]
+forbidden_paths = []
+required_tests = ["python3 -m pytest tests/unit/test_example_c.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "same_worktree_lane_packet"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement a disjoint file in a conflicting worktree."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "codex/lane-d"
+owned_paths = ["src/ares_netguard/example_lane_d.py"]
+forbidden_paths = []
+required_tests = ["python3 -m pytest tests/unit/test_example_d.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
 name = "main_lane_rejected"
 valid = false
 [lane_packet_cases.packet]
@@ -286,8 +340,24 @@ original = "valid_lane_packet"
 fallback = "changed_but_valid_lane_packet"
 valid = false
 
+[[lane_set_cases]]
+name = "disjoint_writers_accepted"
+packets = ["valid_lane_packet", "valid_lane_packet_b"]
+valid = true
+
+[[lane_set_cases]]
+name = "same_writer_branch_rejected"
+packets = ["valid_lane_packet", "same_branch_lane_packet"]
+valid = false
+
+[[lane_set_cases]]
+name = "same_writer_worktree_rejected"
+packets = ["valid_lane_packet", "same_worktree_lane_packet"]
+valid = false
+
 [[ready_ack_cases]]
 name = "valid_ready_ack"
+packet = "valid_lane_packet"
 valid = true
 text = """STATUS: ready
 SKILL_ACK: test-eval-engineering
@@ -298,6 +368,7 @@ BRANCH: codex/lane-a"""
 
 [[ready_ack_cases]]
 name = "ready_ack_missing_branch"
+packet = "valid_lane_packet"
 valid = false
 text = """STATUS: ready
 SKILL_ACK: test-eval-engineering
@@ -307,6 +378,7 @@ CWD: /tmp/ares-netguard-lane-a"""
 
 [[ready_ack_cases]]
 name = "ready_ack_wrong_status"
+packet = "valid_lane_packet"
 valid = false
 text = """STATUS: completed
 SKILL_ACK: test-eval-engineering
@@ -315,8 +387,20 @@ BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 CWD: /tmp/ares-netguard-lane-a
 BRANCH: codex/lane-a"""
 
+[[ready_ack_cases]]
+name = "ready_ack_packet_branch_mismatch"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: ready
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/different-lane"""
+
 [[capability_failure_cases]]
 name = "valid_capability_failure"
+packet = "valid_lane_packet"
 valid = true
 text = """STATUS: capability_failure
 CAPABILITY: required_skill
@@ -326,6 +410,7 @@ ROOT_ACTION: execute_same_packet_serially"""
 
 [[capability_failure_cases]]
 name = "capability_failure_wrong_action"
+packet = "valid_lane_packet"
 valid = false
 text = """STATUS: capability_failure
 CAPABILITY: required_skill
@@ -333,8 +418,19 @@ SKILL_NAME: test-eval-engineering
 SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
 ROOT_ACTION: choose_new_packet"""
 
+[[capability_failure_cases]]
+name = "capability_failure_packet_skill_mismatch"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: capability_failure
+CAPABILITY: required_skill
+SKILL_NAME: python-ml-lab
+SKILL_PATH: .agents/skills/python-ml-lab/SKILL.md
+ROOT_ACTION: execute_same_packet_serially"""
+
 [[completion_result_cases]]
 name = "valid_completion_result"
+packet = "valid_lane_packet"
 valid = true
 text = """STATUS: completed
 SKILL_ACK: test-eval-engineering
@@ -353,6 +449,7 @@ PARENT_ACTION: integrate"""
 
 [[completion_result_cases]]
 name = "completion_missing_head"
+packet = "valid_lane_packet"
 valid = false
 text = """STATUS: blocked
 SKILL_ACK: test-eval-engineering
@@ -370,6 +467,7 @@ PARENT_ACTION: inspect_blocker"""
 
 [[completion_result_cases]]
 name = "completion_invalid_status"
+packet = "valid_lane_packet"
 valid = false
 text = """STATUS: ready
 SKILL_ACK: test-eval-engineering
@@ -385,6 +483,63 @@ COMMIT_STATUS: not_created
 PUSH_STATUS: not_pushed
 UNRESOLVED_RISKS: blocker
 PARENT_ACTION: inspect_blocker"""
+
+[[completion_result_cases]]
+name = "completion_out_of_scope_change"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: src/ares_netguard/unowned.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: not_authorized
+PUSH_STATUS: not_authorized
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "completion_blockers_cannot_integrate"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: src/ares_netguard/example_lane.py
+FORBIDDEN_PATHS_TOUCHED: src/ares_netguard/other_lane.py
+TEST_RESULTS: python3 -m pytest: failed
+COMMIT_STATUS: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+PUSH_STATUS: origin/codex/lane-a
+UNRESOLVED_RISKS: blocker
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "completion_packet_branch_mismatch"
+packet = "valid_lane_packet"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/different-lane
+CHANGED_PATHS: src/ares_netguard/example_lane.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: not_authorized
+PUSH_STATUS: not_authorized
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
 
 [[path_ownership_cases]]
 name = "same_file_rejected"
