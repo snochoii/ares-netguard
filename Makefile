@@ -8,9 +8,9 @@ export MPLCONFIGDIR
 FOUNDATION_PYTHON ?= $(PYTHON)
 CHRONOS_MODEL_ROOT ?=
 
-.PHONY: verify verify-rust-core fixture-smoke verify-foundation-forecast
+.PHONY: verify verify-codex-workflow verify-rust-core fixture-smoke verify-foundation-forecast
 
-verify:
+verify: verify-codex-workflow
 	$(PYTHON) -m ruff check .
 	$(PYTHON) -m ruff format --check .
 	$(PYTHON) -m compileall -q src tests
@@ -19,6 +19,10 @@ verify:
 	git diff --cached --check
 	bash scripts/check_no_generated_artifacts.sh --tracked
 	bash scripts/check_no_generated_artifacts.sh --staged
+
+verify-codex-workflow:
+	$(PYTHON) scripts/validate_codex_workflow.py all
+	$(PYTHON) -m pytest -q tests/unit/test_codex_workflow_contract.py
 
 verify-rust-core:
 	cd apps/rust-core && $(CARGO) fmt --check

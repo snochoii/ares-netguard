@@ -1,0 +1,537 @@
+[meta]
+schema = "codex_workflow_contract_fixtures_v1"
+
+[[branch_cases]]
+name = "main_rejected"
+branch = "main"
+valid = false
+
+[[branch_cases]]
+name = "empty_rejected"
+branch = ""
+valid = false
+
+[[branch_cases]]
+name = "detached_rejected"
+branch = "HEAD"
+valid = false
+
+[[branch_cases]]
+name = "codex_branch_accepted"
+branch = "codex/workflow-a3"
+valid = true
+
+[[branch_cases]]
+name = "other_non_main_accepted"
+branch = "feature/workflow-a3"
+valid = true
+
+[[receipt_cases]]
+name = "positive_receipt"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = true
+ready = true
+
+[[receipt_cases]]
+name = "negative_receipt_is_structural"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: no
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+FINDINGS: blocking issue"""
+valid = true
+ready = false
+
+[[receipt_cases]]
+name = "uppercase_sha_is_normalized"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: yes
+HEAD_SHA: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"""
+valid = true
+ready = true
+
+[[receipt_cases]]
+name = "missing_output"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = ""
+valid = false
+
+[[receipt_cases]]
+name = "malformed_first_line"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "leading_whitespace"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """ MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "markdown_emphasis"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """**MERGE_READY: yes**
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "case_variation"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """Merge_Ready: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "missing_second_line"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = "MERGE_READY: yes"
+valid = false
+
+[[receipt_cases]]
+name = "malformed_sha"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "stale_sha"
+current_head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+text = """MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "marker_only_later"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """Review summary
+MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "schema_description_is_not_receipt"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: yes | no
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[receipt_cases]]
+name = "duplicate_header"
+current_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+text = """MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+MERGE_READY: yes
+HEAD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+valid = false
+
+[[review_packet_cases]]
+name = "valid_technology_choice"
+valid = true
+[review_packet_cases.packet]
+review_category = "technology_choice"
+objective = "Evaluate the bounded runtime choice."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+head_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+inspected_paths = ["pyproject.toml"]
+required_evidence = ["Supported Python range"]
+decision_criteria = ["The choice preserves repository policy"]
+output_contract = "sha_bound_review_v1"
+stopping_conditions = ["Stop on missing evidence"]
+
+[[review_packet_cases]]
+name = "invalid_category"
+valid = false
+[review_packet_cases.packet]
+review_category = "security_review"
+objective = "Evaluate a bounded choice."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+head_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+inspected_paths = ["pyproject.toml"]
+required_evidence = ["Evidence"]
+decision_criteria = ["Criterion"]
+output_contract = "sha_bound_review_v1"
+stopping_conditions = ["Stop"]
+
+[[review_packet_cases]]
+name = "missing_stopping_conditions"
+valid = false
+[review_packet_cases.packet]
+review_category = "product_fit"
+objective = "Evaluate product fit."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+head_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+inspected_paths = ["docs/MERGE_POLICY.md"]
+required_evidence = ["Evidence"]
+decision_criteria = ["Criterion"]
+output_contract = "sha_bound_review_v1"
+
+[[review_packet_cases]]
+name = "wrong_output_contract"
+valid = false
+[review_packet_cases.packet]
+review_category = "architectural_tradeoff"
+objective = "Evaluate topology."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+head_sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+inspected_paths = ["docs/MERGE_POLICY.md"]
+required_evidence = ["Evidence"]
+decision_criteria = ["Criterion"]
+output_contract = "review_v0"
+stopping_conditions = ["Stop"]
+
+[[lane_packet_cases]]
+name = "valid_lane_packet"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement one bounded test file."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "codex/lane-a"
+owned_paths = ["src/ares_netguard/example_lane.py"]
+forbidden_paths = ["src/ares_netguard/other_lane.py"]
+required_tests = ["python3 -m pytest tests/unit/test_example.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "changed_but_valid_lane_packet"
+valid = true
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement a different bounded test file."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "codex/lane-a"
+owned_paths = ["src/ares_netguard/example_lane.py"]
+forbidden_paths = ["src/ares_netguard/other_lane.py"]
+required_tests = ["python3 -m pytest tests/unit/test_example.py"]
+stopping_conditions = ["Stop on shared-path need"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "main_lane_rejected"
+valid = false
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement one bounded test file."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "main"
+owned_paths = ["src/ares_netguard/example_lane.py"]
+forbidden_paths = []
+required_tests = ["python3 -m pytest tests/unit/test_example.py"]
+stopping_conditions = ["Stop"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "shared_chokepoint_rejected"
+valid = false
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Modify shared Python configuration."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "codex/lane-a"
+owned_paths = ["pyproject.toml"]
+forbidden_paths = []
+required_tests = ["python3 -m pytest"]
+stopping_conditions = ["Stop"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[lane_packet_cases]]
+name = "owned_forbidden_overlap"
+valid = false
+[lane_packet_cases.packet]
+skill_name = "test-eval-engineering"
+skill_path = ".agents/skills/test-eval-engineering/SKILL.md"
+objective = "Implement one bounded test file."
+base_sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worktree_path = "/tmp/ares-netguard-lane-a"
+branch = "codex/lane-a"
+owned_paths = ["src/ares_netguard/example_lane.py"]
+forbidden_paths = ["src/ares_netguard"]
+required_tests = ["python3 -m pytest"]
+stopping_conditions = ["Stop"]
+commit_authority = "not_authorized"
+push_authority = "not_authorized"
+result_contract = "lane_result_v1"
+
+[[fallback_packet_cases]]
+name = "unchanged_packet_accepted"
+original = "valid_lane_packet"
+fallback = "valid_lane_packet"
+valid = true
+
+[[fallback_packet_cases]]
+name = "changed_packet_rejected"
+original = "valid_lane_packet"
+fallback = "changed_but_valid_lane_packet"
+valid = false
+
+[[ready_ack_cases]]
+name = "valid_ready_ack"
+valid = true
+text = """STATUS: ready
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a"""
+
+[[ready_ack_cases]]
+name = "ready_ack_missing_branch"
+valid = false
+text = """STATUS: ready
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a"""
+
+[[ready_ack_cases]]
+name = "ready_ack_wrong_status"
+valid = false
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a"""
+
+[[capability_failure_cases]]
+name = "valid_capability_failure"
+valid = true
+text = """STATUS: capability_failure
+CAPABILITY: required_skill
+SKILL_NAME: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+ROOT_ACTION: execute_same_packet_serially"""
+
+[[capability_failure_cases]]
+name = "capability_failure_wrong_action"
+valid = false
+text = """STATUS: capability_failure
+CAPABILITY: required_skill
+SKILL_NAME: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+ROOT_ACTION: choose_new_packet"""
+
+[[completion_result_cases]]
+name = "valid_completion_result"
+valid = true
+text = """STATUS: completed
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: src/ares_netguard/example_lane.py
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: python3 -m pytest: passed
+COMMIT_STATUS: not_authorized
+PUSH_STATUS: not_authorized
+UNRESOLVED_RISKS: none
+PARENT_ACTION: integrate"""
+
+[[completion_result_cases]]
+name = "completion_missing_head"
+valid = false
+text = """STATUS: blocked
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: none
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: not_run
+COMMIT_STATUS: not_created
+PUSH_STATUS: not_pushed
+UNRESOLVED_RISKS: blocker
+PARENT_ACTION: inspect_blocker"""
+
+[[completion_result_cases]]
+name = "completion_invalid_status"
+valid = false
+text = """STATUS: ready
+SKILL_ACK: test-eval-engineering
+SKILL_PATH: .agents/skills/test-eval-engineering/SKILL.md
+BASE_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+HEAD_SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+CWD: /tmp/ares-netguard-lane-a
+BRANCH: codex/lane-a
+CHANGED_PATHS: none
+FORBIDDEN_PATHS_TOUCHED: none
+TEST_RESULTS: not_run
+COMMIT_STATUS: not_created
+PUSH_STATUS: not_pushed
+UNRESOLVED_RISKS: blocker
+PARENT_ACTION: inspect_blocker"""
+
+[[path_ownership_cases]]
+name = "same_file_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["src/ares_netguard/shared.py"]
+forbidden_paths = []
+[[path_ownership_cases.lanes]]
+name = "lane-b"
+kind = "writer"
+owned_paths = ["src/ares_netguard/shared.py"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "owned_forbidden_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["src/ares_netguard/models"]
+forbidden_paths = ["src/ares_netguard/models/shared.py"]
+
+[[path_ownership_cases]]
+name = "pyproject_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["pyproject.toml"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "root_dependency_files_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = [
+  "requirements.txt",
+  "requirements-dev.txt",
+  "requirements-foundation-forecast.in",
+  "requirements-foundation-forecast.lock",
+]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "codex_ancestor_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = [".codex"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "governance_skill_ancestor_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = [".agents/skills"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "workflow_ancestor_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = [".github/workflows"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "disjoint_product_paths_accepted"
+valid = true
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["src/ares_netguard/models/new_model.py"]
+forbidden_paths = ["src/ares_netguard/graph"]
+[[path_ownership_cases.lanes]]
+name = "lane-b"
+kind = "writer"
+owned_paths = ["src/ares_netguard/graph/new_graph.py"]
+forbidden_paths = ["src/ares_netguard/models"]
+
+[[path_ownership_cases]]
+name = "read_only_research_not_writer_ownership"
+valid = true
+[[path_ownership_cases.lanes]]
+name = "research-a"
+kind = "read-only"
+owned_paths = ["docs/MERGE_POLICY.md"]
+forbidden_paths = []
+[[path_ownership_cases.lanes]]
+name = "research-b"
+kind = "read-only"
+owned_paths = ["docs/MERGE_POLICY.md"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "absolute_path_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["/tmp/not-repository-relative"]
+forbidden_paths = []
+
+[[path_ownership_cases]]
+name = "traversal_rejected"
+valid = false
+[[path_ownership_cases.lanes]]
+name = "lane-a"
+kind = "writer"
+owned_paths = ["src/../Makefile"]
+forbidden_paths = []
+
+[[identifier_cases]]
+name = "known_identifiers"
+references = ["netguard-orchestrator", "netguard-correctness-reviewer"]
+valid_identifiers = ["netguard-orchestrator", "netguard-correctness-reviewer"]
+allowlist = []
+valid = true
+
+[[identifier_cases]]
+name = "dangling_identifier"
+references = ["netguard-orchestrator", "netguard-removed-reviewer"]
+valid_identifiers = ["netguard-orchestrator"]
+allowlist = []
+valid = false
+
+[[identifier_cases]]
+name = "explicit_allowlist"
+references = ["netguard-orchestrator", "netguard-prose-category"]
+valid_identifiers = ["netguard-orchestrator"]
+allowlist = ["netguard-prose-category"]
+valid = true
+
+[[fallback_order_cases]]
+name = "canonical_order"
+order = ["verified_named_agent", "verified_generic_child", "SIMULATED_ROOT_SERIAL"]
+valid = true
+
+[[fallback_order_cases]]
+name = "root_before_generic_rejected"
+order = ["verified_named_agent", "SIMULATED_ROOT_SERIAL", "verified_generic_child"]
+valid = false
