@@ -95,6 +95,18 @@ def test_install_report_requires_one_locked_wheel_and_matching_hash(tmp_path: Pa
         environment._verify_install_report(report_path, wheelhouse, locked)
 
 
+def test_install_report_and_manifest_parsing_reject_duplicate_keys(tmp_path: Path) -> None:
+    install_report = tmp_path / "install-report.json"
+    install_report.write_text('{"install":[],"install":[]}', encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate JSON object keys"):
+        environment._strict_json(install_report)
+
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"revision":"bad","revision":"good"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate JSON object keys"):
+        environment._strict_json(manifest)
+
+
 def test_model_preflight_rejects_extra_files_and_hash_drift(tmp_path: Path) -> None:
     model = tmp_path / "model"
     model.mkdir(mode=0o700)

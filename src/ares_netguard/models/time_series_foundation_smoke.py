@@ -439,7 +439,7 @@ def run_smoke(
     attestation_path = Path(environment_attestation_path).resolve()
     if not attestation_path.is_relative_to(isolation_root):
         raise ValueError("B1 environment attestation must be under the isolated root")
-    attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+    attestation = _loads_strict_json(attestation_path.read_text(encoding="utf-8"))
     validate_runtime_attestation(attestation)
     parent_netns = os.readlink("/proc/self/ns/net")
     env = _isolated_environment(isolation_root)
@@ -476,7 +476,7 @@ def run_smoke(
         run_dirs.append(run_dir)
 
     analytical_reports = [
-        json.loads((run_dir / "analytical-evidence.json").read_text(encoding="utf-8"))
+        _loads_strict_json((run_dir / "analytical-evidence.json").read_text(encoding="utf-8"))
         for run_dir in run_dirs
     ]
     for report in analytical_reports:
@@ -485,7 +485,7 @@ def run_smoke(
         raise RuntimeError("B1_REAL_MODEL_GATE: blocked: analytical replay is not exact")
     analytical_sha = _canonical_sha256(analytical_reports[0])
     run_results = [
-        json.loads((run_dir / "operational-run.json").read_text(encoding="utf-8"))
+        _loads_strict_json((run_dir / "operational-run.json").read_text(encoding="utf-8"))
         for run_dir in run_dirs
     ]
     operational = {
@@ -530,6 +530,25 @@ def run_smoke(
 def _exact_fields(raw: Mapping[str, Any], expected: frozenset[str], field: str) -> None:
     if set(raw) != expected:
         raise ValueError(f"{field} fields are invalid")
+
+
+def _loads_strict_json(text: str) -> Any:
+    def reject_constant(value: str) -> NoReturn:
+        raise ValueError(f"non-strict JSON constant is not allowed: {value}")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON object keys are not allowed")
+            result[key] = value
+        return result
+
+    return json.loads(
+        text,
+        parse_constant=reject_constant,
+        object_pairs_hook=reject_duplicate_keys,
+    )
 
 
 def validate_analytical_evidence(report: Mapping[str, Any]) -> None:

@@ -569,6 +569,13 @@ def test_operational_evidence_separates_timing_from_exact_reproducibility() -> N
     assert report["reproducibility"]["exact_match"] is True
 
 
+def test_foundation_smoke_strict_json_rejects_duplicate_keys_and_constants() -> None:
+    with pytest.raises(ValueError, match="duplicate JSON object keys"):
+        foundation_smoke._loads_strict_json('{"model_revision":"bad","model_revision":"good"}')
+    with pytest.raises(ValueError, match="non-strict JSON constant"):
+        foundation_smoke._loads_strict_json('{"peak_rss_kib":NaN}')
+
+
 @pytest.mark.parametrize(
     ("mutate", "error"),
     [
