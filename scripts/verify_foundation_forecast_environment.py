@@ -32,8 +32,19 @@ SOURCE_IDENTITIES = {
 }
 LOCKED_REQUIREMENT_RE = re.compile(r"^([A-Za-z0-9_.-]+)==([^ \\\n]+)")
 HASH_RE = re.compile(r"--hash=sha256:([0-9a-f]{64})")
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 EXPECTED_MODEL_FILES = frozenset({"config.json", "model.safetensors"})
+EXPECTED_MODEL_FILE_ATTESTATION = [
+    {
+        "name": "config.json",
+        "sha256": "278f0086733031635fb1c861cb01c1bad6477420c7fcb19381a2993e335785e0",
+        "size_bytes": 1120,
+    },
+    {
+        "name": "model.safetensors",
+        "sha256": "75068728d376d2bec670379eeef4bfb4d24c0cfe24d957451f8d19b447030a32",
+        "size_bytes": 34622352,
+    },
+]
 ISOLATION_ROOT_RE = re.compile(r"^/tmp/ares-netguard-b1\.[A-Za-z0-9]+$")
 ATTESTATION_FIELDS = frozenset(
     {
@@ -306,17 +317,23 @@ def validate_attestation(attestation: Mapping[str, Any]) -> None:
         or attestation["source_identities"] != SOURCE_IDENTITIES
         or attestation["runtime_platform"] != "cpython312_linux_x86_64_cpu"
         or attestation["package_count"] != 41
+        or attestation["package_set_sha256"]
+        != "065eb94ed00987015e097f936a19175cab763e99d3d62848c18000eb70fcef5b"
         or attestation["wheel_count"] != 41
+        or attestation["wheel_set_sha256"]
+        != "deb8a9616a2648c468ae096a867d881f32ec24bba00c0e7323af887895a7bf5b"
         or attestation["model_id"] != "amazon/chronos-bolt-tiny"
         or attestation["model_revision"] != "a0e552de83495b5c28c14c71c374f3e33280b340"
+        or attestation["model_files"] != EXPECTED_MODEL_FILE_ATTESTATION
         or attestation["model_bundle_sha256"]
         != "9aefb3d869a0a475c81a8685ffaeb99c63a3e3ee1cfc03befeb7cd47b58c00ab"
         or attestation["pip_check_passed"] is not True
     ):
         raise ValueError("environment attestation contract drifted")
-    for field in ("package_set_sha256", "wheel_set_sha256"):
-        if not isinstance(attestation[field], str) or not SHA256_RE.fullmatch(attestation[field]):
-            raise ValueError(f"environment attestation {field} is invalid")
+    if not isinstance(attestation["python"], str) or not re.fullmatch(
+        r"3\.12\.\d+", attestation["python"]
+    ):
+        raise ValueError("environment attestation Python version is invalid")
 
 
 def _atomic_dump(report: Mapping[str, Any], output: Path) -> None:

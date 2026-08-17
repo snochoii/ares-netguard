@@ -684,6 +684,91 @@ def validate_forecast_evaluation(report: Mapping[str, Any]) -> None:
         raise ValueError("forecast evaluation non_claims are invalid")
 
 
+def validate_replay_analytical_consistency(
+    proxy_report: Mapping[str, Any],
+    chronos_report: Mapping[str, Any],
+    anomaly_labels: Sequence[Mapping[str, Any]],
+    evaluation: Mapping[str, Any],
+) -> None:
+    """Cross-check replay metrics against their exact residual rows and labels."""
+    time_series_residual.validate_residual_report(proxy_report)
+    time_series_residual.validate_residual_report(chronos_report)
+    _validate_replay_expected_report(proxy_report, pretrained=False)
+    _validate_replay_expected_report(chronos_report, pretrained=True)
+    validate_forecast_evaluation(evaluation)
+    if evaluation["schema_version"] != REPLAY_REPORT_SCHEMA_VERSION:
+        raise ValueError("analytical consistency requires the replay evaluation schema")
+
+    labels = [_validate_label(row) for row in anomaly_labels]
+    label_keys = [_row_key(row) for row in labels]
+    if (
+        len(labels) != REPLAY_ANOMALY_COUNT
+        or label_keys != sorted(label_keys)
+        or len(label_keys) != len(set(label_keys))
+    ):
+        raise ValueError("analytical consistency anomaly labels are invalid")
+
+    proxy_rows = _rows_by_key(proxy_report)
+    chronos_rows = _rows_by_key(chronos_report)
+    if list(proxy_rows) != list(chronos_rows):
+        raise ValueError("analytical residual reports contain different row keys")
+    if not set(label_keys) <= set(proxy_rows):
+        raise ValueError("analytical labels must identify residual report rows")
+
+    index_by_key: dict[RowKey, int] = {}
+    series_counts: Counter[tuple[str, str]] = Counter()
+    for key in proxy_rows:
+        if proxy_rows[key]["actual_value"] != chronos_rows[key]["actual_value"]:
+            raise ValueError("analytical residual reports contain different actual values")
+        timestamp = datetime.fromisoformat(key[2].replace("Z", "+00:00"))
+        elapsed = (timestamp - REPLAY_START).total_seconds()
+        if elapsed < 0 or elapsed % REPLAY_CADENCE_SECONDS:
+            raise ValueError("analytical residual report timestamps are off the replay grid")
+        index = int(elapsed // REPLAY_CADENCE_SECONDS)
+        if not REPLAY_SCORING_OFFSET <= index < REPLAY_OBSERVATIONS_PER_SERIES:
+            raise ValueError("analytical residual report row is outside scoring boundaries")
+        index_by_key[key] = index
+        series_counts[(key[0], key[1])] += 1
+    if set(series_counts) != set(REPLAY_SERIES) or set(series_counts.values()) != {
+        REPLAY_SCORED_PER_SERIES
+    }:
+        raise ValueError("analytical residual reports do not cover the replay scoring cohort")
+
+    anomaly_keys = set(label_keys)
+    for result, contract in zip(evaluation["regime_results"], REPLAY_REGIMES, strict=True):
+        start = int(contract["start_index"])
+        end = int(contract["end_index"])
+        keys = [key for key in proxy_rows if start <= index_by_key[key] <= end]
+        proxy_result = _backend_metrics(
+            proxy_report,
+            {key: proxy_rows[key] for key in keys},
+            anomaly_keys & set(keys),
+        )
+        chronos_result = _backend_metrics(
+            chronos_report,
+            {key: chronos_rows[key] for key in keys},
+            anomaly_keys & set(keys),
+        )
+        expected_results = sorted(
+            [proxy_result, chronos_result], key=lambda item: item["backend_id"]
+        )
+        if result["backend_results"] != expected_results:
+            raise ValueError(f"analytical regime {contract['regime_id']} metrics are inconsistent")
+        if result["deltas"] != _metric_deltas(proxy_result, chronos_result):
+            raise ValueError(f"analytical regime {contract['regime_id']} deltas are inconsistent")
+
+    proxy_aggregate = _backend_metrics(proxy_report, proxy_rows, anomaly_keys)
+    chronos_aggregate = _backend_metrics(chronos_report, chronos_rows, anomaly_keys)
+    expected_aggregate = sorted(
+        [proxy_aggregate, chronos_aggregate], key=lambda item: item["backend_id"]
+    )
+    aggregate = evaluation["aggregate"]
+    if aggregate["backend_results"] != expected_aggregate:
+        raise ValueError("analytical aggregate metrics are inconsistent")
+    if aggregate["deltas"] != _metric_deltas(proxy_aggregate, chronos_aggregate):
+        raise ValueError("analytical aggregate deltas are inconsistent")
+
+
 def _validate_forecast_replay_evaluation(report: Mapping[str, Any]) -> None:
     _require_exact_fields(report, REPLAY_REPORT_FIELDS, "replay evaluation")
     if report["evaluation_scope"] != REPLAY_EVALUATION_SCOPE:

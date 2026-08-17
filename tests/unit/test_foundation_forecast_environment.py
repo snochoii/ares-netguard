@@ -141,17 +141,17 @@ def test_attestation_rejects_source_or_hash_drift() -> None:
         "python": "3.12.3",
         "runtime_platform": "cpython312_linux_x86_64_cpu",
         "package_count": 41,
-        "package_set_sha256": "a" * 64,
+        "package_set_sha256": "065eb94ed00987015e097f936a19175cab763e99d3d62848c18000eb70fcef5b",
         "wheel_count": 41,
-        "wheel_set_sha256": "b" * 64,
+        "wheel_set_sha256": "deb8a9616a2648c468ae096a867d881f32ec24bba00c0e7323af887895a7bf5b",
         "model_id": "amazon/chronos-bolt-tiny",
         "model_revision": "a0e552de83495b5c28c14c71c374f3e33280b340",
-        "model_files": [],
+        "model_files": list(environment.EXPECTED_MODEL_FILE_ATTESTATION),
         "model_bundle_sha256": "9aefb3d869a0a475c81a8685ffaeb99c63a3e3ee1cfc03befeb7cd47b58c00ab",
         "pip_check_passed": True,
     }
     environment.validate_attestation(attestation)
 
     attestation["wheel_set_sha256"] = "invalid"
-    with pytest.raises(ValueError, match="wheel_set_sha256"):
+    with pytest.raises(ValueError, match="contract drifted"):
         environment.validate_attestation(attestation)

@@ -141,6 +141,24 @@ def _operational_run(run_id: str, *, latency: int) -> dict[str, object]:
     }
 
 
+def _runtime_attestation() -> dict[str, object]:
+    return {
+        "schema_version": "foundation_forecast_environment_attestation.v0",
+        "source_identities": dict(foundation_smoke.EXPECTED_SOURCE_IDENTITIES),
+        "python": "3.12.3",
+        "runtime_platform": "cpython312_linux_x86_64_cpu",
+        "package_count": 41,
+        "package_set_sha256": ("065eb94ed00987015e097f936a19175cab763e99d3d62848c18000eb70fcef5b"),
+        "wheel_count": 41,
+        "wheel_set_sha256": ("deb8a9616a2648c468ae096a867d881f32ec24bba00c0e7323af887895a7bf5b"),
+        "model_id": "amazon/chronos-bolt-tiny",
+        "model_revision": "a0e552de83495b5c28c14c71c374f3e33280b340",
+        "model_files": json.loads(json.dumps(foundation_smoke.EXPECTED_MODEL_FILES)),
+        "model_bundle_sha256": ("9aefb3d869a0a475c81a8685ffaeb99c63a3e3ee1cfc03befeb7cd47b58c00ab"),
+        "pip_check_passed": True,
+    }
+
+
 def _operational_evidence() -> dict[str, object]:
     runs = [_operational_run("run-1", latency=10), _operational_run("run-2", latency=20)]
     return {
@@ -153,7 +171,7 @@ def _operational_evidence() -> dict[str, object]:
             "peak_rss_method": "resource.getrusage_RUSAGE_SELF_ru_maxrss",
             "peak_rss_unit": "KiB",
         },
-        "runtime_attestation": {"environment": "pinned"},
+        "runtime_attestation": _runtime_attestation(),
         "run_results": runs,
         "reproducibility": {
             "run_count": 2,
@@ -575,6 +593,14 @@ def test_operational_evidence_separates_timing_from_exact_reproducibility() -> N
         (
             lambda report: report["run_results"][0].__setitem__("analytical_sha256", "A" * 64),
             "analytical_sha256",
+        ),
+        (
+            lambda report: report["run_results"][1].__setitem__("run_id", "run-1"),
+            "distinct ordered run IDs",
+        ),
+        (
+            lambda report: report["runtime_attestation"].__setitem__("model_revision", "0" * 40),
+            "runtime attestation contract drifted",
         ),
     ],
 )

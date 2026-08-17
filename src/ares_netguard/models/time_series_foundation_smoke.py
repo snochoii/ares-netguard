@@ -33,7 +33,7 @@ from ares_netguard.models.time_series_forecast_evaluation import (
     generate_forecast_replay_evaluation,
     load_anomaly_labels,
     load_replay_anomaly_labels,
-    validate_forecast_evaluation,
+    validate_replay_analytical_consistency,
 )
 from ares_netguard.models.time_series_residual import (
     _atomic_write_text,
@@ -112,6 +112,47 @@ REPRODUCIBILITY_FIELDS = frozenset(
 EXPECTED_INFERENCE_COUNT = 544
 AUDIT_EVENTS = frozenset({"subprocess.Popen", "os.system", "os.posix_spawn", "os.fork"})
 LOWER_HEX = frozenset("0123456789abcdef")
+RUNTIME_ATTESTATION_FIELDS = frozenset(
+    {
+        "schema_version",
+        "source_identities",
+        "python",
+        "runtime_platform",
+        "package_count",
+        "package_set_sha256",
+        "wheel_count",
+        "wheel_set_sha256",
+        "model_id",
+        "model_revision",
+        "model_files",
+        "model_bundle_sha256",
+        "pip_check_passed",
+    }
+)
+EXPECTED_SOURCE_IDENTITIES = {
+    "requirements-foundation-forecast.in": (
+        "29ec8a1dbe075e9d49ff6511fc01a627f21d5fe79f0a461ab44919c30b7cd60d"
+    ),
+    "requirements-foundation-forecast.lock": (
+        "59301d09b3efc73a20466d599d9a56a9634d0c42e001d41947eab2323b677b2e"
+    ),
+    "pyproject.toml": "c5c0df00a1767ef8b63607831e6e6eee45f293bfc110572f1aa39912f3c701ef",
+    "src/ares_netguard/models/manifests/chronos_bolt_tiny_v1.json": (
+        "93d6747444e8db71f7aaa9baf601cfdb67f8860b4fb6d953c0203189581dec3a"
+    ),
+}
+EXPECTED_MODEL_FILES = [
+    {
+        "name": "config.json",
+        "sha256": "278f0086733031635fb1c861cb01c1bad6477420c7fcb19381a2993e335785e0",
+        "size_bytes": 1120,
+    },
+    {
+        "name": "model.safetensors",
+        "sha256": "75068728d376d2bec670379eeef4bfb4d24c0cfe24d957451f8d19b447030a32",
+        "size_bytes": 34622352,
+    },
+]
 
 
 class _TimedBackend:
@@ -399,6 +440,7 @@ def run_smoke(
     if not attestation_path.is_relative_to(isolation_root):
         raise ValueError("B1 environment attestation must be under the isolated root")
     attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+    validate_runtime_attestation(attestation)
     parent_netns = os.readlink("/proc/self/ns/net")
     env = _isolated_environment(isolation_root)
 
@@ -515,7 +557,12 @@ def validate_analytical_evidence(report: Mapping[str, Any]) -> None:
     evaluation = report["evaluation"]
     if not isinstance(evaluation, Mapping):
         raise ValueError("analytical evidence evaluation must be an object")
-    validate_forecast_evaluation(evaluation)
+    validate_replay_analytical_consistency(
+        report["proxy_residual_report"],
+        report["chronos_residual_report"],
+        normalized_labels,
+        evaluation,
+    )
 
 
 def _non_negative_integer(value: Any, field: str, *, positive: bool = False) -> int:
@@ -526,6 +573,33 @@ def _non_negative_integer(value: Any, field: str, *, positive: bool = False) -> 
 
 def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and set(value) <= LOWER_HEX
+
+
+def validate_runtime_attestation(attestation: Any) -> None:
+    if not isinstance(attestation, Mapping):
+        raise ValueError("runtime attestation must be an object")
+    _exact_fields(attestation, RUNTIME_ATTESTATION_FIELDS, "runtime attestation")
+    if (
+        attestation["schema_version"] != "foundation_forecast_environment_attestation.v0"
+        or attestation["source_identities"] != EXPECTED_SOURCE_IDENTITIES
+        or not isinstance(attestation["python"], str)
+        or not attestation["python"].startswith("3.12.")
+        or not attestation["python"][5:].isdigit()
+        or attestation["runtime_platform"] != "cpython312_linux_x86_64_cpu"
+        or attestation["package_count"] != 41
+        or attestation["package_set_sha256"]
+        != "065eb94ed00987015e097f936a19175cab763e99d3d62848c18000eb70fcef5b"
+        or attestation["wheel_count"] != 41
+        or attestation["wheel_set_sha256"]
+        != "deb8a9616a2648c468ae096a867d881f32ec24bba00c0e7323af887895a7bf5b"
+        or attestation["model_id"] != "amazon/chronos-bolt-tiny"
+        or attestation["model_revision"] != "a0e552de83495b5c28c14c71c374f3e33280b340"
+        or attestation["model_files"] != EXPECTED_MODEL_FILES
+        or attestation["model_bundle_sha256"]
+        != "9aefb3d869a0a475c81a8685ffaeb99c63a3e3ee1cfc03befeb7cd47b58c00ab"
+        or attestation["pip_check_passed"] is not True
+    ):
+        raise ValueError("runtime attestation contract drifted")
 
 
 def _validate_run_result(run: Any) -> None:
@@ -603,13 +677,14 @@ def validate_operational_evidence(report: Mapping[str, Any]) -> None:
     }
     if dict(method) != expected_method:
         raise ValueError("operational measurement method is invalid")
-    if not isinstance(report["runtime_attestation"], Mapping):
-        raise ValueError("runtime attestation must be an object")
+    validate_runtime_attestation(report["runtime_attestation"])
     runs = report["run_results"]
     if not isinstance(runs, list) or len(runs) != 2:
         raise ValueError("operational evidence requires two runs")
     for run in runs:
         _validate_run_result(run)
+    if [run["run_id"] for run in runs] != ["run-1", "run-2"]:
+        raise ValueError("operational evidence requires distinct ordered run IDs")
     reproducibility = report["reproducibility"]
     if not isinstance(reproducibility, Mapping):
         raise ValueError("operational reproducibility must be an object")

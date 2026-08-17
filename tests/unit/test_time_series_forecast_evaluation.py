@@ -309,6 +309,15 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
     with pytest.raises(ValueError, match="finite"):
         foundation_smoke.validate_analytical_evidence(tampered)
 
+    tampered = json.loads(json.dumps(analytical))
+    regime = tampered["evaluation"]["regime_results"][0]
+    regime["backend_results"][0]["mae"] += 0.1
+    regime["deltas"]["mae"] = round(
+        regime["backend_results"][0]["mae"] - regime["backend_results"][1]["mae"], 12
+    )
+    with pytest.raises(ValueError, match="stationary_reference.*metrics are inconsistent"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
 
 def test_replay_generic_loader_accepts_stress_shapes_but_replay_grid_rejects() -> None:
     _proxy, _chronos, rows, labels, _pipeline = _replay_reports_and_labels()
