@@ -718,11 +718,14 @@ def validate_replay_analytical_consistency(
         raise ValueError("analytical labels must identify residual report rows")
     for key in proxy_rows:
         cohort_actual = scored_rows[key]["actual_value"]
-        if (
-            proxy_rows[key]["actual_value"] != cohort_actual
-            or chronos_rows[key]["actual_value"] != cohort_actual
-        ):
-            raise ValueError("analytical residual reports contain non-cohort actual values")
+        for row in (proxy_rows[key], chronos_rows[key]):
+            if row["actual_value"] != cohort_actual:
+                raise ValueError("analytical residual reports contain non-cohort actual values")
+            residual_error = abs(
+                float(row["actual_value"]) - float(row["forecast_mean"]) - float(row["residual"])
+            )
+            if residual_error > 0.000002:
+                raise ValueError("analytical forecast and residual values are inconsistent")
 
     anomaly_keys = set(label_keys)
     for result, contract in zip(evaluation["regime_results"], REPLAY_REGIMES, strict=True):

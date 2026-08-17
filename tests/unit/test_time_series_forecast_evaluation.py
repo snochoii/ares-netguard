@@ -328,6 +328,11 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
         foundation_smoke.validate_analytical_evidence(tampered)
 
     tampered = json.loads(json.dumps(analytical))
+    tampered["chronos_residual_report"]["rows"][0]["forecast_mean"] += 1.0
+    with pytest.raises(ValueError, match="forecast and residual values are inconsistent"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
     tampered["cohort_rows"][0]["actual_value"] += 0.01
     with pytest.raises(ValueError, match="digest"):
         foundation_smoke.validate_analytical_evidence(tampered)

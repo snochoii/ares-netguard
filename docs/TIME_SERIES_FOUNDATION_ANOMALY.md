@@ -230,10 +230,12 @@ flags, and explicit non-claims. The `/tmp`-only
 `time_series_forecast_replay_analytical.v1` bundle additionally contains the
 complete 672-row digest input cohort, both complete residual reports, and the
 labels. Validation recomputes the pinned cohort digest and binds each scored
-key and actual value to both residual reports, so exact two-run comparison
-covers keys, actual values, forecasts, intervals, residuals, anomaly scores,
-labels, metrics, digests, safety flags, and non-claims. Exact equality is
-required in the pinned CPU environment; no tolerance is silently substituted.
+key and actual value to both residual reports. It also checks the serialized
+forecast/residual relationship within `0.000002`, solely to account for the
+existing six-decimal residual-row serialization; this is not used to relax
+two-run comparison, which remains exact. Comparison covers keys, actual
+values, forecasts, intervals, residuals, anomaly scores, labels, metrics,
+digests, safety flags, and non-claims.
 
 Operational measurements are deliberately separate in
 `time_series_forecast_replay_operational.v0`. Each run records all 544
