@@ -1881,10 +1881,13 @@ def test_rust_core_allows_forecast_v2_while_retaining_static_v0_snapshot() -> No
     assert '"time_series_residual_report.v2"' in evidence_allowlist
     assert '"time_series_forecast_evaluation.v0"' in registry_allowlist
     assert '"time_series_forecast_evaluation.v0"' in evidence_allowlist
+    assert '"time_series_forecast_evaluation.v1"' in registry_allowlist
+    assert '"time_series_forecast_evaluation.v1"' in evidence_allowlist
     assert '"time_series_residual_report.v0"' in registry_allowlist
     assert '"time_series_residual_report.v1"' not in static_registry_schemas
     assert '"time_series_residual_report.v2"' not in static_registry_schemas
     assert '"time_series_forecast_evaluation.v0"' not in static_registry_schemas
+    assert '"time_series_forecast_evaluation.v1"' not in static_registry_schemas
     assert '"time_series_residual_report_v0_001"' in lib_rs
     assert '"time_series_residual_report_v1_001"' not in lib_rs
 

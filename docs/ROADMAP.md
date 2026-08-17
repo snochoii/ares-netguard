@@ -40,8 +40,11 @@ The near-term roadmap prioritizes experimental ML differentiation before a full 
    - Implemented `time_series_residual_report.v2` with an optional pinned,
      locally provisioned Chronos-Bolt-Tiny CPU backend, verified safetensors
      digest, `local_files_only`, no remote code, and held-out proxy comparison.
-   - Next: longer drift/replay evaluation before any export or native-runtime
-     promotion decision.
+   - Implemented a pinned, two-run synthetic drift/replay evaluation covering
+     stationary, abrupt, gradual, variance, seasonality, and anomaly-density
+     changes plus deterministic rejection of missing and irregular observations.
+   - Next: interpret the expanded evidence before defining any export or
+     native-runtime promotion criteria.
 
 6. **Self-Supervised Traffic Representation Prototype**
    - Tokenization/embedding experiment over sanitized synthetic telemetry.

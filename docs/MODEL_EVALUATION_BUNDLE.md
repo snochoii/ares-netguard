@@ -18,6 +18,7 @@ The v0 bundle accepts local JSON objects for these report schemas:
 - `time_series_residual_report.v1`
 - `time_series_residual_report.v2`
 - `time_series_forecast_evaluation.v0`
+- `time_series_forecast_evaluation.v1`
 - `traffic_representation_report.v0`
 - `temporal_security_graph_report.v0`
 - `agentic_investigation_report.v0`
@@ -32,9 +33,9 @@ disagreement and bundle generation.
 
 Unknown schemas fail closed.
 
-The forecast evaluation source contributes schema-level aggregate evidence but
-no entity/window rows or deployment claim. Its metrics are validated by its own
-strict contract before bundle summarization.
+The v0 and v1 forecast evaluation sources contribute schema-level aggregate
+evidence but no entity/window rows or deployment claim. Their metrics are
+validated by their own strict contracts before bundle summarization.
 
 ## Output scope
 

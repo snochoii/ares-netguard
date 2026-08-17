@@ -7,6 +7,9 @@ export MPLCONFIGDIR
 
 FOUNDATION_PYTHON ?= $(PYTHON)
 CHRONOS_MODEL_ROOT ?=
+B1_ISOLATED_ROOT ?=
+B1_WHEELHOUSE ?=
+B1_INSTALL_REPORT ?=
 
 .PHONY: verify verify-codex-workflow verify-rust-core fixture-smoke verify-foundation-forecast
 
@@ -30,16 +33,38 @@ verify-rust-core:
 	cd apps/rust-core && $(CARGO) clippy -- -D warnings
 
 verify-foundation-forecast:
+	test -n "$(B1_ISOLATED_ROOT)" || (echo "B1_ISOLATED_ROOT is required" >&2; exit 2)
+	test -n "$(B1_WHEELHOUSE)" || (echo "B1_WHEELHOUSE is required" >&2; exit 2)
+	test -n "$(B1_INSTALL_REPORT)" || (echo "B1_INSTALL_REPORT is required" >&2; exit 2)
 	test -n "$(CHRONOS_MODEL_ROOT)" || (echo "CHRONOS_MODEL_ROOT is required" >&2; exit 2)
-	mkdir -p /tmp/ares-netguard-foundation-forecast
+	test "$$(realpath -m "$(B1_ISOLATED_ROOT)")" != "/tmp" || \
+		(echo "B1_ISOLATED_ROOT must be a bounded child of /tmp" >&2; exit 2)
+	test "$$(realpath -m "$(B1_ISOLATED_ROOT)")" = \
+		"$$(realpath -m "$(B1_ISOLATED_ROOT)" | sed -n 's#^\(/tmp/ares-netguard-b1\.[A-Za-z0-9]*\)$$#\1#p')" || \
+		(echo "B1_ISOLATED_ROOT must match /tmp/ares-netguard-b1.XXXXXX" >&2; exit 2)
+	mkdir -p "$(B1_ISOLATED_ROOT)/reports"
+	$(FOUNDATION_PYTHON) scripts/verify_foundation_forecast_environment.py \
+		--repo-root . \
+		--isolation-root "$(B1_ISOLATED_ROOT)" \
+		--wheelhouse "$(B1_WHEELHOUSE)" \
+		--install-report "$(B1_INSTALL_REPORT)" \
+		--model-root "$(CHRONOS_MODEL_ROOT)" \
+		--output "$(B1_ISOLATED_ROOT)/environment-attestation.json"
 	HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
 		$(FOUNDATION_PYTHON) -m ares_netguard.models.time_series_foundation_smoke \
 		tests/fixtures/time_series_forecast/synthetic_windows.jsonl \
 		tests/fixtures/time_series_forecast/anomaly_labels.jsonl \
 		"$(CHRONOS_MODEL_ROOT)" \
-		/tmp/ares-netguard-foundation-forecast
+		"$(B1_ISOLATED_ROOT)/reports" \
+		--replay-windows tests/fixtures/time_series_forecast/replay_windows.jsonl \
+		--replay-labels tests/fixtures/time_series_forecast/replay_anomaly_labels.jsonl \
+		--environment-attestation "$(B1_ISOLATED_ROOT)/environment-attestation.json"
 	$(FOUNDATION_PYTHON) -m json.tool \
-		/tmp/ares-netguard-foundation-forecast/forecast-evaluation.json >/dev/null
+		"$(B1_ISOLATED_ROOT)/reports/forecast-evaluation.json" >/dev/null
+	$(FOUNDATION_PYTHON) -m json.tool \
+		"$(B1_ISOLATED_ROOT)/reports/replay-evaluation.json" >/dev/null
+	$(FOUNDATION_PYTHON) -m json.tool \
+		"$(B1_ISOLATED_ROOT)/reports/operational-evidence.json" >/dev/null
 
 fixture-smoke:
 	mkdir -p /tmp/ares-netguard

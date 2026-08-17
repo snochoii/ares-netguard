@@ -16,6 +16,7 @@ from types import MappingProxyType
 import pytest
 
 from ares_netguard.models import time_series_forecast as forecast
+from ares_netguard.models import time_series_foundation_smoke as foundation_smoke
 from ares_netguard.models.time_series_forecast import (
     CHRONOS_BACKEND_NAME,
     CHRONOS_PACKAGE_VERSIONS,
@@ -102,6 +103,65 @@ def _fixture_bundle(tmp_path: Path) -> tuple[Path, forecast._ChronosManifest]:
     (root / "config.json").write_bytes(config)
     (root / "model.safetensors").write_bytes(weights)
     return root, _fixture_manifest(config, weights)
+
+
+def _operational_run(run_id: str, *, latency: int) -> dict[str, object]:
+    def measurement(backend_id: str) -> dict[str, object]:
+        return {
+            "backend_id": backend_id,
+            "inference_count": foundation_smoke.EXPECTED_INFERENCE_COUNT,
+            "inference_latency_ns": [latency] * foundation_smoke.EXPECTED_INFERENCE_COUNT,
+        }
+
+    return {
+        "run_id": run_id,
+        "analytical_sha256": "a" * 64,
+        "backend_measurements": [
+            measurement("chronos_bolt_tiny_local_v1"),
+            measurement("rolling_mean_proxy_v1"),
+        ],
+        "total_replay_runtime_ns": latency * 2000,
+        "peak_rss_kib": 1000 + latency,
+        "network_canary": {
+            "mechanism": "linux_unshare_user_map_root_network_namespace",
+            "namespace_changed": True,
+            "interfaces": ["lo"],
+            "target": "1.1.1.1:443",
+            "external_connection_allowed": False,
+            "failure_type": "PermissionError",
+            "failure_errno": 1,
+        },
+        "process_isolation": {
+            "os_level_subprocess_denial": False,
+            "python_subprocess_tripwire_triggered": False,
+            "expected_child_processes": 0,
+            "native_threads_allowed": True,
+            "descendants_inherit_network_namespace": True,
+        },
+    }
+
+
+def _operational_evidence() -> dict[str, object]:
+    runs = [_operational_run("run-1", latency=10), _operational_run("run-2", latency=20)]
+    return {
+        "schema_version": foundation_smoke.OPERATIONAL_SCHEMA_VERSION,
+        "measurement_scope": "two_independent_pinned_cpu_replay_processes",
+        "measurement_method": {
+            "clock": "time.perf_counter_ns",
+            "latency_unit": "nanoseconds",
+            "total_runtime_unit": "nanoseconds",
+            "peak_rss_method": "resource.getrusage_RUSAGE_SELF_ru_maxrss",
+            "peak_rss_unit": "KiB",
+        },
+        "runtime_attestation": {"environment": "pinned"},
+        "run_results": runs,
+        "reproducibility": {
+            "run_count": 2,
+            "comparison_scope": "deterministic_analytical_only",
+            "analytical_sha256": ["a" * 64, "a" * 64],
+            "exact_match": True,
+        },
+    }
 
 
 def test_forecast_contract_and_builtin_identity_are_fixed_and_immutable() -> None:
@@ -477,4 +537,106 @@ def test_chronos_rejects_bad_context_quantiles_and_interval() -> None:
     with pytest.raises(ValueError, match="q0.1 <= q0.5 <= q0.9"):
         bad_backend.forecast_one(
             ForecastRequest(context=tuple(float(index) for index in range(64)), interval_z=2.0)
+        )
+
+
+def test_operational_evidence_separates_timing_from_exact_reproducibility() -> None:
+    report = _operational_evidence()
+
+    foundation_smoke.validate_operational_evidence(report)
+
+    first, second = report["run_results"]
+    assert first["total_replay_runtime_ns"] != second["total_replay_runtime_ns"]
+    assert first["peak_rss_kib"] != second["peak_rss_kib"]
+    assert report["reproducibility"]["exact_match"] is True
+
+
+@pytest.mark.parametrize(
+    ("mutate", "error"),
+    [
+        (
+            lambda report: report["measurement_method"].__setitem__("peak_rss_unit", "bytes"),
+            "measurement method",
+        ),
+        (
+            lambda report: report["run_results"][0].__setitem__("peak_rss_kib", -1),
+            "peak RSS",
+        ),
+        (
+            lambda report: report["run_results"][0]["backend_measurements"][0][
+                "inference_latency_ns"
+            ].pop(),
+            "latency sample count",
+        ),
+        (
+            lambda report: report["reproducibility"]["analytical_sha256"].__setitem__(1, "b" * 64),
+            "reproducibility",
+        ),
+        (
+            lambda report: report["run_results"][0].__setitem__("analytical_sha256", "A" * 64),
+            "analytical_sha256",
+        ),
+    ],
+)
+def test_operational_evidence_rejects_method_value_count_and_digest_drift(
+    mutate: object,
+    error: str,
+) -> None:
+    report = _operational_evidence()
+    mutate(report)  # type: ignore[operator]
+
+    with pytest.raises(ValueError, match=error):
+        foundation_smoke.validate_operational_evidence(report)
+
+
+def test_isolated_environment_routes_every_cache_beneath_tmp(tmp_path: Path) -> None:
+    root = tmp_path / "b1"
+
+    env = foundation_smoke._isolated_environment(root)
+
+    for key in (
+        "HOME",
+        "XDG_CACHE_HOME",
+        "PIP_CACHE_DIR",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "HUGGINGFACE_HUB_CACHE",
+        "HF_XET_CACHE",
+        "HF_ASSETS_CACHE",
+        "HF_MODULES_CACHE",
+        "TRANSFORMERS_CACHE",
+        "TORCH_HOME",
+        "TORCH_EXTENSIONS_DIR",
+        "TORCHINDUCTOR_CACHE_DIR",
+        "TRITON_CACHE_DIR",
+        "MPLCONFIGDIR",
+        "PYTHONPYCACHEPREFIX",
+        "TMPDIR",
+    ):
+        assert Path(env[key]).is_relative_to(root)
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONPATH"] == str((Path.cwd() / "src").resolve())
+    assert env["PIP_CONFIG_FILE"] == "/dev/null"
+    assert env["HF_HUB_OFFLINE"] == "1"
+
+
+def test_isolated_runtime_requires_model_and_virtual_environment_under_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "b1"
+    model = root / "model"
+    prefix = root / "replay-venv"
+    model.mkdir(parents=True)
+    prefix.mkdir()
+    monkeypatch.setattr(sys, "prefix", str(prefix))
+
+    foundation_smoke._validate_isolated_runtime_paths(root.resolve(), model)
+
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / "outside-venv"))
+    with pytest.raises(ValueError, match="virtual environment"):
+        foundation_smoke._validate_isolated_runtime_paths(root.resolve(), model)
+    with pytest.raises(ValueError, match="model"):
+        foundation_smoke._validate_isolated_runtime_paths(
+            root.resolve(), tmp_path / "outside-model"
         )
