@@ -90,10 +90,16 @@ also run in the hash-locked optional environment:
 
 ```bash
 make verify-foundation-forecast \
-  FOUNDATION_PYTHON=/tmp/ares-chronos-venv/bin/python \
-  CHRONOS_MODEL_ROOT=/tmp/ares-chronos-bolt-tiny
-/tmp/ares-chronos-venv/bin/python -m pip check
+  B1_ISOLATED_ROOT=/tmp/ares-netguard-b1.ABC123 \
+  B1_WHEELHOUSE=/tmp/ares-netguard-b1.ABC123/wheelhouse \
+  B1_INSTALL_REPORT=/tmp/ares-netguard-b1.ABC123/install-report.json \
+  FOUNDATION_PYTHON=/tmp/ares-netguard-b1.ABC123/replay-venv/bin/python \
+  CHRONOS_MODEL_ROOT=/tmp/ares-netguard-b1.ABC123/model
+/tmp/ares-netguard-b1.ABC123/replay-venv/bin/python -m pip check
 ```
+
+`ABC123` denotes the concrete suffix returned by `mktemp -d
+/tmp/ares-netguard-b1.XXXXXX`; the gate does not accept the literal template.
 
 ## UI changes
 

@@ -25,7 +25,9 @@ from ares_netguard.models.time_series_forecast import (
 )
 from ares_netguard.models.time_series_forecast_evaluation import (
     generate_forecast_evaluation,
+    generate_forecast_replay_evaluation,
     load_anomaly_labels,
+    load_replay_anomaly_labels,
 )
 from ares_netguard.models.time_series_residual import (
     MODEL_ID,
@@ -137,3 +139,28 @@ def test_v2_fixture_flows_through_comparison_and_existing_consumers() -> None:
             disagreement,
             evidence_reports=[tampered_v2],
         )
+
+
+def test_replay_v1_flows_as_schema_level_bundle_and_index_evidence() -> None:
+    rows = load_time_window_rows(Path("tests/fixtures/time_series_forecast/replay_windows.jsonl"))
+    labels = load_replay_anomaly_labels(
+        Path("tests/fixtures/time_series_forecast/replay_anomaly_labels.jsonl")
+    )
+    proxy_report = generate_residual_report(rows, history_window=64, calibration_window=32)
+    chronos_report = generate_residual_report(
+        rows,
+        history_window=64,
+        calibration_window=32,
+        backend=_backend(),
+    )
+    replay = generate_forecast_replay_evaluation(proxy_report, chronos_report, rows, labels)
+
+    bundle = generate_evaluation_bundle([replay])
+    summary = bundle["source_summaries"][0]
+    assert summary["source_schema"] == "time_series_forecast_evaluation.v1"
+    assert summary["row_count"] == 0
+    assert summary["model_ids"] == []
+
+    index = generate_evidence_index([replay])
+    assert index["aggregate_summary"]["schemas_present"] == ["time_series_forecast_evaluation.v1"]
+    assert index["entity_window_index"] == []

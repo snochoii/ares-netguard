@@ -8,6 +8,7 @@ from types import MappingProxyType
 import pytest
 
 from ares_netguard.models import time_series_forecast_evaluation as evaluation
+from ares_netguard.models import time_series_foundation_smoke as foundation_smoke
 from ares_netguard.models.time_series_forecast import (
     CHRONOS_BUNDLE_SHA256,
     CHRONOS_CONFIG_SHA256,
@@ -100,6 +101,28 @@ def _reports_and_labels() -> tuple[
         Path("tests/fixtures/time_series_forecast/anomaly_labels.jsonl")
     )
     return proxy, chronos, rows, labels
+
+
+def _replay_reports_and_labels() -> tuple[
+    dict[str, object],
+    dict[str, object],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    FakePipeline,
+]:
+    rows = load_time_window_rows(Path("tests/fixtures/time_series_forecast/replay_windows.jsonl"))
+    proxy = generate_residual_report(rows, history_window=64, calibration_window=32)
+    backend, pipeline = _chronos_backend()
+    chronos = generate_residual_report(
+        rows,
+        history_window=64,
+        calibration_window=32,
+        backend=backend,
+    )
+    labels = evaluation.load_replay_anomaly_labels(
+        Path("tests/fixtures/time_series_forecast/replay_anomaly_labels.jsonl")
+    )
+    return proxy, chronos, rows, labels, pipeline
 
 
 def test_evaluation_compares_aligned_reports_without_promotion_claims() -> None:
@@ -214,3 +237,194 @@ def test_label_loader_rejects_non_strict_or_false_rows(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="non-strict JSON constant"):
         evaluation.load_anomaly_labels(invalid)
+
+
+def test_replay_evaluation_covers_all_regimes_and_stresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proxy, chronos, rows, labels, pipeline = _replay_reports_and_labels()
+
+    report = evaluation.generate_forecast_replay_evaluation(proxy, chronos, rows, labels)
+
+    assert report["schema_version"] == "time_series_forecast_evaluation.v1"
+    assert report["dataset"] == {
+        "cohort_id": "time_series_foundation_drift_replay_synthetic_v1",
+        "cohort_sha256": evaluation.REPLAY_COHORT_SHA256,
+        "series_count": 2,
+        "observations_per_series": 336,
+        "history_window": 64,
+        "calibration_window": 32,
+        "cadence_seconds": 3600,
+        "scored_observation_count": 480,
+        "anomaly_label_count": 60,
+        "regime_count": 6,
+        "stress_case_count": 2,
+        "labels_sent_to_backend": False,
+    }
+    assert [item["regime_id"] for item in report["regime_results"]] == [
+        "stationary_reference",
+        "abrupt_drift",
+        "gradual_drift",
+        "variance_expansion",
+        "seasonality_change",
+        "anomaly_density_change",
+    ]
+    assert [item["anomaly_label_count"] for item in report["regime_results"]] == [
+        8,
+        8,
+        8,
+        8,
+        8,
+        20,
+    ]
+    assert [item["anomaly_density"] for item in report["regime_results"]] == [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.25,
+    ]
+    assert all(item["scored_observation_count"] == 80 for item in report["regime_results"])
+    assert all(result["count"] == 480 for result in report["aggregate"]["backend_results"])
+    assert [item["observed_rejection"] for item in report["stress_results"]] == [
+        "missing_observation_gap",
+        "irregular_timestamp_interval",
+    ]
+    assert all(item["inference_call_count"] == 0 for item in report["stress_results"])
+    assert len(pipeline.contexts) == 544
+    evaluation.validate_forecast_evaluation(report)
+
+    analytical = foundation_smoke._analytical_evidence(
+        cohort_rows=rows,
+        proxy_report=proxy,
+        chronos_report=chronos,
+        labels=labels,
+        evaluation=report,
+    )
+    foundation_smoke.validate_analytical_evidence(analytical)
+    analytical_digest = foundation_smoke._canonical_sha256(analytical)
+    monkeypatch.setattr(foundation_smoke, "EXPECTED_ANALYTICAL_SHA256", analytical_digest)
+    foundation_smoke.validate_pinned_analytical_evidence(analytical)
+    assert analytical["proxy_residual_report"]["rows"] == proxy["rows"]
+    assert analytical["chronos_residual_report"]["rows"] == chronos["rows"]
+    assert analytical["anomaly_labels"] == labels
+
+    tampered = json.loads(json.dumps(analytical))
+    tampered["chronos_residual_report"]["rows"][0]["residual"] = float("inf")
+    with pytest.raises(ValueError, match="finite"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    regime = tampered["evaluation"]["regime_results"][0]
+    regime["backend_results"][0]["mae"] += 0.1
+    regime["deltas"]["mae"] = round(
+        regime["backend_results"][0]["mae"] - regime["backend_results"][1]["mae"], 12
+    )
+    with pytest.raises(ValueError, match="stationary_reference.*metrics are inconsistent"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    for report_name in ("proxy_residual_report", "chronos_residual_report"):
+        residual_row = tampered[report_name]["rows"][0]
+        for field in ("actual_value", "forecast_mean", "forecast_lower", "forecast_upper"):
+            residual_row[field] += 12345.0
+    with pytest.raises(ValueError, match="non-cohort actual values"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    tampered["chronos_residual_report"]["rows"][0]["forecast_mean"] += 1.0
+    with pytest.raises(ValueError, match="forecast and residual values are inconsistent"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    for report_name in ("proxy_residual_report", "chronos_residual_report"):
+        for residual_row in tampered[report_name]["rows"]:
+            residual_row["forecast_mean"] = round(residual_row["forecast_mean"] + 1.0, 6)
+            residual_row["forecast_lower"] = round(residual_row["forecast_lower"] + 1.0, 6)
+            residual_row["forecast_upper"] = round(residual_row["forecast_upper"] + 1.0, 6)
+            residual_row["residual"] = round(residual_row["residual"] - 1.0, 6)
+    tampered["evaluation"] = evaluation.generate_forecast_replay_evaluation(
+        tampered["proxy_residual_report"],
+        tampered["chronos_residual_report"],
+        tampered["cohort_rows"],
+        tampered["anomaly_labels"],
+    )
+    foundation_smoke.validate_analytical_evidence(tampered)
+    with pytest.raises(ValueError, match="pinned analytical evidence digest drifted"):
+        foundation_smoke.validate_pinned_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    tampered["cohort_rows"][0]["actual_value"] += 0.01
+    with pytest.raises(ValueError, match="digest"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+
+def test_replay_generic_loader_accepts_stress_shapes_but_replay_grid_rejects() -> None:
+    _proxy, _chronos, rows, labels, _pipeline = _replay_reports_and_labels()
+    normalized, _scored, _indexes = evaluation._validate_replay_cohort(rows, labels)
+
+    results = evaluation.generate_replay_stress_results(normalized, labels)
+
+    assert results[0]["observation_count"] == 671
+    assert results[1]["observation_count"] == 672
+    assert all(result["scoring_attempted"] is False for result in results)
+
+
+def test_replay_rejects_digest_grid_metric_and_safety_drift() -> None:
+    proxy, chronos, rows, labels, _pipeline = _replay_reports_and_labels()
+    report = evaluation.generate_forecast_replay_evaluation(proxy, chronos, rows, labels)
+
+    missing = rows[:150] + rows[151:]
+    with pytest.raises(ValueError, match="missing_observation_gap"):
+        evaluation.generate_forecast_replay_evaluation(proxy, chronos, missing, labels)
+
+    irregular = json.loads(json.dumps(rows))
+    irregular[150]["window_start"] = "2027-01-07T06:30:00Z"
+    with pytest.raises(ValueError, match="irregular_timestamp_interval"):
+        evaluation.generate_forecast_replay_evaluation(proxy, chronos, irregular, labels)
+
+    metric_drift = json.loads(json.dumps(report))
+    metric_drift["regime_results"][0]["deltas"]["mae"] += 0.1
+    with pytest.raises(ValueError, match="delta mae is inconsistent"):
+        evaluation.validate_forecast_evaluation(metric_drift)
+
+    safety_drift = json.loads(json.dumps(report))
+    safety_drift["safety_flags"]["stress_inference_used"] = True
+    with pytest.raises(ValueError, match="safety_flags are invalid"):
+        evaluation.validate_forecast_evaluation(safety_drift)
+
+
+def test_replay_cli_flag_preserves_v0_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(evaluation, "load_residual_report", lambda path: {"path": str(path)})
+    monkeypatch.setattr(
+        evaluation.time_series_residual,
+        "load_time_window_rows",
+        lambda path: [{"path": str(path)}],
+    )
+    monkeypatch.setattr(evaluation, "load_anomaly_labels", lambda path: [{"v0": str(path)}])
+    monkeypatch.setattr(evaluation, "load_replay_anomaly_labels", lambda path: [{"v1": str(path)}])
+    monkeypatch.setattr(
+        evaluation,
+        "generate_forecast_evaluation",
+        lambda *_args: {"schema_version": evaluation.REPORT_SCHEMA_VERSION},
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "generate_forecast_replay_evaluation",
+        lambda *_args: {"schema_version": evaluation.REPLAY_REPORT_SCHEMA_VERSION},
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "dump_forecast_evaluation",
+        lambda report, path: calls.append((report["schema_version"], str(path))),
+    )
+
+    assert evaluation.main(["proxy", "chronos", "windows", "labels", "out-v0"]) == 0
+    assert evaluation.main(["proxy", "chronos", "windows", "labels", "out-v1", "--replay"]) == 0
+    assert calls == [
+        (evaluation.REPORT_SCHEMA_VERSION, "out-v0"),
+        (evaluation.REPLAY_REPORT_SCHEMA_VERSION, "out-v1"),
+    ]
