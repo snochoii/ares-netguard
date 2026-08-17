@@ -115,7 +115,7 @@ def _operational_run(run_id: str, *, latency: int) -> dict[str, object]:
 
     return {
         "run_id": run_id,
-        "analytical_sha256": "a" * 64,
+        "analytical_sha256": foundation_smoke.EXPECTED_ANALYTICAL_SHA256,
         "backend_measurements": [
             measurement("chronos_bolt_tiny_local_v1"),
             measurement("rolling_mean_proxy_v1"),
@@ -176,7 +176,10 @@ def _operational_evidence() -> dict[str, object]:
         "reproducibility": {
             "run_count": 2,
             "comparison_scope": "deterministic_analytical_only",
-            "analytical_sha256": ["a" * 64, "a" * 64],
+            "analytical_sha256": [
+                foundation_smoke.EXPECTED_ANALYTICAL_SHA256,
+                foundation_smoke.EXPECTED_ANALYTICAL_SHA256,
+            ],
             "exact_match": True,
         },
     }

@@ -111,6 +111,7 @@ REPRODUCIBILITY_FIELDS = frozenset(
     {"run_count", "comparison_scope", "analytical_sha256", "exact_match"}
 )
 EXPECTED_INFERENCE_COUNT = 544
+EXPECTED_ANALYTICAL_SHA256 = "d3acdeacaee03fcc1a95acb5a351d0ffe6af953e2e49a9b06c764b909a3777aa"
 AUDIT_EVENTS = frozenset({"subprocess.Popen", "os.system", "os.posix_spawn", "os.fork"})
 LOWER_HEX = frozenset("0123456789abcdef")
 RUNTIME_ATTESTATION_FIELDS = frozenset(
@@ -484,7 +485,7 @@ def run_smoke(
         for run_dir in run_dirs
     ]
     for report in analytical_reports:
-        validate_analytical_evidence(report)
+        validate_pinned_analytical_evidence(report)
     if analytical_reports[0] != analytical_reports[1]:
         raise RuntimeError("B1_REAL_MODEL_GATE: blocked: analytical replay is not exact")
     analytical_sha = _canonical_sha256(analytical_reports[0])
@@ -592,6 +593,12 @@ def validate_analytical_evidence(report: Mapping[str, Any]) -> None:
     )
 
 
+def validate_pinned_analytical_evidence(report: Mapping[str, Any]) -> None:
+    validate_analytical_evidence(report)
+    if _canonical_sha256(report) != EXPECTED_ANALYTICAL_SHA256:
+        raise ValueError("pinned analytical evidence digest drifted")
+
+
 def _non_negative_integer(value: Any, field: str, *, positive: bool = False) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < int(positive):
         raise ValueError(f"{field} must be a {'positive' if positive else 'non-negative'} integer")
@@ -635,8 +642,8 @@ def _validate_run_result(run: Any) -> None:
     _exact_fields(run, RUN_FIELDS, "operational run")
     if run["run_id"] not in {"run-1", "run-2"}:
         raise ValueError("operational run_id is invalid")
-    if not _is_sha256(run["analytical_sha256"]):
-        raise ValueError("operational analytical_sha256 is invalid")
+    if run["analytical_sha256"] != EXPECTED_ANALYTICAL_SHA256:
+        raise ValueError("operational analytical_sha256 is not the pinned replay digest")
     measurements = run["backend_measurements"]
     if not isinstance(measurements, list) or len(measurements) != 2:
         raise ValueError("operational backend measurements are invalid")

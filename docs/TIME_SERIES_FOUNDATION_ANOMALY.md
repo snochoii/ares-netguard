@@ -235,7 +235,11 @@ forecast/residual relationship within `0.000002`, solely to account for the
 existing six-decimal residual-row serialization; this is not used to relax
 two-run comparison, which remains exact. Comparison covers keys, actual
 values, forecasts, intervals, residuals, anomaly scores, labels, metrics,
-digests, safety flags, and non-claims.
+digests, safety flags, and non-claims. The outer real-model gate additionally
+requires both run bundles to equal the pinned canonical analytical digest
+`d3acdeacaee03fcc1a95acb5a351d0ffe6af953e2e49a9b06c764b909a3777aa`;
+coordinated changes that remain structurally self-consistent therefore fail
+the pinned-output identity check.
 
 Operational measurements are deliberately separate in
 `time_series_forecast_replay_operational.v0`. Each run records all 544

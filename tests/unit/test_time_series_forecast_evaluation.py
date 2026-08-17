@@ -239,7 +239,9 @@ def test_label_loader_rejects_non_strict_or_false_rows(tmp_path: Path) -> None:
         evaluation.load_anomaly_labels(invalid)
 
 
-def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
+def test_replay_evaluation_covers_all_regimes_and_stresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     proxy, chronos, rows, labels, pipeline = _replay_reports_and_labels()
 
     report = evaluation.generate_forecast_replay_evaluation(proxy, chronos, rows, labels)
@@ -301,6 +303,9 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
         evaluation=report,
     )
     foundation_smoke.validate_analytical_evidence(analytical)
+    analytical_digest = foundation_smoke._canonical_sha256(analytical)
+    monkeypatch.setattr(foundation_smoke, "EXPECTED_ANALYTICAL_SHA256", analytical_digest)
+    foundation_smoke.validate_pinned_analytical_evidence(analytical)
     assert analytical["proxy_residual_report"]["rows"] == proxy["rows"]
     assert analytical["chronos_residual_report"]["rows"] == chronos["rows"]
     assert analytical["anomaly_labels"] == labels
@@ -331,6 +336,23 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
     tampered["chronos_residual_report"]["rows"][0]["forecast_mean"] += 1.0
     with pytest.raises(ValueError, match="forecast and residual values are inconsistent"):
         foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    for report_name in ("proxy_residual_report", "chronos_residual_report"):
+        for residual_row in tampered[report_name]["rows"]:
+            residual_row["forecast_mean"] = round(residual_row["forecast_mean"] + 1.0, 6)
+            residual_row["forecast_lower"] = round(residual_row["forecast_lower"] + 1.0, 6)
+            residual_row["forecast_upper"] = round(residual_row["forecast_upper"] + 1.0, 6)
+            residual_row["residual"] = round(residual_row["residual"] - 1.0, 6)
+    tampered["evaluation"] = evaluation.generate_forecast_replay_evaluation(
+        tampered["proxy_residual_report"],
+        tampered["chronos_residual_report"],
+        tampered["cohort_rows"],
+        tampered["anomaly_labels"],
+    )
+    foundation_smoke.validate_analytical_evidence(tampered)
+    with pytest.raises(ValueError, match="pinned analytical evidence digest drifted"):
+        foundation_smoke.validate_pinned_analytical_evidence(tampered)
 
     tampered = json.loads(json.dumps(analytical))
     tampered["cohort_rows"][0]["actual_value"] += 0.01
