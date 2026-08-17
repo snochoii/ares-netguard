@@ -294,6 +294,7 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
     evaluation.validate_forecast_evaluation(report)
 
     analytical = foundation_smoke._analytical_evidence(
+        cohort_rows=rows,
         proxy_report=proxy,
         chronos_report=chronos,
         labels=labels,
@@ -316,6 +317,19 @@ def test_replay_evaluation_covers_all_regimes_and_stresses() -> None:
         regime["backend_results"][0]["mae"] - regime["backend_results"][1]["mae"], 12
     )
     with pytest.raises(ValueError, match="stationary_reference.*metrics are inconsistent"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    for report_name in ("proxy_residual_report", "chronos_residual_report"):
+        residual_row = tampered[report_name]["rows"][0]
+        for field in ("actual_value", "forecast_mean", "forecast_lower", "forecast_upper"):
+            residual_row[field] += 12345.0
+    with pytest.raises(ValueError, match="non-cohort actual values"):
+        foundation_smoke.validate_analytical_evidence(tampered)
+
+    tampered = json.loads(json.dumps(analytical))
+    tampered["cohort_rows"][0]["actual_value"] += 0.01
+    with pytest.raises(ValueError, match="digest"):
         foundation_smoke.validate_analytical_evidence(tampered)
 
 

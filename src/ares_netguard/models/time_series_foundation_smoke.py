@@ -44,11 +44,12 @@ from ares_netguard.models.time_series_residual import (
 )
 
 OPERATIONAL_SCHEMA_VERSION = "time_series_forecast_replay_operational.v0"
-ANALYTICAL_SCHEMA_VERSION = "time_series_forecast_replay_analytical.v0"
+ANALYTICAL_SCHEMA_VERSION = "time_series_forecast_replay_analytical.v1"
 ANALYTICAL_FIELDS = frozenset(
     {
         "schema_version",
         "cohort_sha256",
+        "cohort_rows",
         "anomaly_labels",
         "proxy_residual_report",
         "chronos_residual_report",
@@ -253,6 +254,7 @@ def _backend_measurement(backend: _TimedBackend) -> dict[str, object]:
 
 def _analytical_evidence(
     *,
+    cohort_rows: Sequence[Mapping[str, Any]],
     proxy_report: Mapping[str, Any],
     chronos_report: Mapping[str, Any],
     labels: Sequence[Mapping[str, Any]],
@@ -261,6 +263,7 @@ def _analytical_evidence(
     evidence = {
         "schema_version": ANALYTICAL_SCHEMA_VERSION,
         "cohort_sha256": REPLAY_COHORT_SHA256,
+        "cohort_rows": [dict(row) for row in cohort_rows],
         "anomaly_labels": [dict(label) for label in labels],
         "proxy_residual_report": dict(proxy_report),
         "chronos_residual_report": dict(chronos_report),
@@ -322,6 +325,7 @@ def _run_inside_namespace(
     total_runtime_ns = time.perf_counter_ns() - started
     peak_rss_kib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     analytical = _analytical_evidence(
+        cohort_rows=replay_rows,
         proxy_report=proxy_replay,
         chronos_report=chronos_replay,
         labels=replay_labels,
@@ -568,6 +572,9 @@ def validate_analytical_evidence(report: Mapping[str, Any]) -> None:
     ]
     if label_keys != sorted(label_keys) or len(label_keys) != len(set(label_keys)):
         raise ValueError("analytical evidence anomaly labels must be sorted and unique")
+    cohort_rows = report["cohort_rows"]
+    if not isinstance(cohort_rows, list):
+        raise ValueError("analytical evidence cohort_rows must be a list")
     for field in ("proxy_residual_report", "chronos_residual_report"):
         residual_report = report[field]
         if not isinstance(residual_report, Mapping):
@@ -579,6 +586,7 @@ def validate_analytical_evidence(report: Mapping[str, Any]) -> None:
     validate_replay_analytical_consistency(
         report["proxy_residual_report"],
         report["chronos_residual_report"],
+        cohort_rows,
         normalized_labels,
         evaluation,
     )

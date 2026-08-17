@@ -687,6 +687,7 @@ def validate_forecast_evaluation(report: Mapping[str, Any]) -> None:
 def validate_replay_analytical_consistency(
     proxy_report: Mapping[str, Any],
     chronos_report: Mapping[str, Any],
+    cohort_rows: Sequence[Mapping[str, Any]],
     anomaly_labels: Sequence[Mapping[str, Any]],
     evaluation: Mapping[str, Any],
 ) -> None:
@@ -708,31 +709,20 @@ def validate_replay_analytical_consistency(
     ):
         raise ValueError("analytical consistency anomaly labels are invalid")
 
+    _, scored_rows, index_by_key = _validate_replay_cohort(cohort_rows, labels)
     proxy_rows = _rows_by_key(proxy_report)
     chronos_rows = _rows_by_key(chronos_report)
-    if list(proxy_rows) != list(chronos_rows):
-        raise ValueError("analytical residual reports contain different row keys")
+    if list(proxy_rows) != list(chronos_rows) or list(proxy_rows) != list(scored_rows):
+        raise ValueError("analytical residual reports do not match frozen cohort row keys")
     if not set(label_keys) <= set(proxy_rows):
         raise ValueError("analytical labels must identify residual report rows")
-
-    index_by_key: dict[RowKey, int] = {}
-    series_counts: Counter[tuple[str, str]] = Counter()
     for key in proxy_rows:
-        if proxy_rows[key]["actual_value"] != chronos_rows[key]["actual_value"]:
-            raise ValueError("analytical residual reports contain different actual values")
-        timestamp = datetime.fromisoformat(key[2].replace("Z", "+00:00"))
-        elapsed = (timestamp - REPLAY_START).total_seconds()
-        if elapsed < 0 or elapsed % REPLAY_CADENCE_SECONDS:
-            raise ValueError("analytical residual report timestamps are off the replay grid")
-        index = int(elapsed // REPLAY_CADENCE_SECONDS)
-        if not REPLAY_SCORING_OFFSET <= index < REPLAY_OBSERVATIONS_PER_SERIES:
-            raise ValueError("analytical residual report row is outside scoring boundaries")
-        index_by_key[key] = index
-        series_counts[(key[0], key[1])] += 1
-    if set(series_counts) != set(REPLAY_SERIES) or set(series_counts.values()) != {
-        REPLAY_SCORED_PER_SERIES
-    }:
-        raise ValueError("analytical residual reports do not cover the replay scoring cohort")
+        cohort_actual = scored_rows[key]["actual_value"]
+        if (
+            proxy_rows[key]["actual_value"] != cohort_actual
+            or chronos_rows[key]["actual_value"] != cohort_actual
+        ):
+            raise ValueError("analytical residual reports contain non-cohort actual values")
 
     anomaly_keys = set(label_keys)
     for result, contract in zip(evaluation["regime_results"], REPLAY_REGIMES, strict=True):

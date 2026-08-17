@@ -227,11 +227,13 @@ Each stress digest binds its case ID, source cohort digest, all transformed
 rows, all labels, and expected rejection marker. The v1 analytical report
 records per-regime and aggregate metrics, the two rejection results, safety
 flags, and explicit non-claims. The `/tmp`-only
-`time_series_forecast_replay_analytical.v0` bundle additionally contains both
-complete residual reports and the labels, so exact two-run comparison covers
-keys, actual values, forecasts, intervals, residuals, anomaly scores, labels,
-metrics, digests, safety flags, and non-claims. Exact equality is required in
-the pinned CPU environment; no tolerance is silently substituted.
+`time_series_forecast_replay_analytical.v1` bundle additionally contains the
+complete 672-row digest input cohort, both complete residual reports, and the
+labels. Validation recomputes the pinned cohort digest and binds each scored
+key and actual value to both residual reports, so exact two-run comparison
+covers keys, actual values, forecasts, intervals, residuals, anomaly scores,
+labels, metrics, digests, safety flags, and non-claims. Exact equality is
+required in the pinned CPU environment; no tolerance is silently substituted.
 
 Operational measurements are deliberately separate in
 `time_series_forecast_replay_operational.v0`. Each run records all 544
